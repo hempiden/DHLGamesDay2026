@@ -1,0 +1,6 @@
+{
+  "name": "DHL Games Day Scoring & Leaderboard",
+  "description": "Scoring control panel for sub-admins on the court and a live presentation leaderboard for DHL Games Day.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
