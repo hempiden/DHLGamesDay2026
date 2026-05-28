@@ -14,10 +14,14 @@ export default function App() {
   const [isOnline, setIsOnline] = useState<boolean>(typeof window !== 'undefined' ? window.navigator.onLine : true);
 
   // Supabase states
-  const [supabaseUrl, setSupabaseUrl] = useState<string>(localStorage.getItem('dhl_supabase_url') || '');
-  const [supabaseAnonKey, setSupabaseAnonKey] = useState<string>(localStorage.getItem('dhl_supabase_anon_key') || '');
+  const [supabaseUrl, setSupabaseUrl] = useState<string>(
+    localStorage.getItem('dhl_supabase_url') || 'https://yaabfbyzvcqmnlzlribl.supabase.co'
+  );
+  const [supabaseAnonKey, setSupabaseAnonKey] = useState<string>(
+    localStorage.getItem('dhl_supabase_anon_key') || 'sb_publishable_UG2etT68udwph9BSHi_ciw_ydzIUjLR'
+  );
   const [isSupabaseEnabled, setIsSupabaseEnabled] = useState<boolean>(
-    localStorage.getItem('dhl_supabase_enabled') === 'true'
+    localStorage.getItem('dhl_supabase_enabled') !== 'false'
   );
   const [supabaseConnected, setSupabaseConnected] = useState<boolean>(false);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);

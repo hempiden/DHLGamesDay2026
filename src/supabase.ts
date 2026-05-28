@@ -5,8 +5,8 @@ let supabaseInstance: SupabaseClient | null = null;
 
 // Initialize Supabase Client dynamically
 export function getSupabaseClient(url?: string, anonKey?: string): SupabaseClient | null {
-  const finalUrl = url || localStorage.getItem('dhl_supabase_url') || '';
-  const finalKey = anonKey || localStorage.getItem('dhl_supabase_anon_key') || '';
+  const finalUrl = url || localStorage.getItem('dhl_supabase_url') || 'https://yaabfbyzvcqmnlzlribl.supabase.co';
+  const finalKey = anonKey || localStorage.getItem('dhl_supabase_anon_key') || 'sb_publishable_UG2etT68udwph9BSHi_ciw_ydzIUjLR';
 
   if (!finalUrl || !finalKey || finalUrl.includes('YOUR_PROJECT_ID') || finalKey.includes('YOUR_ANON_KEY')) {
     supabaseInstance = null;
