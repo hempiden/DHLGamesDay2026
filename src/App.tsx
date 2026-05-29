@@ -9,13 +9,14 @@ import LoginView from './components/LoginView';
 import UsersApprovalPanel from './components/UsersApprovalPanel';
 import PublicTeamsView from './components/PublicTeamsView';
 import PublicAthletePhotoUpload from './components/PublicAthletePhotoUpload';
+import AnalyticsDashboard from './components/AnalyticsDashboard';
 import { Match, SportType, Participant, AppUser } from './types';
 import { INITIAL_MATCHES, INITIAL_PARTICIPANTS } from './data';
 import { getSupabaseClient, testSupabaseConnection } from './supabase';
 import { Laptop, Wifi, WifiOff, RefreshCw, Layers, ShieldAlert, Heart, Calendar } from 'lucide-react';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'leaderboard' | 'public_teams' | 'scoring' | 'admin' | 'teams' | 'database' | 'users' | 'login'>('leaderboard');
+  const [activeTab, setActiveTab] = useState<'leaderboard' | 'public_teams' | 'dashboard' | 'scoring' | 'admin' | 'teams' | 'database' | 'users' | 'login'>('leaderboard');
   const [matches, setMatches] = useState<Match[]>([]);
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [isOnline, setIsOnline] = useState<boolean>(typeof window !== 'undefined' ? window.navigator.onLine : true);
@@ -740,6 +741,15 @@ export default function App() {
                 supabaseUrl={supabaseUrl}
                 supabaseAnonKey={supabaseAnonKey}
                 isSupabaseEnabled={isSupabaseEnabled}
+              />
+            )}
+
+            {/* NEW TAB: DYNAMIC ANALYTICS DASHBOARD */}
+            {activeTab === 'dashboard' && (
+              <AnalyticsDashboard
+                matches={matches}
+                participants={participants}
+                setActiveTab={setActiveTab}
               />
             )}
 

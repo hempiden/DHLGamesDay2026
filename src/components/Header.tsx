@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Award, Layers, ToggleLeft, RefreshCw, AlertCircle, Laptop, Settings, Wifi, WifiOff, Users, Upload, Monitor, Database, ShieldAlert, LogOut, KeyRound } from 'lucide-react';
+import { Award, Layers, ToggleLeft, RefreshCw, AlertCircle, Laptop, Settings, Wifi, WifiOff, Users, Upload, Monitor, Database, ShieldAlert, LogOut, KeyRound, BarChart3 } from 'lucide-react';
 import { AppUser } from '../types';
 
 interface HeaderProps {
-  activeTab: 'leaderboard' | 'public_teams' | 'scoring' | 'admin' | 'teams' | 'database' | 'users' | 'login';
-  setActiveTab: (tab: 'leaderboard' | 'public_teams' | 'scoring' | 'admin' | 'teams' | 'database' | 'users' | 'login') => void;
+  activeTab: 'leaderboard' | 'public_teams' | 'dashboard' | 'scoring' | 'admin' | 'teams' | 'database' | 'users' | 'login';
+  setActiveTab: (tab: 'leaderboard' | 'public_teams' | 'dashboard' | 'scoring' | 'admin' | 'teams' | 'database' | 'users' | 'login') => void;
   isOnline: boolean;
   supabaseConnected: boolean;
   currentUser: AppUser | null;
@@ -73,6 +73,19 @@ export default function Header({ activeTab, setActiveTab, isOnline, supabaseConn
             >
               <Users className="w-4 h-4 animate-pulse" />
               <span>បញ្ជីឈ្មោះក្រុម (Public Teams)</span>
+            </button>
+
+            <button
+              id="tab-dashboard"
+              onClick={() => setActiveTab('dashboard')}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs uppercase cursor-pointer tracking-wide transition-all duration-200 active:scale-95 whitespace-nowrap ${
+                activeTab === 'dashboard'
+                  ? 'bg-[#D40511] text-white shadow-md shadow-[#D40511]/15'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              <BarChart3 className="w-4 h-4" />
+              <span>វិភាគទិន្នន័យ (Dashboard)</span>
             </button>
 
             {currentUser ? (
