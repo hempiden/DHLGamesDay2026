@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Database, RefreshCw, Save, CheckCircle, AlertTriangle, Cloud, CloudOff, Info } from 'lucide-react';
-import { testSupabaseConnection } from '../supabase';
+import { Database, RefreshCw, Save, CheckCircle, AlertTriangle, Cloud, CloudOff, Info, Upload } from 'lucide-react';
+import { testSupabaseConnection, getSupabaseClient } from '../supabase';
 
 interface DatabaseSetupProps {
   supabaseUrl: string;
@@ -20,6 +20,8 @@ export default function DatabaseSetup({
   setIsSupabaseEnabled,
 }: DatabaseSetupProps) {
   const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'success' | 'failed'>('idle');
+  const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'success' | 'failed'>('idle');
+  const [syncMessage, setSyncMessage] = useState<string>('');
 
   const handleTestConnection = async () => {
     if (!supabaseUrl || !supabaseAnonKey) {
@@ -40,6 +42,90 @@ export default function DatabaseSetup({
     localStorage.setItem('dhl_supabase_url', supabaseUrl);
     localStorage.setItem('dhl_supabase_anon_key', supabaseAnonKey);
     alert('រក្សាទុកការភ្ជាប់ជោគជ័យ! Supabase Key settings saved locally.');
+  };
+
+  const handlePushLocalToCloud = async () => {
+    if (!supabaseUrl || !supabaseAnonKey) {
+      alert('សូមបំពេញ URL និង Anon Key រួចរក្សាទុកជាមុនសិន។ Please define and save Supabase credentials first.');
+      return;
+    }
+
+    const client = getSupabaseClient(supabaseUrl, supabaseAnonKey);
+    if (!client) {
+      alert('មិនអាចបង្កើត Supabase client បានទេ។ Could not initialize client.');
+      return;
+    }
+
+    const confirmed = window.confirm(
+      "តើអ្នកពិតជាចង់បញ្ចូលទិន្នន័យ (Matches & Participants) ពីម៉ាស៊ីនស្រុករបស់អ្នកទៅកាន់ Supabase មែនទេ? នេះនឹងបន្ថែមទិន្នន័យថ្មីទៅកាន់ពពក។\n\nDo you want to bulk upload your current local matches and participants to Supabase?"
+    );
+    if (!confirmed) return;
+
+    setSyncStatus('syncing');
+    setSyncMessage('កំពុងរៀបចំទិន្នន័យ... Preparing local records...');
+
+    try {
+      const localMatchesStr = localStorage.getItem('dhl_games_day_matches');
+      const localParticipantsStr = localStorage.getItem('dhl_games_day_participants');
+
+      const matches = localMatchesStr ? JSON.parse(localMatchesStr) : [];
+      const participants = localParticipantsStr ? JSON.parse(localParticipantsStr) : [];
+
+      if (matches.length === 0 && participants.length === 0) {
+        setSyncStatus('failed');
+        setSyncMessage('គ្មានទិន្នន័យក្នុង Browser memory ដើម្បី Sync ទេ។ No local database records found.');
+        return;
+      }
+
+      let matchCount = 0;
+      let participantCount = 0;
+
+      // 1. Sync matches
+      if (matches.length > 0) {
+        setSyncMessage(`កំពុងបញ្ជូន ${matches.length} ការប្រកួតទៅ Supabase... Uploading matches...`);
+        const matchesToInsert = matches.map((m: any) => ({
+          sport_name: m.sport_name,
+          match_label: m.match_label,
+          team_a: m.team_a,
+          team_b: m.team_b,
+          score_a: Number(m.score_a) || 0,
+          score_b: Number(m.score_b) || 0,
+          status: m.status,
+        }));
+
+        const { error: matchError } = await client.from('matches').insert(matchesToInsert);
+        if (matchError) {
+          throw new Error(`Match upload error: ${matchError.message}`);
+        }
+        matchCount = matches.length;
+      }
+
+      // 2. Sync participants
+      if (participants.length > 0) {
+        setSyncMessage(`កំពុងបញ្ជូន ${participants.length} កីឡាករទៅ Supabase... Uploading participants...`);
+        const partToInsert = participants.map((p: any) => ({
+          name: p.name,
+          sport_type: p.sport_type,
+          is_team: Boolean(p.is_team),
+          team_id: p.team_id && p.team_id !== 'null' ? String(p.team_id) : null,
+          photo_url: p.photo_url || null,
+        }));
+
+        const { error: partError } = await client.from('participants').insert(partToInsert);
+        if (partError) {
+          throw new Error(`Participants upload error: ${partError.message}`);
+        }
+        participantCount = participants.length;
+      }
+
+      setSyncStatus('success');
+      setSyncMessage(`ការ Sync បានជោគជ័យ! Pushed ${matchCount} matches & ${participantCount} participants to Supabase!`);
+      alert(`បញ្ជូនជោគជ័យ! Pushed ${matchCount} matches and ${participantCount} participants to Supabase.`);
+    } catch (err: any) {
+      console.error(err);
+      setSyncStatus('failed');
+      setSyncMessage(`បរាជ័យក្នុងការបញ្ជូនទៅ Cloud: ${err.message || err}`);
+    }
   };
 
   return (
@@ -192,6 +278,60 @@ export default function DatabaseSetup({
         </div>
       </div>
 
+      {/* BULK DATA PUSH SECTION */}
+      {isSupabaseEnabled && (
+        <div className="bg-white rounded-3xl p-6 sm:p-8 shadow-md border border-gray-100 space-y-4">
+          <div className="flex items-center gap-3 border-b border-gray-100 pb-4">
+            <div className="w-10 h-10 rounded-2xl bg-emerald-50 flex items-center justify-center">
+              <Upload className="w-5 h-5 text-emerald-600" />
+            </div>
+            <div>
+              <h3 className="text-sm font-black text-gray-800 uppercase tracking-wide">
+                បញ្ចូលទិន្នន័យពីក្នុង Browser ទៅកាន់ Cloud (UPLOAD LOCAL DATA TO CLOUD)
+              </h3>
+              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wide">
+                Push your pre-existing players & matches list into your empty Supabase database
+              </p>
+            </div>
+          </div>
+
+          <div className="text-xs space-y-3">
+            <p className="text-gray-500 font-medium leading-relaxed">
+              នៅពេលដំបូងបង្អស់ដែលអ្នកទើបតែបង្កើតតារាងនៅក្នុង Supabase វានឹងគ្មានទិន្នន័យឡើយ (0 records)។ អ្នកអាចចុចប៊ូតុងខាងក្រោមដើម្បីផ្ទេរទិន្នន័យកីឡាករ និងគូប្រកួតទាំងអស់ពី Browser (LocalStorage) របស់អ្នកទៅកាន់ Supabase បានភ្លាមៗ។
+            </p>
+
+            <button
+              type="button"
+              disabled={syncStatus === 'syncing'}
+              onClick={handlePushLocalToCloud}
+              className={`w-full py-4 px-5 rounded-2xl font-black uppercase tracking-wider text-xs duration-150 active:scale-95 transition cursor-pointer flex items-center justify-center gap-2.5 ${
+                syncStatus === 'syncing' 
+                  ? 'bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed'
+                  : 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-sm'
+              }`}
+            >
+              <Upload className={`w-4.5 h-4.5 ${syncStatus === 'syncing' ? 'animate-bounce' : ''}`} />
+              <span>{syncStatus === 'syncing' ? 'កំពុងបញ្ចូលទិន្នន័យ (Uploading...)' : 'បញ្ចូលទិន្នន័យទៅកាន់ Supabase (Push Local Data to Supabase)'}</span>
+            </button>
+
+            {syncStatus !== 'idle' && (
+              <div className={`p-4 rounded-2xl border text-[11px] leading-relaxed flex items-center gap-3 animate-fade-in ${
+                syncStatus === 'success' 
+                  ? 'bg-emerald-50/70 border-emerald-200 text-emerald-850 font-semibold' 
+                  : syncStatus === 'failed'
+                  ? 'bg-red-50/70 border-red-200 text-red-850 font-semibold'
+                  : 'bg-indigo-50/70 border-indigo-200 text-indigo-850 font-semibold'
+              }`}>
+                {syncStatus === 'syncing' && <RefreshCw className="w-4.5 h-4.5 text-indigo-600 animate-spin shrink-0" />}
+                {syncStatus === 'success' && <CheckCircle className="w-4.5 h-4.5 text-emerald-600 shrink-0" />}
+                {syncStatus === 'failed' && <AlertTriangle className="w-4.5 h-4.5 text-red-600 shrink-0" />}
+                <p>{syncMessage}</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* SQL SCHEMA INITIALIZATION SECTION */}
       <div className="bg-white rounded-3xl p-6 sm:p-8 shadow-md border border-gray-100 space-y-4">
         <div className="flex items-center justify-between border-b border-gray-100 pb-4">
@@ -211,7 +351,7 @@ export default function DatabaseSetup({
           <button
             type="button"
             onClick={() => {
-              const sqlText = `-- Supabase Table Setup for DHL Games Day\n\n-- 1. Create Matches Table\ncreate table if not exists public.matches (\n  id text primary key,\n  sport_name text not null,\n  match_label text,\n  team_a text not null,\n  team_b text not null,\n  score_a integer default 0,\n  score_b integer default 0,\n  status text check (status in ('Upcoming', 'Live', 'Finished')),\n  created_at timestamp with time zone default timezone('utc'::text, now()),\n  updated_at timestamp with time zone default timezone('utc'::text, now())\n);\n\n-- 2. Create Participants Table\ncreate table if not exists public.participants (\n  id text primary key,\n  name text not null,\n  sport_type text not null,\n  is_team boolean not null default false,\n  team_id text,\n  photo_url text,\n  created_at timestamp with time zone default timezone('utc'::text, now()),\n  updated_at timestamp with time zone default timezone('utc'::text, now())\n);\n\n-- 3. Enable Public Access policies for quick testing\nalter table public.matches enable row level security;\ncreate policy "Allow read matches" on public.matches for select using (true);\ncreate policy "Allow insert matches" on public.matches for insert with check (true);\ncreate policy "Allow update matches" on public.matches for update using (true);\ncreate policy "Allow delete matches" on public.matches for delete using (true);\n\nalter table public.participants enable row level security;\ncreate policy "Allow read participants" on public.participants for select using (true);\ncreate policy "Allow insert participants" on public.participants for insert with check (true);\ncreate policy "Allow update participants" on public.participants for update using (true);\ncreate policy "Allow delete participants" on public.participants for delete using (true);`;
+              const sqlText = `-- Supabase Table Setup for DHL Games Day\n\n-- 1. Create Matches Table\ncreate table if not exists public.matches (\n  id bigint generated by default as identity primary key,\n  sport_name text not null,\n  match_label text,\n  team_a text not null,\n  team_b text not null,\n  score_a integer default 0,\n  score_b integer default 0,\n  status text check (status in ('Upcoming', 'Live', 'Finished')),\n  created_at timestamp with time zone default timezone('utc'::text, now()),\n  updated_at timestamp with time zone default timezone('utc'::text, now())\n);\n\n-- 2. Create Participants Table\ncreate table if not exists public.participants (\n  id bigint generated by default as identity primary key,\n  name text not null,\n  sport_type text not null,\n  is_team boolean not null default false,\n  team_id text,\n  photo_url text,\n  created_at timestamp with time zone default timezone('utc'::text, now()),\n  updated_at timestamp with time zone default timezone('utc'::text, now())\n);\n\n-- 3. Enable Public Access policies for quick testing\nalter table public.matches enable row level security;\ncreate policy "Allow read matches" on public.matches for select using (true);\ncreate policy "Allow insert matches" on public.matches for insert with check (true);\ncreate policy "Allow update matches" on public.matches for update using (true);\ncreate policy "Allow delete matches" on public.matches for delete using (true);\n\nalter table public.participants enable row level security;\ncreate policy "Allow read participants" on public.participants for select using (true);\ncreate policy "Allow insert participants" on public.participants for insert with check (true);\ncreate policy "Allow update participants" on public.participants for update using (true);\ncreate policy "Allow delete participants" on public.participants for delete using (true);`;
               navigator.clipboard.writeText(sqlText);
               alert("រក្សាទុក SQL នៅក្នុង Clipboard រួចរាល់! SQL copied to clipboard. Go to Supabase SQL Editor, paste and click 'Run'.");
             }}
@@ -237,7 +377,7 @@ export default function DatabaseSetup({
             <pre className="p-4 bg-gray-50 border border-gray-150 rounded-2xl text-[10px] font-mono text-gray-600 overflow-x-auto max-h-64 leading-relaxed shadow-inner">
 {`-- 1. Create Matches Table
 create table if not exists public.matches (
-  id text primary key,
+  id bigint generated by default as identity primary key,
   sport_name text not null,
   match_label text,
   team_a text not null,
@@ -251,7 +391,7 @@ create table if not exists public.matches (
 
 -- 2. Create Participants Table
 create table if not exists public.participants (
-  id text primary key,
+  id bigint generated by default as identity primary key,
   name text not null,
   sport_type text not null,
   is_team boolean not null default false,
