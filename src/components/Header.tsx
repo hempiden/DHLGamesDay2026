@@ -59,7 +59,7 @@ export default function Header({ activeTab, setActiveTab, isOnline, supabaseConn
               }`}
             >
               <Award className="w-4 h-4" />
-              <span>លទ្ធផល & មហាជន (Live Board)</span>
+              <span>លទ្ធផល (Live Board)</span>
             </button>
 
             <button
@@ -113,7 +113,7 @@ export default function Header({ activeTab, setActiveTab, isOnline, supabaseConn
                   }`}
                 >
                   <Settings className="w-4 h-4" />
-                  <span>រៀបចំការប្រកួត (Setup Engine)</span>
+                  <span>រៀបចំការប្រកួត (Setup Game)</span>
                 </button>
 
                 <button
