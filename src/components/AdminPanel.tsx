@@ -1,35 +1,24 @@
 import React, { useState } from 'react';
-import { Match, SportType } from '../types';
+import { Match, SportType, Participant } from '../types';
 import { DEFAULT_TEAMS, SPORT_CONFIGS } from '../data';
-import { testSupabaseConnection } from '../supabase';
-import { Plus, Wifi, Undo, Save, Database, Trash2, CheckCircle, RefreshCw, AlertTriangle, ExternalLink } from 'lucide-react';
+import { Plus, Undo, Trash2, RefreshCw, AlertTriangle } from 'lucide-react';
 
 interface AdminPanelProps {
   matches: Match[];
+  participants: Participant[];
   addMatch: (match: Omit<Match, 'id' | 'created_at' | 'updated_at'>) => void;
   updateMatchStatus: (id: string, status: 'Upcoming' | 'Live' | 'Finished') => void;
   deleteMatch: (id: string) => void;
   resetToDefault: () => void;
-  supabaseUrl: string;
-  setSupabaseUrl: (url: string) => void;
-  supabaseAnonKey: string;
-  setSupabaseAnonKey: (key: string) => void;
-  isSupabaseEnabled: boolean;
-  setIsSupabaseEnabled: (enabled: boolean) => void;
 }
 
 export default function AdminPanel({
   matches,
+  participants,
   addMatch,
   updateMatchStatus,
   deleteMatch,
   resetToDefault,
-  supabaseUrl,
-  setSupabaseUrl,
-  supabaseAnonKey,
-  setSupabaseAnonKey,
-  isSupabaseEnabled,
-  setIsSupabaseEnabled,
 }: AdminPanelProps) {
   
   // Form states
@@ -38,20 +27,29 @@ export default function AdminPanel({
   const [teamB, setTeamB] = useState('');
   const [matchLabel, setMatchLabel] = useState('វគ្គជម្រុះតាមពូល (Group Stage)');
   const [status, setStatus] = useState<'Upcoming' | 'Live' | 'Finished'>('Live');
+
+  // Filter registered teams from the participants table corresponding to the active sport category
+  const registeredTeamsFiltered = participants.filter((p) => p.is_team && p.sport_type === sport);
+  
+  // If there are no team participants for this sport, offer ALL team participants in database, or finally default to DEFAULT_TEAMS
+  const availableTeamNamesList = registeredTeamsFiltered.length > 0
+    ? registeredTeamsFiltered.map((p) => p.name)
+    : participants.filter((p) => p.is_team).length > 0
+    ? participants.filter((p) => p.is_team).map((p) => p.name)
+    : DEFAULT_TEAMS;
   
   // Custom teams toggle
   const [customTeamA, setCustomTeamA] = useState(false);
   const [customTeamB, setCustomTeamB] = useState(false);
 
-  // Supabase states
-  const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'success' | 'failed'>('idle');
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    const finalA = teamA.trim() || DEFAULT_TEAMS[0];
-    const finalB = teamB.trim() || DEFAULT_TEAMS[1];
+    const finalA = teamA.trim() || availableTeamNamesList[0];
+    const finalB = teamB.trim() || (availableTeamNamesList[1] || availableTeamNamesList[0]);
 
     if (finalA === finalB) {
       alert('ក្រុមទាំង២ មិនអាចដូចគ្នាបានឡើយ! Please choose distinct teams.');
@@ -69,37 +67,16 @@ export default function AdminPanel({
     });
 
     // Reset simple form inputs
-    if (customTeamA) setTeamA('');
-    if (customTeamB) setTeamB('');
+    setTeamA('');
+    setTeamB('');
     alert('ការប្រកួតត្រូវបានបង្កើត! Match created successfully.');
-  };
-
-  const handleTestConnection = async () => {
-    if (!supabaseUrl || !supabaseAnonKey) {
-      alert('សូមបំពេញ URL និង Anon Key ជាមុនសិន។');
-      setTestStatus('failed');
-      return;
-    }
-    setTestStatus('testing');
-    const works = await testSupabaseConnection(supabaseUrl, supabaseAnonKey);
-    setTestStatus(works ? 'success' : 'failed');
-    if (works) {
-      setIsSupabaseEnabled(true);
-      localStorage.setItem('dhl_supabase_enabled', 'true');
-    }
-  };
-
-  const saveKeys = () => {
-    localStorage.setItem('dhl_supabase_url', supabaseUrl);
-    localStorage.setItem('dhl_supabase_anon_key', supabaseAnonKey);
-    alert('រក្សាទុកការភ្ជាប់ជោគជ័យ! Supabase Key settings saved locally.');
   };
 
   return (
     <div className="space-y-8 max-w-7xl mx-auto">
       
-      {/* 2-Column Grid of Action modules */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+      {/* Centered and styled Module 1 container */}
+      <div className="max-w-3xl mx-auto">
         
         {/* MODULE 1: CREATE NEW MATCH */}
         <div className="bg-white rounded-3xl p-6 shadow-md border border-gray-100 space-y-5">
@@ -169,11 +146,11 @@ export default function AdminPanel({
                 />
               ) : (
                 <select
-                  value={teamA || (DEFAULT_TEAMS[0])}
+                  value={teamA || availableTeamNamesList[0] || ''}
                   onChange={(e) => setTeamA(e.target.value)}
                   className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:border-[#FFCC00] outline-none font-bold text-gray-700 bg-gray-50/50"
                 >
-                  {DEFAULT_TEAMS.map((team) => (
+                  {availableTeamNamesList.map((team) => (
                     <option key={team} value={team}>
                       {team}
                     </option>
@@ -211,11 +188,11 @@ export default function AdminPanel({
                 />
               ) : (
                 <select
-                  value={teamB || (DEFAULT_TEAMS[1])}
+                  value={teamB || (availableTeamNamesList[1] || availableTeamNamesList[0] || '')}
                   onChange={(e) => setTeamB(e.target.value)}
                   className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:border-[#FFCC00] outline-none font-bold text-gray-700 bg-gray-50/50"
                 >
-                  {DEFAULT_TEAMS.map((team) => (
+                  {availableTeamNamesList.map((team) => (
                     <option key={team} value={team}>
                       {team}
                     </option>
@@ -271,106 +248,6 @@ export default function AdminPanel({
             </button>
           </form>
         </div>
-
-        {/* MODULE 2: DATABASE OPTIONAL SYNCHRONIZATION SETTINGS */}
-        <div className="bg-white rounded-3xl p-6 shadow-md border border-gray-100 space-y-5">
-          <div className="flex items-center gap-2 border-b border-gray-100 pb-3">
-            <Database className="w-5 h-5 text-indigo-600" />
-            <h2 className="text-sm font-black text-gray-800 uppercase tracking-wide">
-              ការភ្ជាប់ SUPABASE DATABASE (ស្រេចចិត្ត)
-            </h2>
-          </div>
-
-          <div className="text-xs space-y-4">
-            <p className="text-gray-400 text-[10px] leading-relaxed">
-              អ្នកអាចភ្ជាប់កម្មវិធីនេះទៅកាន់ **Supabase Realtime Database** ផ្ទាល់ខ្លួនរបស់អ្នកបាន។ ប្រសិនបើភ្ជាប់ជោគជ័យ ទិន្នន័យនៃការបញ្ចូលពិន្ទុនឹងត្រូវបានរក្សាទុក និង Sync នៅលើ Server ជាក់ស្តែង។
-            </p>
-
-            {/* Supabase inputs */}
-            <div className="space-y-3">
-              <div>
-                <label className="block text-[10px] font-black uppercase text-gray-400 tracking-wider mb-1">
-                  SUPABASE URL
-                </label>
-                <input
-                  type="text"
-                  placeholder="https://YOUR_PROJECT_ID.supabase.co"
-                  value={supabaseUrl}
-                  onChange={(e) => setSupabaseUrl(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:border-indigo-500 outline-none font-mono text-[11px]"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-black uppercase text-gray-400 tracking-wider mb-1">
-                  SUPABASE ANON KEY
-                </label>
-                <input
-                  type="password"
-                  placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-                  value={supabaseAnonKey}
-                  onChange={(e) => setSupabaseAnonKey(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:border-indigo-500 outline-none font-mono text-[11px]"
-                />
-              </div>
-            </div>
-
-            {/* Actions for database */}
-            <div className="flex flex-wrap gap-2 pt-1">
-              <button
-                type="button"
-                onClick={handleTestConnection}
-                className="px-4 py-3 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl font-extrabold uppercase tracking-wide text-[10px] active:scale-95 transition cursor-pointer flex items-center gap-1.5"
-              >
-                <RefreshCw className={`w-3.5 h-3.5 ${testStatus === 'testing' ? 'animate-spin' : ''}`} />
-                <span>តេស្តការភ្ជាប់ (Test Connection)</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={saveKeys}
-                className="px-4 py-3 bg-[#1a1a1a] hover:bg-black text-white rounded-xl font-extrabold uppercase tracking-wide text-[10px] active:scale-95 transition cursor-pointer flex items-center gap-1.5"
-              >
-                <Save className="w-3.5 h-3.5" />
-                <span>រក្សាទុកកូដ (Save Keys Locally)</span>
-              </button>
-            </div>
-
-            {/* Switch to enable / disable connection */}
-            <div className="pt-3 border-t border-gray-50 flex items-center justify-between">
-              <span className="font-bold text-gray-600 uppercase text-[10px]">ទាក់ទងស្ថានភាព DB (DATABASE ATTACHMENT)</span>
-              <button
-                type="button"
-                onClick={() => {
-                  const state = !isSupabaseEnabled;
-                  setIsSupabaseEnabled(state);
-                  localStorage.setItem('dhl_supabase_enabled', String(state));
-                  alert(state ? 'Supabase Sync Connection is Enabled!' : 'Supabase Sync is disabled. Operating locally.');
-                }}
-                className={`w-12 h-6.5 rounded-full flex items-center px-1 duration-250 transition-colors cursor-pointer ${
-                  isSupabaseEnabled ? 'bg-emerald-500 justify-end' : 'bg-gray-200 justify-start'
-                }`}
-              >
-                <span className="w-4.5 h-4.5 bg-white rounded-full shadow-md"></span>
-              </button>
-            </div>
-
-            {/* Live Connection Feedback notification */}
-            {testStatus === 'success' && (
-              <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 flex items-center gap-2">
-                <CheckCircle className="w-4 h-4 shrink-0 text-emerald-600" />
-                <p className="font-bold text-[10px]">ការភ្ជាប់ទៅ Supabase ជោគជ័យ! Sync ដំណើរការល្បឿនលឿន។</p>
-              </div>
-            )}
-            {testStatus === 'failed' && (
-              <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-red-800 flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4 shrink-0 text-red-600" />
-                <p className="font-bold text-[10px]">ការភ្ជាប់បរាជ័យ។ សូមពិនិត្យមើល URL, API Keys ឬបង្កើតតារាង 'matches' នៅក្នុង Supabase របស់អ្នក។</p>
-              </div>
-            )}
-          </div>
-        </div>
-
       </div>
 
       {/* MODULE 3: ACTIVE TOURNAMENT MATCH MANAGEMENT PANEL & QUICK STATE CONTROLLIONS */}
@@ -511,18 +388,36 @@ export default function AdminPanel({
 
                     {/* Actions delete */}
                     <td className="py-3 px-4 text-center">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (confirm('តើអ្នកពិតជាចង់លុបការប្រកួតនេះមែនទេ? Delete Match?')) {
-                            deleteMatch(m.id);
-                          }
-                        }}
-                        className="p-2 text-gray-400 hover:text-red-500 rounded-lg hover:bg-gray-100 active:scale-90 transition cursor-pointer"
-                        title="Delete Match"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      {confirmDeleteId === m.id ? (
+                        <div className="flex items-center justify-center gap-1.5 animate-fade-in">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              deleteMatch(m.id);
+                              setConfirmDeleteId(null);
+                            }}
+                            className="px-2.5 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg font-black text-[9px] uppercase tracking-wider scale-95 duration-100 cursor-pointer shadow-sm"
+                          >
+                            លុប (Yes)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setConfirmDeleteId(null)}
+                            className="px-2.5 py-1 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg font-black text-[9px] uppercase tracking-wider scale-95 duration-100 cursor-pointer text-gray-650"
+                          >
+                            ទេ (No)
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setConfirmDeleteId(m.id)}
+                          className="p-2 text-gray-400 hover:text-red-500 rounded-lg hover:bg-gray-100 active:scale-90 transition cursor-pointer"
+                          title="Delete Match"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
                     </td>
 
                   </tr>

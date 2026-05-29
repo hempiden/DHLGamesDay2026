@@ -1,4 +1,41 @@
-import { Match, TeamStanding, SportConfig, SportType } from './types';
+import { Match, TeamStanding, SportConfig, SportType, Participant } from './types';
+
+export const INITIAL_PARTICIPANTS: Participant[] = [
+  // Soccer Teams
+  { id: 'team-1', name: 'DHL Express Warriors', sport_type: 'Soccer', is_team: true, team_id: null },
+  { id: 'team-2', name: 'DHL Supply Chain United', sport_type: 'Soccer', is_team: true, team_id: null },
+  // Volleyball Teams
+  { id: 'team-3', name: 'DHL Global Forwarding Titans', sport_type: 'Volleyball', is_team: true, team_id: null },
+  { id: 'team-4', name: 'DHL eCommerce Flyers', sport_type: 'Volleyball', is_team: true, team_id: null },
+  // Pingpong Teams
+  { id: 'team-5', name: 'DHL IT Solutions CyberKnights', sport_type: 'Pingpong', is_team: true, team_id: null },
+  { id: 'team-6', name: 'DHL Aviation Chargers', sport_type: 'Pingpong', is_team: true, team_id: null },
+
+  // Soccer Players (Assigned)
+  { id: 'player-1', name: 'Vichet Ly', sport_type: 'Soccer', is_team: false, team_id: 'team-1' },
+  { id: 'player-2', name: 'Somnang Mean', sport_type: 'Soccer', is_team: false, team_id: 'team-1' },
+  { id: 'player-3', name: 'Phanith Sok', sport_type: 'Soccer', is_team: false, team_id: 'team-1' },
+  { id: 'player-4', name: 'Sopheap Oum', sport_type: 'Soccer', is_team: false, team_id: 'team-2' },
+  { id: 'player-5', name: 'Kosal Chea', sport_type: 'Soccer', is_team: false, team_id: 'team-2' },
+  { id: 'player-6', name: 'Dara Heng', sport_type: 'Soccer', is_team: false, team_id: 'team-2' },
+  
+  // Soccer Players - Unassigned (free agents for soccer)
+  { id: 'player-7', name: 'Rithy Srun', sport_type: 'Soccer', is_team: false, team_id: null },
+  { id: 'player-8', name: 'Piseth Chan', sport_type: 'Soccer', is_team: false, team_id: null },
+  { id: 'player-9', name: 'Vuthy Nhim', sport_type: 'Soccer', is_team: false, team_id: null },
+
+  // Volleyball Players
+  { id: 'player-10', name: 'Khemara Seng', sport_type: 'Volleyball', is_team: false, team_id: 'team-3' },
+  { id: 'player-11', name: 'Vandeth Meas', sport_type: 'Volleyball', is_team: false, team_id: 'team-3' },
+  { id: 'player-12', name: 'Chanthou Lay', sport_type: 'Volleyball', is_team: false, team_id: 'team-4' },
+  { id: 'player-13', name: 'Sokha Roth', sport_type: 'Volleyball', is_team: false, team_id: 'team-4' },
+  { id: 'player-14', name: 'Nara Phoung', sport_type: 'Volleyball', is_team: false, team_id: null },
+
+  // Pingpong Players
+  { id: 'player-15', name: 'Sovanna Dy', sport_type: 'Pingpong', is_team: false, team_id: 'team-5' },
+  { id: 'player-16', name: 'Vibol Bun', sport_type: 'Pingpong', is_team: false, team_id: null },
+];
+
 
 export const SPORT_CONFIGS: Record<SportType, SportConfig> = {
   Soccer: {

@@ -37,3 +37,26 @@ export interface SupabaseConfig {
   anonKey: string;
   isEnabled: boolean;
 }
+
+export interface Participant {
+  id: string; // matches both local string UUIDs/timestamp IDs and Supabase numeric bigints strings
+  name: string;
+  sport_type: SportType;
+  is_team: boolean;
+  team_id: string | null;
+  created_at?: string;
+  updated_at?: string;
+  photo_url?: string;
+}
+
+export interface AppUser {
+  id: string;
+  username: string;
+  email: string;
+  name: string;
+  role: 'admin' | 'super_admin';
+  status: 'pending' | 'approved' | 'rejected';
+  passwordPlain: string; // Stored simply for local auth demo/persistence
+  created_at?: string;
+}
+
