@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Award, Trophy, Zap, Users, AlertCircle, RefreshCw, Star, CheckCircle, Flame, Calendar, Clock, ArrowRight } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Award, Trophy, Zap, Users, AlertCircle, RefreshCw, Star, CheckCircle, Flame, Calendar, Clock, ArrowRight, X, Maximize2 } from 'lucide-react';
 import { Match, Participant, SportType } from '../types';
 import { SPORT_CONFIGS } from '../data';
 
@@ -11,6 +11,32 @@ interface PublicScoresProps {
 export default function PublicScores({ matches, participants }: PublicScoresProps) {
   // Select active sport to view scores
   const [selectedSport, setSelectedSport] = useState<SportType | 'All'>('All');
+
+  // Fullscreen slideshow match state
+  const [selectedFullscreenMatchId, setSelectedFullscreenMatchId] = useState<string | null>(null);
+
+  // Auto-dismiss or escape handler for projector view
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setSelectedFullscreenMatchId(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  // Real-time swimming stopwatch ticker state (ticks every 43ms to update live spectator views)
+  const [tick, setTick] = useState<number>(0);
+  useEffect(() => {
+    const isLiveSwimActive = matches.some((m) => m.sport_name === 'Swimming' && m.status === 'Live');
+    if (!isLiveSwimActive) return;
+
+    const intervalId = setInterval(() => {
+      setTick((t) => t + 1);
+    }, 43);
+    return () => clearInterval(intervalId);
+  }, [matches]);
 
   // Filter matches based on selected sport
   const filteredMatches = matches.filter(
@@ -274,7 +300,7 @@ export default function PublicScores({ matches, participants }: PublicScoresProp
             if (finishedSwimMatches.length === 0) return null;
 
             // Group swimmers by stage label
-            const swimGroups: Record<string, { name: string; time: number; matchLabel: string }[]> = {};
+            const swimGroups: Record<string, { id: string; name: string; time: number | null; matchLabel: string }[]> = {};
 
             finishedSwimMatches.forEach((m) => {
               try {
@@ -282,17 +308,19 @@ export default function PublicScores({ matches, participants }: PublicScoresProp
                 const timerState = JSON.parse(m.team_b) as { times: Record<string, number | null> };
                 
                 swimmersList.forEach((sw) => {
-                  const duration = timerState.times?.[sw.id] ?? timerState.times?.[sw.name];
-                  if (duration !== undefined && duration !== null) {
-                    if (!swimGroups[m.match_label]) {
-                      swimGroups[m.match_label] = [];
-                    }
-                    swimGroups[m.match_label].push({
-                      name: sw.name,
-                      time: duration,
-                      matchLabel: m.match_label,
-                    });
+                  const duration = timerState.times?.[sw.id] !== undefined
+                    ? timerState.times?.[sw.id]
+                    : (timerState.times?.[sw.name] !== undefined ? timerState.times?.[sw.name] : null);
+                  
+                  if (!swimGroups[m.match_label]) {
+                    swimGroups[m.match_label] = [];
                   }
+                  swimGroups[m.match_label].push({
+                    id: sw.id,
+                    name: sw.name,
+                    time: duration,
+                    matchLabel: m.match_label,
+                  });
                 });
               } catch (e) {
                 console.error("Failed to parse swimming match for leaderboard:", e);
@@ -318,8 +346,12 @@ export default function PublicScores({ matches, participants }: PublicScoresProp
 
                 <div className="space-y-6">
                   {labels.map((label) => {
-                    // Sort swimmers in this label by time ascending (lowest time = fastest!)
-                    const sortedSwimmers = [...swimGroups[label]].sort((a, b) => a.time - b.time);
+                    // Sort swimmers in this label by time ascending (lowest time = fastest, nulls rank last as Disqualified!)
+                    const sortedSwimmers = [...swimGroups[label]].sort((a, b) => {
+                      if (a.time === null) return 1;
+                      if (b.time === null) return -1;
+                      return a.time! - b.time!;
+                    });
 
                     return (
                       <div key={label} className="bg-slate-900/60 p-4 rounded-2xl border border-slate-800 space-y-3">
@@ -334,16 +366,20 @@ export default function PublicScores({ matches, participants }: PublicScoresProp
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                           {sortedSwimmers.map((sw, index) => {
-                            const isGold = index === 0;
-                            const isSilver = index === 1;
-                            const isBronze = index === 2;
+                            const isDisqualified = sw.time === null;
+                            const isGold = index === 0 && !isDisqualified;
+                            const isSilver = index === 1 && !isDisqualified;
+                            const isBronze = index === 2 && !isDisqualified;
 
                             // Format as mm:ss.SS
-                            const totalMs = sw.time;
-                            const mins = Math.floor(totalMs / 60000);
-                            const secs = Math.floor((totalMs % 60000) / 1000);
-                            const ms = Math.floor((totalMs % 1000) / 10);
-                            const formattedTime = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}.${ms.toString().padStart(2, '0')}`;
+                            let formattedTime = "Disqualify (DQ)";
+                            if (sw.time !== null) {
+                              const totalMs = sw.time!;
+                              const mins = Math.floor(totalMs / 60000);
+                              const secs = Math.floor((totalMs % 60000) / 1000);
+                              const ms = Math.floor((totalMs % 1000) / 10);
+                              formattedTime = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}.${ms.toString().padStart(2, '0')}`;
+                            }
 
                             return (
                               <div
@@ -355,6 +391,8 @@ export default function PublicScores({ matches, participants }: PublicScoresProp
                                     ? 'bg-slate-100/5 border border-slate-400/30 text-slate-100'
                                     : isBronze
                                     ? 'bg-amber-700/5 border border-amber-805/30 text-amber-200'
+                                    : isDisqualified
+                                    ? 'bg-red-950/20 border border-red-900/35 text-red-350'
                                     : 'bg-slate-950/45 border border-slate-900/40 text-gray-300'
                                 }`}
                               >
@@ -366,18 +404,22 @@ export default function PublicScores({ matches, participants }: PublicScoresProp
                                       ? 'bg-slate-300 text-gray-900 text-[10px]'
                                       : isBronze
                                       ? 'bg-amber-600 text-white text-[10px]'
+                                      : isDisqualified
+                                      ? 'bg-red-950 text-red-400 text-[9px] font-black'
                                       : 'bg-slate-900 text-gray-400'
                                   }`}>
-                                    {isGold ? '🥇' : isSilver ? '🥈' : isBronze ? '🥉' : `${index + 1}`}
+                                    {isGold ? '🥇' : isSilver ? '🥈' : isBronze ? '🥉' : isDisqualified ? 'DQ' : `${index + 1}`}
                                   </span>
                                   <span className="font-extrabold text-xs">{sw.name}</span>
                                 </div>
 
                                 <div className="flex items-center gap-2">
-                                  <span className="text-[10px] uppercase font-black tracking-widest text-[#FFCC00]/80">
-                                    {isGold ? 'Winner' : ''}
-                                  </span>
-                                  <span className="font-mono text-xs font-black text-cyan-400 bg-cyan-950/40 px-2.5 py-1 rounded-lg border border-cyan-500/10">
+                                  {isGold && (
+                                    <span className="text-[10px] uppercase font-black tracking-widest text-[#FFCC00]/80">
+                                      Winner
+                                    </span>
+                                  )}
+                                  <span className={`font-mono text-xs font-black ${isDisqualified ? 'text-red-400 bg-red-950/30 border border-red-900/15' : 'text-cyan-400 bg-cyan-950/40 border border-cyan-500/10'} px-2.5 py-1 rounded-lg`}>
                                     ⏱️ {formattedTime}
                                   </span>
                                 </div>
@@ -417,18 +459,28 @@ export default function PublicScores({ matches, participants }: PublicScoresProp
                   return (
                     <div 
                       key={m.id}
-                      className="bg-[#0f172a] text-white rounded-[24px] border-l-[6px] border-l-cyan-550 border border-slate-800 shadow-md p-6 relative overflow-hidden"
+                      onClick={() => setSelectedFullscreenMatchId(m.id)}
+                      className="bg-[#0f172a] text-white rounded-[24px] border-l-[6px] border-l-cyan-550 border border-slate-800 shadow-md p-6 relative overflow-hidden cursor-pointer hover:scale-[1.01] hover:shadow-cyan-950/30 hover:border-cyan-500/30 transition-all duration-200 group"
+                      title="Click to enter Fullscreen Slideshow Mode"
                     >
-                      <div className="absolute top-0 right-0 py-1.5 px-4 bg-cyan-600 text-white font-black text-[9px] uppercase tracking-widest rounded-bl-xl animate-pulse">
-                        LIVE SWIM HEAT
+                      <div className="absolute top-0 right-0 py-1.5 px-4 bg-cyan-600 text-white font-black text-[9px] uppercase tracking-widest rounded-bl-xl flex items-center gap-1 animate-pulse">
+                        <span className="w-1.5 h-1.5 rounded-full bg-white"></span>
+                        <span>LIVE SWIM HEAT</span>
                       </div>
 
                       <div className="space-y-4">
-                        <div className="space-y-1">
-                          <span className="px-2.5 py-0.5 bg-cyan-950 text-cyan-400 font-extrabold uppercase text-[9px] tracking-wider rounded-md border border-cyan-800 inline-block">
-                            ⏱️ SWIMMING • {m.match_label}
+                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                          <div className="space-y-1">
+                            <span className="px-2.5 py-0.5 bg-cyan-950 text-cyan-400 font-extrabold uppercase text-[9px] tracking-wider rounded-md border border-cyan-800 inline-block">
+                              ⏱️ SWIMMING • {m.match_label}
+                            </span>
+                            <h4 className="font-black text-white text-md tracking-tight uppercase">គន្លងហែលទឹកផ្សាយផ្ទាល់ (Live Lane Track Feed)</h4>
+                          </div>
+                          
+                          <span className="text-[9px] inline-flex items-center gap-1.5 text-cyan-400 font-black uppercase tracking-wider bg-cyan-950 border border-cyan-800 px-2.5 py-1 rounded-full shrink-0">
+                            <Maximize2 className="w-3 h-3 animate-pulse" />
+                            <span>បង្ហាញ Fullscreen Slideshow 📺</span>
                           </span>
-                          <h4 className="font-black text-white text-md tracking-tight uppercase">គន្លងហែលទឹកផ្សាយផ្ទាល់ (Live Lane Track Feed)</h4>
                         </div>
 
                         {/* List lanes */}
@@ -446,8 +498,13 @@ export default function PublicScores({ matches, participants }: PublicScoresProp
                               const secs = Math.floor((totalMs % 60000) / 1000);
                               const ms = Math.floor((totalMs % 1000) / 10);
                               displayTime = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}.${ms.toString().padStart(2, '0')}`;
-                            } else if (isTimerRunning) {
-                              displayTime = "Running... (កំពុងហែល)";
+                            } else if (isTimerRunning && stopwatchState.start_time) {
+                              // Ticks dynamically in millisecond precision
+                              const elapsedMs = Math.max(0, Date.now() - stopwatchState.start_time);
+                              const mins = Math.floor(elapsedMs / 60000);
+                              const secs = Math.floor((elapsedMs % 60000) / 1000);
+                              const ms = Math.floor((elapsedMs % 1000) / 10);
+                              displayTime = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}.${ms.toString().padStart(2, '0')}`;
                             }
 
                             return (
@@ -457,7 +514,7 @@ export default function PublicScores({ matches, participants }: PublicScoresProp
                                   isStopped
                                     ? 'bg-slate-900 border-slate-800 text-gray-400'
                                     : isTimerRunning
-                                    ? 'bg-cyan-950/40 border-cyan-500/30 text-cyan-100 animate-pulse'
+                                    ? 'bg-cyan-950/40 border-cyan-500/30 text-cyan-100'
                                     : 'bg-slate-950/60 border-slate-900 text-gray-500'
                                 }`}
                               >
@@ -482,10 +539,13 @@ export default function PublicScores({ matches, participants }: PublicScoresProp
                 return (
                   <div 
                     key={m.id}
-                    className="bg-white rounded-[24px] border-l-[6px] border-l-red-500 border border-gray-100 shadow-md p-6 relative overflow-hidden"
+                    onClick={() => setSelectedFullscreenMatchId(m.id)}
+                    className="bg-white rounded-[24px] border-l-[6px] border-l-red-500 border border-gray-150 shadow-md p-6 relative overflow-hidden cursor-pointer hover:scale-[1.01] hover:shadow-lg hover:border-red-200 transition-all duration-200 group"
+                    title="Click to enter Fullscreen Slideshow Mode"
                   >
-                    <div className="absolute top-0 right-0 py-1.5 px-4 bg-red-600 text-white font-black text-[9px] uppercase tracking-widest rounded-bl-xl animate-pulse">
-                      Live Score
+                    <div className="absolute top-0 right-0 py-1.5 px-4 bg-red-650 text-white font-black text-[9px] uppercase tracking-widest rounded-bl-xl flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping"></span>
+                      <span>Live Score</span>
                     </div>
 
                     <div className="flex flex-col sm:flex-row justify-between items-center gap-6">
@@ -495,7 +555,7 @@ export default function PublicScores({ matches, participants }: PublicScoresProp
                         </span>
                         <h4 className="font-black text-gray-800 text-sm mt-1 uppercase">{m.match_label}</h4>
                         <div className="flex items-center gap-1 text-[9px] text-[#D40511] font-bold uppercase">
-                          <Clock className="w-3 h-3 animate-spin" />
+                          <Clock className="w-3 h-3 animate-spin text-[#D40511]" />
                           <span>Live Timing Active</span>
                         </div>
                       </div>
@@ -506,7 +566,7 @@ export default function PublicScores({ matches, participants }: PublicScoresProp
                           <span className="text-[9px] text-gray-400 uppercase font-black">Competitor A</span>
                         </div>
 
-                        <div className="px-5 py-2.5 bg-gray-950 text-[#FFCC00] rounded-2xl font-mono text-xl sm:text-2xl font-black tracking-widest shadow-inner">
+                        <div className="px-5 py-2.5 bg-gray-950 text-[#FFCC00] rounded-2xl font-mono text-xl sm:text-2xl font-black tracking-widest shadow-inner group-hover:scale-105 duration-100">
                           {m.score_a} - {m.score_b}
                         </div>
 
@@ -515,6 +575,14 @@ export default function PublicScores({ matches, participants }: PublicScoresProp
                           <span className="text-[9px] text-gray-400 uppercase font-black">Competitor B</span>
                         </div>
                       </div>
+                    </div>
+
+                    {/* Fullscreen indicator banner */}
+                    <div className="mt-4 pt-3 border-t border-slate-50 flex flex-col sm:flex-row justify-between items-start sm:items-center text-[10px] uppercase font-bold text-gray-400 gap-2">
+                      <span>👉 ចុចលើផ្ទាំងនេះដើម្បីបង្ហាញបែបស្លាយ Slide Show (Click to Broadcast)</span>
+                      <span className="opacity-80 group-hover:opacity-100 text-[#D40511] font-black transition-opacity flex items-center gap-1">
+                        <Maximize2 className="w-3 h-3" /> FULLSCREEN AREA 📺
+                      </span>
                     </div>
                   </div>
                 );
@@ -595,14 +663,25 @@ export default function PublicScores({ matches, participants }: PublicScoresProp
                     stopwatchState = JSON.parse(m.team_b);
                   } catch (e) {}
 
-                  // Sort swimmers by recorded stopped times
+                  // Sort swimmers by recorded stopped times, putting nulls (Disqualified) at the bottom
                   const sortedSwimmers = swimmersList
                     .map(sw => ({
                       name: sw.name,
-                      time: stopwatchState.times?.[sw.id] ?? stopwatchState.times?.[sw.name] ?? null
+                      time: stopwatchState.times?.[sw.id] !== undefined
+                        ? stopwatchState.times?.[sw.id]
+                        : (stopwatchState.times?.[sw.name] !== undefined ? stopwatchState.times?.[sw.name] : null)
                     }))
-                    .filter(s => s.time !== null)
-                    .sort((a, b) => a.time! - b.time!);
+                    .sort((a, b) => {
+                      if (a.time === null) return 1;
+                      if (b.time === null) return -1;
+                      return b.time - a.time; // sort descending to print properly in slice or show full list
+                    })
+                    // Sort ascending for placement rank, placing DQ at the bottom
+                    .sort((a, b) => {
+                      if (a.time === null) return 1;
+                      if (b.time === null) return -1;
+                      return a.time - b.time;
+                    });
 
                   return (
                     <div key={m.id} className="p-3.5 bg-cyan-50/20 border border-cyan-100 rounded-2xl space-y-2">
@@ -616,19 +695,23 @@ export default function PublicScores({ matches, participants }: PublicScoresProp
                       </div>
 
                       <div className="space-y-1.5 pt-1">
-                        {sortedSwimmers.slice(0, 3).map((sw, insideIdx) => {
-                          const totalMs = sw.time!;
-                          const mins = Math.floor(totalMs / 60000);
-                          const secs = Math.floor((totalMs % 60000) / 1000);
-                          const ms = Math.floor((totalMs % 1000) / 10);
-                          const formatted = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}.${ms.toString().padStart(2, '0')}`;
+                        {sortedSwimmers.map((sw, insideIdx) => {
+                          const isDisqualified = sw.time === null;
+                          let formatted = "Disqualify (DQ)";
+                          if (!isDisqualified) {
+                            const totalMs = sw.time!;
+                            const mins = Math.floor(totalMs / 60000);
+                            const secs = Math.floor((totalMs % 60000) / 1000);
+                            const ms = Math.floor((totalMs % 1000) / 10);
+                            formatted = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}.${ms.toString().padStart(2, '0')}`;
+                          }
 
                           return (
                             <div key={insideIdx} className="flex justify-between items-center text-[11px]">
                               <span className="font-extrabold text-gray-700 flex items-center gap-1">
-                                <span className="font-mono text-[9px] text-gray-400">#{insideIdx + 1}</span> {sw.name} {insideIdx === 0 ? '🥇' : insideIdx === 1 ? '🥈' : insideIdx === 2 ? '🥉' : ''}
+                                <span className="font-mono text-[9px] text-gray-400">#{insideIdx + 1}</span> {sw.name} {!isDisqualified && (insideIdx === 0 ? '🥇' : insideIdx === 1 ? '🥈' : insideIdx === 2 ? '🥉' : '')}
                               </span>
-                              <span className="font-mono font-bold text-[10px] text-cyan-600">
+                              <span className={`font-mono font-black text-[10px] ${isDisqualified ? 'text-red-500' : 'text-cyan-600'}`}>
                                 {formatted}
                               </span>
                             </div>
@@ -684,6 +767,274 @@ export default function PublicScores({ matches, participants }: PublicScoresProp
         </div>
 
       </div>
+
+      {/* FULLSCREEN IMMERSIVE BROADCAST SCOREBOARD FOR SLIDESHOW / PROJECTOR DISPLAY */}
+      {selectedFullscreenMatchId && (() => {
+        const m = matches.find(match => match.id === selectedFullscreenMatchId);
+        if (!m) return null;
+        const isSwimming = m.sport_name === 'Swimming';
+
+        if (isSwimming) {
+          let swimmersList: { id: string; name: string }[] = [];
+          let stopwatchState = { start_time: null as number | null, is_running: false, times: {} as Record<string, number | null> };
+          try {
+            swimmersList = JSON.parse(m.team_a);
+            stopwatchState = JSON.parse(m.team_b);
+          } catch (e) {}
+
+          // Math to calculate live continuous ticking or stopped time for the master clock
+          let masterDisplayTime = "00:00.00";
+          if (stopwatchState.start_time) {
+            const elapsed = stopwatchState.is_running 
+              ? Math.max(0, Date.now() - stopwatchState.start_time)
+              : Object.values(stopwatchState.times).filter(t => t !== null).reduce((max: number, curr: number | null) => Math.max(max, curr ?? 0), 0) || 0;
+            
+            if (elapsed) {
+              const mins = Math.floor(elapsed / 60000);
+              const secs = Math.floor((elapsed % 60000) / 1000);
+              const ms = Math.floor((elapsed % 1000) / 10);
+              masterDisplayTime = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}.${ms.toString().padStart(2, '0')}`;
+            }
+          }
+
+          return (
+            <div className="fixed inset-0 bg-[#020617] z-50 flex flex-col justify-between p-6 sm:p-12 overflow-y-auto font-sans text-white select-none">
+              {/* Background Ambient Cosmic Glows */}
+              <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-cyan-500/10 rounded-full blur-[120px] pointer-events-none"></div>
+              <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-teal-500/5 rounded-full blur-[120px] pointer-events-none"></div>
+
+              {/* Header section */}
+              <div className="relative z-10 flex flex-col md:flex-row justify-between items-center bg-slate-900/60 backdrop-blur-md border border-cyan-500/30 px-6 py-4 rounded-[32px] gap-4 mb-8">
+                <div className="flex items-center gap-4">
+                  <div className="bg-[#D40511] px-4 py-1.5 transform -skew-x-12 inline-block shadow-lg">
+                    <span className="text-white font-black italic tracking-tighter text-sm">DHL GAMES 2026</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-3 h-3 rounded-full bg-cyan-400 animate-ping"></span>
+                    <span className="text-cyan-400 font-extrabold text-xs uppercase tracking-widest font-mono">LIVE STADIUM BROADCAST</span>
+                  </div>
+                </div>
+
+                <div className="text-center">
+                  <p className="text-[11px] text-zinc-400 font-black tracking-widest uppercase mb-0.5">SWIMMING HEAT SLIDESHOW</p>
+                  <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight uppercase">{m.match_label}</h1>
+                </div>
+
+                <button 
+                  onClick={() => setSelectedFullscreenMatchId(null)}
+                  className="px-5 py-2.5 bg-red-650 hover:bg-red-700 active:scale-95 duration-100 text-white font-black text-xs uppercase tracking-wider rounded-2xl flex items-center gap-1.5 shadow-md shadow-red-950/40 cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                  <span>ចាកចេញពី Fullscreen [ESC]</span>
+                </button>
+              </div>
+
+              {/* Master Digital Stopwatch Stage */}
+              <div className="relative z-10 flex-1 flex flex-col justify-center items-center py-6">
+                <div className="text-center space-y-2 bg-slate-950/90 border-4 border-cyan-500/40 p-8 sm:p-12 rounded-[40px] shadow-[0_0_50px_rgba(34,211,238,0.25)] max-w-xl sm:max-w-2xl w-full">
+                  <span className="text-cyan-400 font-black text-xs uppercase tracking-[0.3em] font-mono block">MASTER DIGITAL STOPWATCH</span>
+                  <div className="text-6xl sm:text-[8.5rem] font-mono font-black tracking-widest text-cyan-400 drop-shadow-[0_0_20px_rgba(34,211,238,0.6)] leading-none my-4">
+                    {masterDisplayTime}
+                  </div>
+                  <div className="inline-flex items-center justify-center gap-1.5 py-1 px-4 bg-cyan-950/50 border border-cyan-800/40 rounded-full text-[10px] uppercase font-black tracking-widest text-cyan-300">
+                    <span className={`w-2 h-2 rounded-full ${stopwatchState.is_running ? 'bg-emerald-400 animate-ping' : 'bg-red-400'}`}></span>
+                    <span>{stopwatchState.is_running ? 'HEAT RUNNING (ម៉ោងកំពុងដើរ)' : 'HEAT IDLE / STOPPED (ម៉ោងផ្អាក)'}</span>
+                  </div>
+                </div>
+
+                {/* Sub swimmers progress list */}
+                <div className="w-full max-w-5xl grid grid-cols-1 md:grid-cols-2 gap-4 mt-8">
+                  {swimmersList.map((sw, idx) => {
+                    const stoppedTime = stopwatchState.times?.[sw.id] ?? stopwatchState.times?.[sw.name];
+                    const isStopped = stoppedTime !== undefined && stoppedTime !== null;
+                    const isTimerRunning = stopwatchState.is_running && !isStopped;
+
+                    // format individual times
+                    let displayTime = "00:00.00";
+                    if (isStopped) {
+                      const totalMs = stoppedTime!;
+                      const mins = Math.floor(totalMs / 60000);
+                      const secs = Math.floor((totalMs % 60000) / 1000);
+                      const ms = Math.floor((totalMs % 1000) / 10);
+                      displayTime = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}.${ms.toString().padStart(2, '0')}`;
+                    } else if (isTimerRunning && stopwatchState.start_time) {
+                      const elapsedMs = Math.max(0, Date.now() - stopwatchState.start_time);
+                      const mins = Math.floor(elapsedMs / 60000);
+                      const secs = Math.floor((elapsedMs % 60000) / 1000);
+                      const ms = Math.floor((elapsedMs % 1000) / 10);
+                      displayTime = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}.${ms.toString().padStart(2, '0')}`;
+                    }
+
+                    return (
+                      <div 
+                        key={sw.id || idx}
+                        className={`p-5 rounded-3xl flex items-center justify-between border-2 transition-all duration-200 ${
+                          isStopped
+                            ? 'bg-slate-900 border-slate-705/50 text-gray-450'
+                            : isTimerRunning
+                            ? 'bg-cyan-950/70 border-cyan-400 text-white shadow-[0_0_20px_rgba(34,211,238,0.15)] animate-pulse'
+                            : 'bg-slate-950/50 border-slate-850 text-gray-550'
+                        }`}
+                      >
+                        <div className="flex items-center gap-4">
+                          <span className={`font-mono font-black text-xs px-3 py-1 rounded-xl border ${
+                            isStopped 
+                              ? 'bg-slate-950 border-slate-800 text-slate-500' 
+                              : 'bg-cyan-900 border-cyan-700 text-cyan-300'
+                          }`}>
+                            LANE {idx + 1}
+                          </span>
+                          <div>
+                            <p className="font-extrabold text-sm sm:text-base text-white tracking-wide uppercase leading-tight">{sw.name}</p>
+                            <span className="text-[10px] text-cyan-400 font-extrabold tracking-widest uppercase">
+                              {isStopped ? '✅ FINISHED' : isTimerRunning ? '🏊‍♂️ PACING LANE' : '⏱️ READY TO START'}
+                            </span>
+                          </div>
+                        </div>
+
+                        <span className={`font-mono text-lg sm:text-2xl font-black ${
+                          isStopped ? 'text-emerald-400' : isTimerRunning ? 'text-[#FFCC00] animate-pulse' : 'text-zinc-500'
+                        }`}>
+                          {displayTime}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Informational footer */}
+              <div className="relative z-10 border-t border-slate-900 pt-4 flex flex-col sm:flex-row justify-between items-center gap-3 text-xs text-gray-400 mt-8">
+                <span>DHL GIANTS SWIMMING CHAMPIONSHIPS • SPECTATOR DISPLAY</span>
+                <span>Press escape [ESC] or click close to return to board</span>
+              </div>
+            </div>
+          );
+        } else {
+          // Standard traditional team match view
+          const rosterA = getTeamRosterAndTheme(m.team_a, m.sport_name).roster;
+          const rosterB = getTeamRosterAndTheme(m.team_b, m.sport_name).roster;
+
+          return (
+            <div className="fixed inset-0 bg-[#090505] z-50 flex flex-col justify-between p-6 sm:p-12 overflow-y-auto font-sans text-white select-none">
+              {/* Backglow decoration for big-screen stadium board */}
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-[#D40511]/10 rounded-full blur-[140px] pointer-events-none"></div>
+
+              {/* Header section */}
+              <div className="relative z-10 flex flex-col md:flex-row justify-between items-center bg-zinc-950/80 border border-zinc-805 px-6 py-4 rounded-[32px] gap-4 mb-4">
+                <div className="flex items-center gap-4">
+                  <div className="bg-[#D40511] px-4 py-1.5 transform -skew-x-12 inline-block shadow-lg">
+                    <span className="text-white font-black italic tracking-tighter text-sm">DHL GAMES 2026</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-3 h-3 rounded-full bg-red-600 animate-ping"></span>
+                    <span className="text-[#D40511] font-extrabold text-xs uppercase tracking-widest font-mono">LIVE STADIUM SCREEN</span>
+                  </div>
+                </div>
+
+                <div className="text-center">
+                  <p className="text-[11px] text-zinc-400 font-black tracking-widest uppercase mb-0.5">{m.sport_name} ACTION BOARD</p>
+                  <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight uppercase">{m.match_label}</h1>
+                </div>
+
+                <button 
+                  onClick={() => setSelectedFullscreenMatchId(null)}
+                  className="px-5 py-2.5 bg-red-650 hover:bg-red-700 active:scale-95 duration-100 text-white font-black text-xs uppercase tracking-wider rounded-2xl flex items-center gap-1.5 shadow-md cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                  <span>ចាកចេញពី Fullscreen [ESC]</span>
+                </button>
+              </div>
+
+              {/* Huge Stadium scoreboard */}
+              <div className="relative z-10 flex-grow flex flex-col lg:flex-row justify-center items-center gap-12 py-10">
+                {/* Team A on the left */}
+                <div className="w-full lg:w-1/3 flex flex-col items-center lg:items-end text-center lg:text-right space-y-6">
+                  <div className="space-y-1">
+                    <span className="text-[11px] bg-red-950 text-[#FF3B30] font-black uppercase tracking-widest py-1 px-3.5 rounded-full border border-red-900 border-opacity-30">COMPETITOR A</span>
+                    <h2 className="text-3xl sm:text-6xl font-black text-white tracking-normal leading-tight uppercase pr-1">
+                      {m.team_a}
+                    </h2>
+                  </div>
+
+                  {/* Player roster for Team A */}
+                  <div className="w-full max-w-sm bg-neutral-900/40 p-5 rounded-3xl border border-zinc-800/40">
+                    <h3 className="text-[10px] text-zinc-400 font-extrabold uppercase tracking-widest mb-3.5 text-center lg:text-right">ROSTER MEMBERS (កីឡាករជាសមាជិក)</h3>
+                    {rosterA.length === 0 ? (
+                      <p className="text-[11px] text-zinc-500 uppercase font-bold text-center lg:text-right">No roster registered under Team A</p>
+                    ) : (
+                      <div className="grid grid-cols-2 gap-2 text-left">
+                        {rosterA.map((p, idx) => (
+                          <div key={p.id || idx} className="flex items-center gap-2.5 p-1.5 bg-zinc-950/60 rounded-xl">
+                            <div className="w-7 h-7 rounded-full overflow-hidden bg-zinc-900 border border-zinc-800 shrink-0 flex items-center justify-center font-mono font-black text-[10px] text-red-500">
+                              {p.photo_url ? <img src={p.photo_url} alt={p.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" /> : p.name.charAt(0).toUpperCase()}
+                            </div>
+                            <span className="text-xs font-bold truncate text-zinc-300">{p.name}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Score section in the center */}
+                <div className="flex flex-col justify-center items-center">
+                  <div className="bg-gradient-to-b from-neutral-900 to-black border-4 border-zinc-800 px-12 sm:px-16 py-10 rounded-[48px] shadow-2xl flex items-center gap-6 sm:gap-10 sm:scale-110">
+                    <span className="text-7xl sm:text-[10rem] font-mono font-black text-[#FFCC00] leading-none drop-shadow-[0_0_20px_rgba(255,204,0,0.5)]">
+                      {m.score_a}
+                    </span>
+                    <span className="text-4xl sm:text-[6rem] font-black text-zinc-700 leading-none select-none tracking-tighter">
+                      -
+                    </span>
+                    <span className="text-7xl sm:text-[10rem] font-mono font-black text-[#FFCC00] leading-none drop-shadow-[0_0_20px_rgba(255,204,0,0.5)]">
+                      {m.score_b}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5 py-1 px-4 bg-red-950/30 border border-red-900/30 rounded-full text-[10px] font-black uppercase tracking-widest text-red-400 mt-6 animate-pulse">
+                    <span className="w-2.5 h-2.5 rounded-full bg-red-600 animate-ping"></span>
+                    <span>LIVE PROGRESS IN PLAY (កំពុងលេង)</span>
+                  </div>
+                </div>
+
+                {/* Team B on the right */}
+                <div className="w-full lg:w-1/3 flex flex-col items-center lg:items-start text-center lg:text-left space-y-6">
+                  <div className="space-y-1">
+                    <span className="text-[11px] bg-red-950 text-[#FF3B30] font-black uppercase tracking-widest py-1 px-3.5 rounded-full border border-red-900 border-opacity-30">COMPETITOR B</span>
+                    <h2 className="text-3xl sm:text-6xl font-black text-white tracking-normal leading-tight uppercase pl-1">
+                      {m.team_b}
+                    </h2>
+                  </div>
+
+                  {/* Player roster for Team B */}
+                  <div className="w-full max-w-sm bg-neutral-900/40 p-5 rounded-3xl border border-zinc-800/40">
+                    <h3 className="text-[10px] text-zinc-400 font-extrabold uppercase tracking-widest mb-3.5 text-center lg:text-left">ROSTER MEMBERS (កីឡាករជាសមាជិក)</h3>
+                    {rosterB.length === 0 ? (
+                      <p className="text-[11px] text-zinc-500 uppercase font-bold text-center lg:text-right">No roster registered under Team B</p>
+                    ) : (
+                      <div className="grid grid-cols-2 gap-2 text-left">
+                        {rosterB.map((p, idx) => (
+                          <div key={p.id || idx} className="flex items-center gap-2.5 p-1.5 bg-zinc-950/60 rounded-xl">
+                            <div className="w-7 h-7 rounded-full overflow-hidden bg-zinc-900 border border-zinc-800 shrink-0 flex items-center justify-center font-mono font-black text-[10px] text-red-500">
+                              {p.photo_url ? <img src={p.photo_url} alt={p.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" /> : p.name.charAt(0).toUpperCase()}
+                            </div>
+                            <span className="text-xs font-bold truncate text-zinc-300">{p.name}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Informational footer */}
+              <div className="relative z-10 border-t border-zinc-900 py-4 flex flex-col sm:flex-row justify-between items-center gap-3 text-xs text-gray-500 mt-4">
+                <span>DHL SPORTS TOURNAMENT ARENA CODES • SLIDESHOW OVERVIEW</span>
+                <span>Press escape [ESC] or click close to return to board</span>
+              </div>
+            </div>
+          );
+        }
+      })()}
 
     </div>
   );

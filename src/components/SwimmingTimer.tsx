@@ -69,6 +69,21 @@ export default function SwimmingTimer({ matches, participants, updateMatchFields
     return swimmingMatches.find(m => m.id === selectedMatchId);
   }, [swimmingMatches, selectedMatchId]);
 
+  const hasTimerPrivilege = currentUser !== null && (currentUser.role === 'admin' || currentUser.role === 'super_admin');
+  const [activeQRSwimmer, setActiveQRSwimmer] = useState<SwimmerData | null>(null);
+  const [showResetConfirm, setShowResetConfirm] = useState<boolean>(false);
+
+  useEffect(() => {
+    setShowResetConfirm(false);
+  }, [selectedMatchId]);
+
+  const qrCodeUrl = useMemo(() => {
+    if (!activeQRSwimmer || !activeMatch) return '';
+    const origin = typeof window !== 'undefined' ? window.location.origin : 'https://dhl-sports-app.vercel.app';
+    const path = typeof window !== 'undefined' ? window.location.pathname : '/';
+    return `${origin}${path}?swim_match=${activeMatch.id}&swim_id=${activeQRSwimmer.id}&username=${encodeURIComponent(activeQRSwimmer.name)}`;
+  }, [activeQRSwimmer, activeMatch]);
+
   // Parse swimmers from activeMatch.team_a
   const swimmers: SwimmerData[] = useMemo(() => {
     if (!activeMatch) return [];
@@ -250,7 +265,6 @@ export default function SwimmingTimer({ matches, participants, updateMatchFields
 
   const handleResetHeat = async () => {
     if (!activeMatch) return;
-    if (!window.confirm('តើអ្នកចង់កំណត់ម៉ោងកីឡាករទាំងអស់ឡើងវិញមែនទេ? Confirm Reset Heat?')) return;
     
     playBeep(220, 'sawtooth', 0.3);
     const defaultState: SwimmingState = {
@@ -263,6 +277,7 @@ export default function SwimmingTimer({ matches, participants, updateMatchFields
       status: 'Upcoming',
       team_b: JSON.stringify(defaultState)
     });
+    setShowResetConfirm(false);
   };
 
   // Find photo URL for a swimmer name or ID
@@ -354,6 +369,19 @@ export default function SwimmingTimer({ matches, participants, updateMatchFields
                 </div>
               </div>
 
+              {/* Guest Warning Card */}
+              {!hasTimerPrivilege && (
+                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-amber-900 text-xs font-bold leading-relaxed flex items-center gap-2.5 shadow-sm">
+                  <span className="text-xl shrink-0">⚠️</span>
+                  <div>
+                    <h5 className="font-extrabold text-amber-950 uppercase tracking-wide">តំបន់សុវត្ថិភាព (Staff Stopwatch Access Required)</h5>
+                    <p className="text-[10.5px] text-amber-850 mt-0.5 normal-case">
+                      You are viewing as a guest. Please log in as an Admin or Subadmin to run timers, trigger stop lanes, or lock results.
+                    </p>
+                  </div>
+                </div>
+              )}
+
               {/* Master Digital Clock Display */}
               <div className="py-8 text-center bg-slate-950 rounded-[32px] text-cyan-400 font-mono shadow-inner border-y-4 border-cyan-500 relative overflow-hidden flex flex-col justify-center items-center">
                 <div className="absolute inset-0 bg-radial-gradient from-cyan-950/20 via-transparent to-transparent opacity-80"></div>
@@ -376,8 +404,8 @@ export default function SwimmingTimer({ matches, participants, updateMatchFields
                 {activeMatch.status === 'Upcoming' || (!swimState.start_time && !swimState.is_running) ? (
                   <button
                     onClick={handleStartAll}
-                    disabled={swimmers.length === 0}
-                    className="flex-1 py-4.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white rounded-2xl text-xs font-black uppercase tracking-widest cursor-pointer hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center justify-center gap-2 shadow-lg disabled:opacity-50"
+                    disabled={swimmers.length === 0 || !hasTimerPrivilege}
+                    className="flex-1 py-4.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white rounded-2xl text-xs font-black uppercase tracking-widest cursor-pointer hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center justify-center gap-2 shadow-lg disabled:opacity-40"
                   >
                     <Play className="w-5 h-5 fill-white" />
                     <span>ចាប់ផ្តើមទាំងអស់គ្នា (START ALL RACERS)</span>
@@ -386,20 +414,41 @@ export default function SwimmingTimer({ matches, participants, updateMatchFields
                   <>
                     <button
                       onClick={handleCompleteMatch}
-                      disabled={activeMatch.status === 'Finished'}
-                      className="flex-1 py-4 bg-gray-950 hover:bg-slate-800 text-white rounded-2xl text-xs font-black uppercase tracking-wider cursor-pointer active:scale-95 transition flex items-center justify-center gap-2 disabled:opacity-50"
+                      disabled={activeMatch.status === 'Finished' || !hasTimerPrivilege}
+                      className="flex-1 py-4 bg-gray-950 hover:bg-slate-800 text-white rounded-2xl text-xs font-black uppercase tracking-wider cursor-pointer active:scale-95 transition flex items-center justify-center gap-2 disabled:opacity-45"
                     >
                       <Flag className="w-4 h-4 text-cyan-400" />
                       <span>បញ្ជប់ការប្រកួតទាំងស្រុង (Lock & Finish Heat)</span>
                     </button>
 
-                    <button
-                      onClick={handleResetHeat}
-                      className="px-5 py-4 bg-red-50 text-red-650 hover:bg-red-100/80 rounded-2xl text-[10px] font-black uppercase tracking-wider cursor-pointer active:scale-95 transition flex items-center justify-center gap-1"
-                    >
-                      <RotateCcw className="w-3.5 h-3.5" />
-                      <span>កំណត់ម៉ោងឡើងវិញ (Reset Heat)</span>
-                    </button>
+                    {showResetConfirm ? (
+                      <div className="flex items-center gap-2 bg-red-50 p-2.5 rounded-2xl border border-red-200">
+                        <span className="text-[10px] font-black text-red-700 px-1 uppercase tracking-tight">Confirm?</span>
+                        <button
+                          type="button"
+                          onClick={handleResetHeat}
+                          className="px-3 py-2 bg-red-650 hover:bg-red-750 text-white font-black text-[9.5px] uppercase tracking-wider rounded-xl cursor-pointer active:scale-95 duration-75"
+                        >
+                          Yes, Reset (បាទ/ចាស)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setShowResetConfirm(false)}
+                          className="px-3 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-extrabold text-[9.5px] uppercase tracking-wider rounded-xl cursor-pointer active:scale-95 duration-75"
+                        >
+                          Cancel (បោះបង់)
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setShowResetConfirm(true)}
+                        disabled={!hasTimerPrivilege}
+                        className="px-5 py-4 bg-red-50 text-red-650 hover:bg-red-100/80 rounded-2xl text-[10px] font-black uppercase tracking-wider cursor-pointer active:scale-95 transition flex items-center justify-center gap-1 disabled:opacity-40"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5" />
+                        <span>កំណត់ម៉ោងឡើងវិញ (Reset Heat)</span>
+                      </button>
+                    )}
                   </>
                 )}
               </div>
@@ -473,7 +522,18 @@ export default function SwimmingTimer({ matches, participants, updateMatchFields
                           </div>
                           <div>
                             <span className="font-bold text-slate-400 text-[10px] uppercase tracking-wider block">កន្លងហែលទឹកទី {index + 1} (Lane {index + 1})</span>
-                            <h4 className="font-black text-slate-800 text-xs sm:text-[13px]">{sw.name}</h4>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                // Set QR Swimmer and show link popup
+                                setActiveQRSwimmer(sw);
+                              }}
+                              className="font-black text-slate-800 text-left cursor-pointer text-xs sm:text-[13px] hover:text-cyan-600 hover:underline flex items-center gap-1.5 duration-100 active:scale-95 group"
+                              title="Click to generate Mobile Device Stop-button QR Code"
+                            >
+                              <span>{sw.name}</span>
+                              <span className="text-[8.5px] font-black bg-cyan-50 border border-cyan-200 text-cyan-600 px-1 py-0.5 rounded opacity-80 group-hover:opacity-100 font-mono tracking-wide">QR STOPPER</span>
+                            </button>
                           </div>
                         </div>
 
@@ -491,8 +551,13 @@ export default function SwimmingTimer({ matches, participants, updateMatchFields
                       {swimState.is_running && !hasFinished && (
                         <button
                           type="button"
-                          onClick={() => handleStopSwimmer(sw.id)}
-                          className="w-full py-4.5 bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 text-white font-extrabold uppercase text-xs tracking-wider rounded-xl cursor-pointer shadow-md active:scale-95 shadow-red-200 hover:shadow-lg duration-100 flex items-center justify-center gap-1.5"
+                          onClick={() => {
+                            if (hasTimerPrivilege) {
+                              handleStopSwimmer(sw.id);
+                            }
+                          }}
+                          disabled={!hasTimerPrivilege}
+                          className="w-full py-4.5 bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 text-white font-extrabold uppercase text-xs tracking-wider rounded-xl cursor-pointer shadow-md enabled:active:scale-95 shadow-red-200 enabled:hover:shadow-lg duration-100 flex items-center justify-center gap-1.5 disabled:opacity-40"
                         >
                           <CircleDot className="w-4 h-4 text-white animate-pulse" />
                           <span>ឈប់វាស់ម៉ោង (STOP TIMER FOR {sw.name})</span>
@@ -503,8 +568,13 @@ export default function SwimmingTimer({ matches, participants, updateMatchFields
                       {hasFinished && activeMatch.status !== 'Finished' && (
                         <button
                           type="button"
-                          onClick={() => handleResetSwimmer(sw.id)}
-                          className="text-[9px] font-black uppercase tracking-wide text-slate-400 hover:text-red-500 self-end flex items-center gap-0.5 mt-1 hover:underline cursor-pointer"
+                          onClick={() => {
+                            if (hasTimerPrivilege) {
+                              handleResetSwimmer(sw.id);
+                            }
+                          }}
+                          disabled={!hasTimerPrivilege}
+                          className="text-[9px] font-black uppercase tracking-wide text-slate-400 hover:text-red-500 self-end flex items-center gap-0.5 mt-1 hover:underline cursor-pointer disabled:opacity-40"
                         >
                           <RotateCcw className="w-3 h-3 text-slate-400 hover:text-red-500" />
                           <span>វាស់ឡើងវិញ (RESET LANE TIME)</span>
@@ -526,6 +596,66 @@ export default function SwimmingTimer({ matches, participants, updateMatchFields
           <p className="text-xs text-slate-400 max-w-sm mx-auto">
             សូមចូលទៅកាន់បន្ទះ "Setup Game" ដើម្បីបង្កើតការប្រកួតហែលទឹកមួយ ជាមួយកីឡាករចុះឈ្មោះជាមុនសិន។
           </p>
+        </div>
+      )}
+
+      {/* Dynamic Swimmer Link QR Modal Setup */}
+      {activeQRSwimmer && (
+        <div 
+          onClick={() => setActiveQRSwimmer(null)}
+          className="fixed inset-0 bg-slate-950/85 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="bg-[#0f172a] border-2 border-cyan-400 text-white p-6 sm:p-8 rounded-[36px] w-full max-w-sm text-center relative shadow-2xl overflow-hidden space-y-6"
+          >
+            {/* Ambient abstract glow background */}
+            <div className="absolute top-0 left-0 w-32 h-32 bg-cyan-500/15 rounded-full blur-2xl"></div>
+
+            <div className="space-y-1.5 relative z-10">
+              <span className="text-[10px] bg-cyan-950 text-cyan-400 border border-cyan-800 py-1 px-3 rounded-full font-black uppercase tracking-wider">
+                🏊‍♂️ Lane Facilitator Stopper QR
+              </span>
+              <h4 className="font-black text-white text-lg tracking-tight uppercase pt-2">
+                {activeQRSwimmer.name}
+              </h4>
+              <p className="text-[11px] text-slate-300 leading-relaxed max-w-xs mx-auto">
+                Scan with a mobile web browser to use full-screen stop button stopwatch! Perfect for Lane Assistants sitting at the end of the pool.
+              </p>
+            </div>
+
+            {/* QR Code Frame */}
+            <div className="bg-white p-4.5 rounded-[24px] inline-block shadow-lg border border-slate-700/10 relative z-10 transition hover:scale-105 duration-150">
+              <img 
+                src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(qrCodeUrl)}`} 
+                alt="Facilitator Scan Stopper Link" 
+                className="w-44 h-44 border-0 rounded-lg shrink-0"
+              />
+            </div>
+
+            {/* Manual Stopper Link Details */}
+            <div className="space-y-1.5 pt-1 relative z-10">
+              <span className="text-[9px] text-gray-400 block font-semibold truncate leading-tight bg-slate-900 border border-slate-800 p-2.5 rounded-xl">
+                {qrCodeUrl}
+              </span>
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(qrCodeUrl);
+                  alert("Stopper link copied successfully!");
+                }}
+                className="text-[9.5px] font-black text-cyan-400 hover:underline uppercase tracking-wider block mx-auto cursor-pointer"
+              >
+                Copy stopper link manually
+              </button>
+            </div>
+
+            <button
+              onClick={() => setActiveQRSwimmer(null)}
+              className="w-full py-3 bg-red-650 hover:bg-red-700 text-white font-black uppercase text-xs rounded-2xl cursor-pointer duration-150 active:scale-95"
+            >
+              Close Overlay
+            </button>
+          </div>
         </div>
       )}
 

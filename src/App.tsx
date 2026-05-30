@@ -11,16 +11,42 @@ import PublicTeamsView from './components/PublicTeamsView';
 import PublicAthletePhotoUpload from './components/PublicAthletePhotoUpload';
 import AnalyticsDashboard from './components/AnalyticsDashboard';
 import SwimmingTimer from './components/SwimmingTimer';
+import FacilitatorSwimmerDesk from './components/FacilitatorSwimmerDesk';
 import { Match, SportType, Participant, AppUser } from './types';
 import { INITIAL_MATCHES, INITIAL_PARTICIPANTS } from './data';
 import { getSupabaseClient, testSupabaseConnection } from './supabase';
 import { Laptop, Wifi, WifiOff, RefreshCw, Layers, ShieldAlert, Heart, Calendar } from 'lucide-react';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'leaderboard' | 'public_teams' | 'dashboard' | 'scoring' | 'admin' | 'teams' | 'database' | 'users' | 'login' | 'swimming'>('leaderboard');
+  const [activeTab, setActiveTab] = useState<'leaderboard' | 'public_teams' | 'dashboard' | 'scoring' | 'admin' | 'teams' | 'database' | 'users' | 'login'>('leaderboard');
   const [matches, setMatches] = useState<Match[]>([]);
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [isOnline, setIsOnline] = useState<boolean>(typeof window !== 'undefined' ? window.navigator.onLine : true);
+
+  // QR Mobile Facilitator controller state
+  const [facilitatorParams, setFacilitatorParams] = useState<{ matchId: string; swimId: string; name: string } | null>(() => {
+    if (typeof window !== 'undefined') {
+      const p = new URLSearchParams(window.location.search);
+      const matchId = p.get('swim_match');
+      const swimId = p.get('swim_id');
+      const username = p.get('username') || '';
+      if (matchId && swimId) {
+        return { matchId, swimId, name: username };
+      }
+    }
+    return null;
+  });
+
+  const handleClearFacilitatorParams = () => {
+    setFacilitatorParams(null);
+    if (typeof window !== 'undefined' && window.history.replaceState) {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('swim_match');
+      url.searchParams.delete('swim_id');
+      url.searchParams.delete('username');
+      window.history.replaceState({}, '', url.toString());
+    }
+  };
 
   // External upload target
   const [uploadPhotoPlayerId, setUploadPhotoPlayerId] = useState<string | null>(null);
@@ -728,6 +754,21 @@ export default function App() {
     alert('ទិន្នន័យដើមរបស់កីឡាករ និងក្រុមការងារត្រូវបានកំណត់ឡើងវិញជោគជ័យ!');
   };
 
+  if (facilitatorParams) {
+    return (
+      <FacilitatorSwimmerDesk
+        matchId={facilitatorParams.matchId}
+        swinnerId={facilitatorParams.swimId}
+        swimmerName={facilitatorParams.name || 'Swimmer'}
+        isSupabaseEnabled={isSupabaseEnabled}
+        supabaseUrl={supabaseUrl}
+        supabaseAnonKey={supabaseAnonKey}
+        onUpdateMatchFields={updateMatchFields}
+        onBackToMain={handleClearFacilitatorParams}
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen flex flex-col bg-gray-50 pb-20 select-none">
       
@@ -769,16 +810,6 @@ export default function App() {
               />
             )}
 
-            {/* NEW TAB: SWIMMING TIMER ENGINE */}
-            {activeTab === 'swimming' && (
-              <SwimmingTimer
-                matches={matches}
-                participants={participants}
-                updateMatchFields={updateMatchFields}
-                currentUser={currentUser}
-              />
-            )}
-
             {/* NEW TAB: PUBLIC TEAMS & MEMBERS VIEW */}
             {activeTab === 'public_teams' && (
               <PublicTeamsView
@@ -802,9 +833,12 @@ export default function App() {
             {activeTab === 'scoring' && currentUser && (
               <ScoringPanel
                 matches={matches}
+                participants={participants}
                 updateMatchScore={updateMatchScore}
+                updateMatchFields={updateMatchFields}
                 finishMatch={finishMatch}
                 deleteMatch={deleteMatch}
+                currentUser={currentUser}
               />
             )}
 
