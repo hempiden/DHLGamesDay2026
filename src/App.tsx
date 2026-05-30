@@ -293,7 +293,9 @@ export default function App() {
 
   // 3. Sync from / to Supabase if enabled
   useEffect(() => {
-    async function syncAndFetch() {
+    let active = true;
+
+    async function syncAndFetch(silent = false) {
       if (!isSupabaseEnabled || !isOnline) {
         setSupabaseConnected(false);
         return;
@@ -305,12 +307,15 @@ export default function App() {
         return;
       }
 
-      // Test Connection live
-      const tested = await testSupabaseConnection(supabaseUrl, supabaseAnonKey);
-      setSupabaseConnected(tested);
+      // Test Connection live (skip testing continuously to save latency except once on init)
+      let tested = true;
+      if (!silent) {
+        tested = await testSupabaseConnection(supabaseUrl, supabaseAnonKey);
+        setSupabaseConnected(tested);
+      }
 
       if (tested) {
-        setIsSyncing(true);
+        if (!silent) setIsSyncing(true);
         try {
           // Fetch remote matches
           const { data, error } = await client
@@ -320,7 +325,7 @@ export default function App() {
 
           if (error) {
             console.error('Supabase fetch error:', error.message);
-          } else if (data && data.length > 0) {
+          } else if (data && data.length > 0 && active) {
             // Map table records back to our Match TS interface safely
             const mappedMatches: Match[] = data.map((item: any) => ({
               id: String(item.id),
@@ -335,8 +340,13 @@ export default function App() {
               updated_at: item.updated_at || new Date().toISOString(),
             }));
             
-            setMatches(mappedMatches);
-            localStorage.setItem('dhl_games_day_matches', JSON.stringify(mappedMatches));
+            setMatches((prev) => {
+              if (JSON.stringify(prev) !== JSON.stringify(mappedMatches)) {
+                localStorage.setItem('dhl_games_day_matches', JSON.stringify(mappedMatches));
+                return mappedMatches;
+              }
+              return prev;
+            });
           }
 
           // Fetch remote participants table
@@ -347,7 +357,7 @@ export default function App() {
           
           if (pResult.error) {
             console.error('Supabase participants fetch error:', pResult.error.message);
-          } else if (pResult.data && pResult.data.length > 0) {
+          } else if (pResult.data && pResult.data.length > 0 && active) {
             const mappedParticipants: Participant[] = pResult.data.map((item: any) => ({
               id: String(item.id),
               name: item.name,
@@ -358,18 +368,35 @@ export default function App() {
               created_at: item.created_at,
               updated_at: item.updated_at,
             }));
-            setParticipants(mappedParticipants);
-            localStorage.setItem('dhl_games_day_participants', JSON.stringify(mappedParticipants));
+            setParticipants((prev) => {
+              if (JSON.stringify(prev) !== JSON.stringify(mappedParticipants)) {
+                localStorage.setItem('dhl_games_day_participants', JSON.stringify(mappedParticipants));
+                return mappedParticipants;
+              }
+              return prev;
+            });
           }
         } catch (err) {
           console.error('Database Sync Issue:', err);
         } finally {
-          setIsSyncing(false);
+          if (!silent && active) {
+            setIsSyncing(false);
+          }
         }
       }
     }
 
-    syncAndFetch();
+    syncAndFetch(false);
+
+    // Dynamic database polling loop
+    const pollInterval = setInterval(() => {
+      syncAndFetch(true);
+    }, 2500);
+
+    return () => {
+      active = false;
+      clearInterval(pollInterval);
+    };
   }, [isSupabaseEnabled, supabaseUrl, supabaseAnonKey, isOnline]);
 
   // Save matches change locally

@@ -2,6 +2,8 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { Match } from './types';
 
 let supabaseInstance: SupabaseClient | null = null;
+let lastUsedUrl: string | null = null;
+let lastUsedKey: string | null = null;
 
 // Initialize Supabase Client dynamically
 export function getSupabaseClient(url?: string, anonKey?: string): SupabaseClient | null {
@@ -17,8 +19,10 @@ export function getSupabaseClient(url?: string, anonKey?: string): SupabaseClien
   }
 
   try {
-    if (!supabaseInstance) {
+    if (!supabaseInstance || finalUrl !== lastUsedUrl || finalKey !== lastUsedKey) {
       supabaseInstance = createClient(finalUrl, finalKey);
+      lastUsedUrl = finalUrl;
+      lastUsedKey = finalKey;
     }
     return supabaseInstance;
   } catch (error) {

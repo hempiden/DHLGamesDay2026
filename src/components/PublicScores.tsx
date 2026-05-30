@@ -311,8 +311,13 @@ export default function PublicScores({ matches, participants }: PublicScoresProp
 
             sortedFinishedSwimMatches.forEach((m) => {
               try {
-                const swimmersList = JSON.parse(m.team_a) as { id: string; name: string }[];
-                const timerState = JSON.parse(m.team_b) as { times: Record<string, number | null> };
+                const swimmersList = typeof m.team_a === 'object' && m.team_a !== null
+                  ? (m.team_a as any)
+                  : (JSON.parse(m.team_a || '[]') as { id: string; name: string }[]);
+                  
+                const timerState = typeof m.team_b === 'object' && m.team_b !== null
+                  ? (m.team_b as any)
+                  : (JSON.parse(m.team_b || '{}') as { times: Record<string, number | null> });
                 
                 swimmersList.forEach((sw) => {
                   const duration = timerState.times?.[sw.id] !== undefined
@@ -464,8 +469,13 @@ export default function PublicScores({ matches, participants }: PublicScoresProp
                   let swimmersList: { id: string; name: string }[] = [];
                   let stopwatchState = { start_time: null as number | null, is_running: false, times: {} as Record<string, number | null> };
                   try {
-                    swimmersList = JSON.parse(m.team_a);
-                    stopwatchState = JSON.parse(m.team_b);
+                    swimmersList = typeof m.team_a === 'object' && m.team_a !== null
+                      ? (m.team_a as any)
+                      : JSON.parse(m.team_a || '[]');
+                    
+                    stopwatchState = typeof m.team_b === 'object' && m.team_b !== null
+                      ? (m.team_b as any)
+                      : JSON.parse(m.team_b || '{}');
                   } catch (e) {}
 
                   return (
@@ -671,8 +681,13 @@ export default function PublicScores({ matches, participants }: PublicScoresProp
                   let swimmersList: { id: string; name: string }[] = [];
                   let stopwatchState = { times: {} as Record<string, number | null> };
                   try {
-                    swimmersList = JSON.parse(m.team_a);
-                    stopwatchState = JSON.parse(m.team_b);
+                    swimmersList = typeof m.team_a === 'object' && m.team_a !== null
+                      ? (m.team_a as any)
+                      : JSON.parse(m.team_a || '[]');
+                    
+                    stopwatchState = typeof m.team_b === 'object' && m.team_b !== null
+                      ? (m.team_b as any)
+                      : JSON.parse(m.team_b || '{}');
                   } catch (e) {}
 
                   // Sort swimmers by recorded stopped times, putting nulls (Disqualified) at the bottom
@@ -790,8 +805,13 @@ export default function PublicScores({ matches, participants }: PublicScoresProp
           let swimmersList: { id: string; name: string }[] = [];
           let stopwatchState = { start_time: null as number | null, is_running: false, times: {} as Record<string, number | null> };
           try {
-            swimmersList = JSON.parse(m.team_a);
-            stopwatchState = JSON.parse(m.team_b);
+            swimmersList = typeof m.team_a === 'object' && m.team_a !== null
+              ? (m.team_a as any)
+              : JSON.parse(m.team_a || '[]');
+            
+            stopwatchState = typeof m.team_b === 'object' && m.team_b !== null
+              ? (m.team_b as any)
+              : JSON.parse(m.team_b || '{}');
           } catch (e) {}
 
           // Math to calculate live continuous ticking or stopped time for the master clock

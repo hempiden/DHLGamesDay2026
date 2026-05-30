@@ -100,9 +100,14 @@ export default function FacilitatorSwimmerDesk({
   // Decode the stopwatch state from database
   const swimState = useMemo(() => {
     const defaultState = { start_time: null as number | null, is_running: false, times: {} as Record<string, number | null> };
-    if (!localMatch) return defaultState;
+    if (!localMatch || !localMatch.team_b) return defaultState;
+
+    if (typeof localMatch.team_b === 'object') {
+      return { ...defaultState, ...(localMatch.team_b as any) };
+    }
+
     try {
-      if (localMatch.team_b.startsWith('{')) {
+      if (typeof localMatch.team_b === 'string' && localMatch.team_b.trim().startsWith('{')) {
         return JSON.parse(localMatch.team_b);
       }
     } catch (e) {}
@@ -162,15 +167,20 @@ export default function FacilitatorSwimmerDesk({
 
     // Auto calculate if all have completed
     let matchSwimmers: { id: string; name: string }[] = [];
-    try {
-      if (localMatch.team_a.startsWith('[')) {
-        matchSwimmers = JSON.parse(localMatch.team_a);
-      } else if (localMatch.team_a) {
-        const split = localMatch.team_a.split(',').map(s => s.trim()).filter(Boolean);
-        matchSwimmers = split.map((name, i) => ({ id: `swimmer-${i}-${name}`, name }));
-      }
-    } catch (e) {
-      if (localMatch.team_a) {
+    
+    if (Array.isArray(localMatch.team_a)) {
+      matchSwimmers = localMatch.team_a;
+    } else if (localMatch.team_a && typeof localMatch.team_a === 'object') {
+      matchSwimmers = [localMatch.team_a as any];
+    } else if (typeof localMatch.team_a === 'string') {
+      try {
+        if (localMatch.team_a.trim().startsWith('[')) {
+          matchSwimmers = JSON.parse(localMatch.team_a);
+        } else {
+          const split = localMatch.team_a.split(',').map(s => s.trim()).filter(Boolean);
+          matchSwimmers = split.map((name, i) => ({ id: `swimmer-${i}-${name}`, name }));
+        }
+      } catch (e) {
         const split = localMatch.team_a.split(',').map(s => s.trim()).filter(Boolean);
         matchSwimmers = split.map((name, i) => ({ id: `swimmer-${i}-${name}`, name }));
       }

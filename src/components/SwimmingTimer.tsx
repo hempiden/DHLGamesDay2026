@@ -102,8 +102,17 @@ export default function SwimmingTimer({
   // Parse swimmers from activeMatch.team_a
   const swimmers: SwimmerData[] = useMemo(() => {
     if (!activeMatch) return [];
+    
+    // If team_a is already an array, use it directly
+    if (Array.isArray(activeMatch.team_a)) {
+      return activeMatch.team_a;
+    }
+    if (activeMatch.team_a && typeof activeMatch.team_a === 'object') {
+      return [activeMatch.team_a];
+    }
+
     try {
-      if (activeMatch.team_a.startsWith('[')) {
+      if (typeof activeMatch.team_a === 'string' && activeMatch.team_a.trim().startsWith('[')) {
         return JSON.parse(activeMatch.team_a);
       }
     } catch (e) {
@@ -111,7 +120,7 @@ export default function SwimmingTimer({
     }
     
     // Fallback: split by comma or treat team_a and team_b as simple single names
-    if (!activeMatch.team_a) return [];
+    if (!activeMatch.team_a || typeof activeMatch.team_a !== 'string') return [];
     const split = activeMatch.team_a.split(',').map(s => s.trim()).filter(Boolean);
     if (split.length > 1) {
       return split.map((name, i) => ({ id: `swimmer-${i}-${name}`, name }));
@@ -119,7 +128,7 @@ export default function SwimmingTimer({
     
     return [
       { id: 'team-a', name: activeMatch.team_a },
-      { id: 'team-b', name: activeMatch.team_b }
+      { id: 'team-b', name: String(activeMatch.team_b || '') }
     ];
   }, [activeMatch]);
 
@@ -127,8 +136,13 @@ export default function SwimmingTimer({
   const swimState: SwimmingState = useMemo(() => {
     const defaultState: SwimmingState = { start_time: null, is_running: false, times: {} };
     if (!activeMatch) return defaultState;
+
+    if (activeMatch.team_b && typeof activeMatch.team_b === 'object') {
+      return { ...defaultState, ...(activeMatch.team_b as any) };
+    }
+
     try {
-      if (activeMatch.team_b.startsWith('{')) {
+      if (typeof activeMatch.team_b === 'string' && activeMatch.team_b.trim().startsWith('{')) {
         return JSON.parse(activeMatch.team_b);
       }
     } catch (e) {
@@ -282,6 +296,8 @@ export default function SwimmingTimer({
     if (!activeMatch) return;
     
     playBeep(220, 'sawtooth', 0.3);
+    setShowResetConfirm(false);
+
     const defaultState: SwimmingState = {
       start_time: null,
       is_running: false,
@@ -292,7 +308,6 @@ export default function SwimmingTimer({
       status: 'Upcoming',
       team_b: JSON.stringify(defaultState)
     });
-    setShowResetConfirm(false);
   };
 
   // Find photo URL for a swimmer name or ID
@@ -442,7 +457,7 @@ export default function SwimmingTimer({
                         <button
                           type="button"
                           onClick={handleResetHeat}
-                          className="px-3 py-2 bg-red-650 hover:bg-red-750 text-white font-black text-[9.5px] uppercase tracking-wider rounded-xl cursor-pointer active:scale-95 duration-75"
+                          className="px-3 py-2 bg-red-600 hover:bg-red-700 text-white font-black text-[9.5px] uppercase tracking-wider rounded-xl cursor-pointer active:scale-95 duration-75 shadow-sm"
                         >
                           Yes, Reset (បាទ/ចាស)
                         </button>
