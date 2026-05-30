@@ -338,6 +338,8 @@ export default function App() {
               status: item.status as 'Upcoming' | 'Live' | 'Finished',
               created_at: item.created_at || new Date().toISOString(),
               updated_at: item.updated_at || new Date().toISOString(),
+              scheduled_date: item.scheduled_date || undefined,
+              scheduled_time: item.scheduled_time || undefined,
             }));
             
             setMatches((prev) => {
@@ -547,6 +549,8 @@ export default function App() {
             score_a: items.score_a,
             score_b: items.score_b,
             status: items.status,
+            scheduled_date: items.scheduled_date || null,
+            scheduled_time: items.scheduled_time || null,
           });
           if (error) console.error('Error inserting match:', error.message);
         } catch (err) {
@@ -853,6 +857,7 @@ export default function App() {
                 supabaseUrl={supabaseUrl}
                 supabaseAnonKey={supabaseAnonKey}
                 isSupabaseEnabled={isSupabaseEnabled}
+                matches={matches}
               />
             )}
 
@@ -909,7 +914,7 @@ export default function App() {
             )}
 
             {/* TAB 5: DATABASE SYNCHRONIZATION SETUP */}
-            {activeTab === 'database' && currentUser && (
+            {activeTab === 'database' && currentUser && currentUser.role === 'super_admin' && (
               <DatabaseSetup
                 supabaseUrl={supabaseUrl}
                 setSupabaseUrl={setSupabaseUrl}
@@ -945,12 +950,38 @@ export default function App() {
       </main>
 
       {/* Brand Footer Info mimicking score.html footer exactly with dynamic clock */}
-      <footer className="fixed bottom-0 w-full bg-white border-t border-gray-200 px-6 sm:px-8 py-3 flex flex-col sm:flex-row justify-between items-center z-40 gap-2 shadow-inner select-none">
-        <div className="flex gap-6">
+      <footer className="fixed bottom-0 w-full bg-white border-t border-gray-200 px-6 sm:px-8 py-3 flex flex-col sm:flex-row justify-between items-center z-45 gap-2 shadow-inner select-none">
+        <div className="flex gap-6 items-center flex-wrap">
           <div className="flex items-center gap-1.5">
             <span className="text-[10px] font-black text-gray-400 uppercase">Admin:</span>
-            <span className="text-[10px] font-bold text-gray-700">{currentUser ? currentUser.name : 'GUEST / SPECTATOR'}</span>
+            <span className="text-[10px] font-bold text-gray-700">{currentUser ? `${currentUser.name} (${currentUser.role === 'super_admin' ? 'SuperAdmin' : 'Facilitator'})` : 'GUEST / SPECTATOR'}</span>
           </div>
+          {currentUser && currentUser.role === 'super_admin' && (
+            <div className="flex items-center gap-2 border-l border-gray-200 pl-3">
+              <button
+                type="button"
+                onClick={() => setActiveTab('database')}
+                className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all duration-150 cursor-pointer shrink-0 ${
+                  activeTab === 'database'
+                    ? 'bg-indigo-600 text-white shadow-xs'
+                    : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100'
+                }`}
+              >
+                💾 Database Setup
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('users')}
+                className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all duration-150 cursor-pointer shrink-0 ${
+                  activeTab === 'users'
+                    ? 'bg-purple-600 text-white shadow-xs'
+                    : 'bg-purple-50 text-purple-700 hover:bg-purple-100'
+                }`}
+              >
+                🛡️ Admins & Approvals
+              </button>
+            </div>
+          )}
           <div className="flex items-center gap-1.5 text-center sm:text-left">
             <span className="text-[10px] font-black text-gray-400 uppercase">Session:</span>
             <span className="text-[10px] font-bold text-[#D40511] font-mono tracking-tight">{currentTime || '12:00:00 PM'}</span>

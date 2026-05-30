@@ -482,24 +482,31 @@ export default function PublicScores({ matches, participants }: PublicScoresProp
                     <div 
                       key={m.id}
                       onClick={() => setSelectedFullscreenMatchId(m.id)}
-                      className="bg-[#0f172a] text-white rounded-[24px] border-l-[6px] border-l-cyan-550 border border-slate-800 shadow-md p-6 relative overflow-hidden cursor-pointer hover:scale-[1.01] hover:shadow-cyan-950/30 hover:border-cyan-500/30 transition-all duration-200 group"
+                      className="bg-white text-gray-800 rounded-[24px] border-l-[6px] border-l-red-650 border border-gray-150 shadow-md p-6 relative overflow-hidden cursor-pointer hover:scale-[1.01] hover:shadow-lg hover:border-red-200 transition-all duration-200 group"
                       title="Click to enter Fullscreen Slideshow Mode"
                     >
-                      <div className="absolute top-0 right-0 py-1.5 px-4 bg-cyan-600 text-white font-black text-[9px] uppercase tracking-widest rounded-bl-xl flex items-center gap-1 animate-pulse">
-                        <span className="w-1.5 h-1.5 rounded-full bg-white"></span>
+                      <div className="absolute top-0 right-0 py-1.5 px-4 bg-red-650 text-white font-black text-[9px] uppercase tracking-widest rounded-bl-xl flex items-center gap-1 animate-pulse">
+                        <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping"></span>
                         <span>LIVE SWIM HEAT</span>
                       </div>
 
                       <div className="space-y-4">
                         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
                           <div className="space-y-1">
-                            <span className="px-2.5 py-0.5 bg-cyan-950 text-cyan-400 font-extrabold uppercase text-[9px] tracking-wider rounded-md border border-cyan-800 inline-block">
-                              ⏱️ SWIMMING • {m.match_label}
-                            </span>
-                            <h4 className="font-black text-white text-md tracking-tight uppercase">គន្លងហែលទឹកផ្សាយផ្ទាល់ (Live Lane Track Feed)</h4>
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <span className="px-2.5 py-0.5 bg-red-50 text-[#D40511] font-extrabold uppercase text-[9px] tracking-wider rounded-md border border-red-100 inline-block">
+                                ⏱️ SWIMMING • {m.match_label}
+                              </span>
+                              {(m.scheduled_date || m.scheduled_time) && (
+                                <span className="px-2 py-0.5 bg-gray-50 border border-gray-150 text-gray-500 font-extrabold uppercase text-[9px] tracking-wider rounded-md inline-block">
+                                  📅 {[m.scheduled_date, m.scheduled_time].filter(Boolean).join(' • ')}
+                                </span>
+                              )}
+                            </div>
+                            <h4 className="font-black text-gray-800 text-sm mt-1 uppercase">គន្លងហែលទឹកផ្សាយផ្ទាល់ (Live Lane Track Feed)</h4>
                           </div>
                           
-                          <span className="text-[9px] inline-flex items-center gap-1.5 text-cyan-400 font-black uppercase tracking-wider bg-cyan-950 border border-cyan-800 px-2.5 py-1 rounded-full shrink-0">
+                          <span className="text-[9px] inline-flex items-center gap-1.5 text-[#D40511] font-black uppercase tracking-wider bg-red-50 border border-red-100 px-2.5 py-1 rounded-full shrink-0">
                             <Maximize2 className="w-3 h-3 animate-pulse" />
                             <span>បង្ហាញ Fullscreen Slideshow 📺</span>
                           </span>
@@ -532,21 +539,25 @@ export default function PublicScores({ matches, participants }: PublicScoresProp
                             return (
                               <div 
                                 key={sw.id || idx}
-                                className={`p-3 rounded-xl flex items-center justify-between border ${
+                                className={`p-3 rounded-xl flex items-center justify-between border transition ${
                                   isStopped
-                                    ? 'bg-slate-900 border-slate-800 text-gray-400'
+                                    ? 'bg-gray-50 border-gray-200 text-gray-500'
                                     : isTimerRunning
-                                    ? 'bg-cyan-950/40 border-cyan-500/30 text-cyan-100'
-                                    : 'bg-slate-950/60 border-slate-900 text-gray-500'
+                                    ? 'bg-yellow-50 border-yellow-400/45 text-slate-800'
+                                    : 'bg-white border-gray-100 text-gray-400'
                                 }`}
                               >
                                 <div className="flex items-center gap-2.5 text-xs">
-                                  <span className="font-mono font-black text-[9px] text-cyan-400 bg-cyan-950 px-2 py-0.5 rounded border border-cyan-850">
+                                  <span className={`font-mono font-black text-[9px] px-2 py-0.5 rounded border ${
+                                    isTimerRunning 
+                                      ? 'text-[#D40511] bg-yellow-100 border-yellow-300' 
+                                      : 'text-gray-500 bg-gray-100 border-gray-200'
+                                  }`}>
                                     Lane {idx + 1}
                                   </span>
-                                  <p className="font-bold truncate max-w-[120px] text-white">{sw.name}</p>
+                                  <p className="font-bold truncate max-w-[120px] text-gray-800">{sw.name}</p>
                                 </div>
-                                <span className={`font-mono text-[11px] font-black ${isStopped ? 'text-cyan-400' : 'text-[#FFCC00]'}`}>
+                                <span className={`font-mono text-[11px] font-black ${isStopped ? 'text-emerald-600' : isTimerRunning ? 'text-[#D40511]' : 'text-gray-400'}`}>
                                   {isStopped ? `⏱️ ${displayTime}` : isTimerRunning ? '🏊‍♂️ ' + displayTime : '⏱️ ' + displayTime}
                                 </span>
                               </div>
@@ -572,9 +583,16 @@ export default function PublicScores({ matches, participants }: PublicScoresProp
 
                     <div className="flex flex-col sm:flex-row justify-between items-center gap-6">
                       <div className="space-y-1 text-center sm:text-left shrink-0">
-                        <span className="px-2 py-0.5 bg-red-50 text-[#D40511] font-black uppercase text-[9px] tracking-wider rounded-md border border-red-100">
-                          {SPORT_CONFIGS[m.sport_name]?.icon} {m.sport_name}
-                        </span>
+                        <div className="flex flex-wrap justify-center sm:justify-start items-center gap-1.5">
+                          <span className="px-2 py-0.5 bg-red-50 text-[#D40511] font-black uppercase text-[9px] tracking-wider rounded-md border border-red-100">
+                            {SPORT_CONFIGS[m.sport_name]?.icon} {m.sport_name}
+                          </span>
+                          {(m.scheduled_date || m.scheduled_time) && (
+                            <span className="px-2 py-0.5 bg-gray-50 border border-gray-150 text-gray-500 font-extrabold uppercase text-[9px] tracking-wider rounded-md inline-block">
+                              📅 {[m.scheduled_date, m.scheduled_time].filter(Boolean).join(' • ')}
+                            </span>
+                          )}
+                        </div>
                         <h4 className="font-black text-gray-800 text-sm mt-1 uppercase">{m.match_label}</h4>
                         <div className="flex items-center gap-1 text-[9px] text-[#D40511] font-bold uppercase">
                           <Clock className="w-3 h-3 animate-spin text-[#D40511]" />
@@ -631,19 +649,66 @@ export default function PublicScores({ matches, participants }: PublicScoresProp
                     className="p-5 bg-white border border-gray-100 rounded-3xl shadow-sm flex flex-col justify-between space-y-4"
                   >
                     <div className="flex justify-between items-start">
-                      <span className="px-2.5 py-1 bg-blue-50 border border-blue-100 text-blue-600 rounded-xl font-extrabold text-[9px] uppercase tracking-wide">
-                        {SPORT_CONFIGS[m.sport_name]?.icon} {m.sport_name}
-                      </span>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="px-2.5 py-1 bg-blue-50 border border-blue-100 text-blue-600 rounded-xl font-extrabold text-[9px] uppercase tracking-wide">
+                          {SPORT_CONFIGS[m.sport_name]?.icon} {m.sport_name}
+                        </span>
+                        {(m.scheduled_date || m.scheduled_time) && (
+                          <span className="px-2 py-0.5 bg-gray-50 border border-gray-150 text-gray-500 font-extrabold uppercase text-[9px] tracking-wider rounded-md inline-block">
+                            📅 {[m.scheduled_date, m.scheduled_time].filter(Boolean).join(' • ')}
+                          </span>
+                        )}
+                      </div>
                       <span className="text-[9px] text-gray-400 font-extrabold uppercase bg-gray-50 px-2 py-0.5 rounded-md">Upcoming</span>
                     </div>
 
                     <div className="space-y-1">
                       <h5 className="font-black text-gray-400 uppercase text-[9px] tracking-wider">{m.match_label}</h5>
-                      <div className="flex items-center gap-1 font-bold text-xs text-gray-700">
-                        <span className="line-clamp-1 max-w-[110px]">{m.team_a}</span>
-                        <span className="text-gray-300 font-black italic select-none px-1">VS</span>
-                        <span className="line-clamp-1 max-w-[110px]">{m.team_b}</span>
-                      </div>
+                      {m.sport_name === 'Swimming' ? (
+                        <div className="text-[10.5px] text-gray-700">
+                          <span className="font-black text-red-650 block text-[9.5px] uppercase tracking-wide mb-1">
+                            🏊‍♂️ ឈ្មោះកីឡាករ (Racer Pool Roster):
+                          </span>
+                          <div className="flex flex-wrap gap-1 pt-0.5">
+                            {(() => {
+                              let list: { id: string; name: string }[] = [];
+                              let parseSuccess = false;
+                              try {
+                                if (typeof m.team_a === 'object' && m.team_a !== null) {
+                                  list = m.team_a as any;
+                                  parseSuccess = Array.isArray(list);
+                                } else if (typeof m.team_a === 'string' && m.team_a.trim().startsWith('[')) {
+                                  list = JSON.parse(m.team_a);
+                                  parseSuccess = Array.isArray(list);
+                                }
+                              } catch(e) {}
+
+                              if (!parseSuccess || list.length === 0) {
+                                const rawText = typeof m.team_a === 'string' ? m.team_a : '';
+                                if (rawText) {
+                                  return (
+                                    <span className="px-2 py-0.5 bg-yellow-50 text-slate-800 border border-yellow-250 rounded-md text-[9.5px] font-extrabold shadow-xs">
+                                      {rawText}
+                                    </span>
+                                  );
+                                }
+                                return <span className="text-gray-400 italic">No registered swimmers</span>;
+                              }
+                              return list.map((sw, index) => (
+                                <span key={sw.id || index} className="px-2 py-0.5 bg-yellow-50 text-slate-800 border border-yellow-250 rounded-md text-[9.5px] font-extrabold shadow-xs transition hover:bg-yellow-100">
+                                  Lane {index + 1}: {sw.name}
+                                </span>
+                              ));
+                            })()}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1 font-bold text-xs text-gray-700 font-bold text-xs text-gray-700">
+                          <span className="line-clamp-1 max-w-[110px]">{m.team_a}</span>
+                          <span className="text-gray-300 font-black italic select-none px-1">VS</span>
+                          <span className="line-clamp-1 max-w-[110px]">{m.team_b}</span>
+                        </div>
+                      )}
                     </div>
 
                     <div className="flex items-center gap-1 text-[9px] font-black uppercase text-gray-400 border-t border-slate-50 pt-3">

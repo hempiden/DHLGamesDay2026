@@ -130,34 +130,6 @@ export default function Header({ activeTab, setActiveTab, isOnline, supabaseConn
                   <Settings className="w-4 h-4" />
                   <span>រៀបចំការប្រកួត (Setup Game)</span>
                 </button>
-
-                <button
-                  id="tab-database"
-                  onClick={() => setActiveTab('database')}
-                  className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs uppercase cursor-pointer tracking-wide transition-all duration-200 active:scale-95 whitespace-nowrap ${
-                    activeTab === 'database'
-                      ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/15'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  }`}
-                >
-                  <Database className="w-4 h-4" />
-                  <span>ការកំណត់ទិន្នន័យ (Database Setup)</span>
-                </button>
-
-                {currentUser.role === 'super_admin' && (
-                  <button
-                    id="tab-users"
-                    onClick={() => setActiveTab('users')}
-                    className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs uppercase cursor-pointer tracking-wide transition-all duration-200 active:scale-95 whitespace-nowrap ${
-                      activeTab === 'users'
-                        ? 'bg-purple-600 text-white shadow-md shadow-purple-600/15'
-                        : 'bg-[#FFCC00]/10 text-amber-800 border-2 border-dashed border-[#FFCC00] hover:bg-[#FFCC00]/25'
-                    }`}
-                  >
-                    <ShieldAlert className="w-4 h-4 text-amber-700" />
-                    <span>ការអនុញ្ញាតអាដមីន (Admins & Approvals)</span>
-                  </button>
-                )}
               </>
             ) : (
               <button

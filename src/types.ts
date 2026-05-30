@@ -11,6 +11,8 @@ export interface Match {
   status: 'Upcoming' | 'Live' | 'Finished';
   created_at: string;
   updated_at: string;
+  scheduled_date?: string;
+  scheduled_time?: string;
 }
 
 export interface TeamStanding {

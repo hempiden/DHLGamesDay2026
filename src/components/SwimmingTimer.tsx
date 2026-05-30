@@ -54,7 +54,7 @@ export default function SwimmingTimer({
 }: SwimmingTimerProps) {
   // 1. Filter active swimming matches (Upcoming or Live)
   const swimmingMatches = useMemo(() => {
-    return matches.filter(m => m.sport_name === 'Swimming');
+    return matches.filter(m => m.sport_name === 'Swimming' && m.status !== 'Finished');
   }, [matches]);
 
   const [selectedMatchId, setSelectedMatchId] = useState<string>('');
@@ -305,7 +305,7 @@ export default function SwimmingTimer({
     };
 
     await updateMatchFields(activeMatch.id, {
-      status: 'Upcoming',
+      status: 'Live',
       team_b: JSON.stringify(defaultState)
     });
   };

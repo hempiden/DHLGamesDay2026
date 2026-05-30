@@ -27,6 +27,8 @@ export default function AdminPanel({
   const [teamB, setTeamB] = useState('');
   const [matchLabel, setMatchLabel] = useState('វគ្គជម្រុះតាមពូល (Group Stage)');
   const [status, setStatus] = useState<'Upcoming' | 'Live' | 'Finished'>('Live');
+  const [scheduledDate, setScheduledDate] = useState('');
+  const [scheduledTime, setScheduledTime] = useState('');
 
   // Filter registered teams from the participants table corresponding to the active sport category
   const registeredTeamsFiltered = participants.filter((p) => p.is_team && p.sport_type === sport);
@@ -92,6 +94,8 @@ export default function AdminPanel({
         score_a: 0,
         score_b: 0,
         status,
+        scheduled_date: scheduledDate || undefined,
+        scheduled_time: scheduledTime || undefined,
       });
 
       alert('ការប្រកួតហែលទឹកត្រូវបានបង្កើត! Swimming heat created successfully.');
@@ -101,6 +105,8 @@ export default function AdminPanel({
         { id: 'lane-3', name: '', isCustom: false },
         { id: 'lane-4', name: '', isCustom: false }
       ]);
+      setScheduledDate('');
+      setScheduledTime('');
       return;
     }
 
@@ -120,11 +126,15 @@ export default function AdminPanel({
       score_a: 0,
       score_b: 0,
       status,
+      scheduled_date: scheduledDate || undefined,
+      scheduled_time: scheduledTime || undefined,
     });
 
     // Reset simple form inputs
     setTeamA('');
     setTeamB('');
+    setScheduledDate('');
+    setScheduledTime('');
     alert('ការប្រកួតត្រូវបានបង្កើត! Match created successfully.');
   };
 
@@ -368,6 +378,32 @@ export default function AdminPanel({
                 onChange={(e) => setMatchLabel(e.target.value)}
                 className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:border-[#FFCC00] focus:ring-1 focus:ring-[#FFCC00] outline-none font-medium"
               />
+            </div>
+
+            {/* Scheduled Date & Time */}
+            <div className="grid grid-cols-2 gap-35 gap-3">
+              <div>
+                <label className="block text-[10px] font-black uppercase text-gray-400 tracking-wider mb-1">
+                  កាលបរិច្ឆេទប្រកួត (Scheduled Date)
+                </label>
+                <input
+                  type="date"
+                  value={scheduledDate}
+                  onChange={(e) => setScheduledDate(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:border-[#FFCC00] focus:ring-1 focus:ring-[#FFCC00] outline-none font-medium text-xs text-gray-700"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-black uppercase text-gray-400 tracking-wider mb-1">
+                  ម៉ោងប្រកួត (Scheduled Time)
+                </label>
+                <input
+                  type="time"
+                  value={scheduledTime}
+                  onChange={(e) => setScheduledTime(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:border-[#FFCC00] focus:ring-1 focus:ring-[#FFCC00] outline-none font-medium text-xs text-gray-700"
+                />
+              </div>
             </div>
 
             {/* Match Status option */}

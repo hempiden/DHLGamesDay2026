@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Users, Search, HelpCircle, Trophy, User, ArrowRight, QrCode, X, Copy, ExternalLink } from 'lucide-react';
-import { Participant, SportType } from '../types';
+import { Participant, SportType, Match } from '../types';
 import { SPORT_CONFIGS } from '../data';
 
 interface PublicTeamsViewProps {
@@ -8,6 +8,7 @@ interface PublicTeamsViewProps {
   supabaseUrl?: string;
   supabaseAnonKey?: string;
   isSupabaseEnabled?: boolean;
+  matches?: Match[];
 }
 
 export default function PublicTeamsView({
@@ -15,6 +16,7 @@ export default function PublicTeamsView({
   supabaseUrl,
   supabaseAnonKey,
   isSupabaseEnabled,
+  matches = [],
 }: PublicTeamsViewProps) {
   const [selectedSport, setSelectedSport] = useState<SportType | 'All'>('All');
   const [searchQuery, setSearchQuery] = useState('');
@@ -29,11 +31,52 @@ export default function PublicTeamsView({
     return baseUrl;
   };
 
-  // Extract all teams (is_team === true)
-  const allTeams = participants.filter((p) => p.is_team);
+  // Extract all official teams (is_team === true) combined with individual sport participants who are listed in matches
+  const allTeams = React.useMemo(() => {
+    const teams = participants.filter((p) => p.is_team);
+    
+    const individualSports: SportType[] = ['Swimming', 'Badminton', 'Pingpong'];
+    const individualTeams = participants.filter((p) => {
+      if (p.is_team) return false;
+      if (!individualSports.includes(p.sport_type)) return false;
+      
+      // Check if they are added in any match setup
+      return matches.some((m) => {
+        if (m.sport_name !== p.sport_type) return false;
+        
+        if (m.sport_name === 'Swimming') {
+          try {
+            let list: { id: string; name: string }[] = [];
+            if (typeof m.team_a === 'object' && m.team_a !== null) {
+              list = m.team_a as any;
+            } else if (typeof m.team_a === 'string') {
+              if (m.team_a.trim().startsWith('[')) {
+                list = JSON.parse(m.team_a);
+              } else {
+                list = m.team_a.split(',').map((name, i) => ({ id: `swimmer-${i}-${name}`, name: name.trim() }));
+              }
+            }
+            return list.some(sw => sw.id === p.id || sw.name.toLowerCase() === p.name.toLowerCase());
+          } catch (e) {
+            return false;
+          }
+        } else {
+          const matchA = typeof m.team_a === 'string' ? m.team_a : '';
+          const matchB = typeof m.team_b === 'string' ? m.team_b : '';
+          return matchA.toLowerCase() === p.name.toLowerCase() || matchB.toLowerCase() === p.name.toLowerCase();
+        }
+      });
+    }).map((p) => ({
+      ...p,
+      is_team: true, // Treat as team for layout in this view
+      is_single_player: true,
+    }));
+    
+    return [...teams, ...individualTeams];
+  }, [participants, matches]);
 
   // Filter based on sport and search query
-  const filteredTeams = allTeams.filter((team) => {
+  const filteredTeams = allTeams.filter((team: any) => {
     // Sport Filter
     const matchesSport = selectedSport === 'All' || team.sport_type === selectedSport;
 
@@ -46,9 +89,9 @@ export default function PublicTeamsView({
     const matchesTeamName = team.name.toLowerCase().includes(query);
     
     // Find athletes of this team
-    const teamMembers = participants.filter(
-      (p) => !p.is_team && p.team_id === team.id
-    );
+    const teamMembers = team.is_single_player 
+      ? [{ ...team, is_team: false }]
+      : participants.filter((p) => !p.is_team && p.team_id === team.id);
     const matchesAnyMember = teamMembers.some((member) =>
       member.name.toLowerCase().includes(query)
     );
@@ -160,11 +203,11 @@ export default function PublicTeamsView({
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredTeams.map((team) => {
+          {filteredTeams.map((team: any) => {
             // Find active athletes rostered to this team
-            const members = participants.filter(
-              (p) => !p.is_team && p.team_id === team.id
-            );
+            const members = team.is_single_player
+              ? [{ ...team, is_team: false }]
+              : participants.filter((p) => !p.is_team && p.team_id === team.id);
             const sportCfg = SPORT_CONFIGS[team.sport_type] || {
               icon: '🛡️',
               khmerName: 'មិនស្គាល់',

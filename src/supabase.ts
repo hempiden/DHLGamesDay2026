@@ -59,6 +59,8 @@ export async function syncLocalToSupabase(matches: Match[], client: SupabaseClie
       score_a: match.score_a,
       score_b: match.score_b,
       status: match.status,
+      scheduled_date: match.scheduled_date || null,
+      scheduled_time: match.scheduled_time || null,
     };
 
     // Upsert by sport and teams if we are mapping
