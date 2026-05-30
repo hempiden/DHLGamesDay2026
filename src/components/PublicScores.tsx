@@ -265,6 +265,134 @@ export default function PublicScores({ matches, participants }: PublicScoresProp
             </h3>
           </div>
 
+          {selectedSport === 'Swimming' && (() => {
+            // Group finished swimming matches by match_label
+            const finishedSwimMatches = matches.filter(
+              (m) => m.sport_name === 'Swimming' && m.status === 'Finished'
+            );
+
+            if (finishedSwimMatches.length === 0) return null;
+
+            // Group swimmers by stage label
+            const swimGroups: Record<string, { name: string; time: number; matchLabel: string }[]> = {};
+
+            finishedSwimMatches.forEach((m) => {
+              try {
+                const swimmersList = JSON.parse(m.team_a) as { id: string; name: string }[];
+                const timerState = JSON.parse(m.team_b) as { times: Record<string, number | null> };
+                
+                swimmersList.forEach((sw) => {
+                  const duration = timerState.times?.[sw.id] ?? timerState.times?.[sw.name];
+                  if (duration !== undefined && duration !== null) {
+                    if (!swimGroups[m.match_label]) {
+                      swimGroups[m.match_label] = [];
+                    }
+                    swimGroups[m.match_label].push({
+                      name: sw.name,
+                      time: duration,
+                      matchLabel: m.match_label,
+                    });
+                  }
+                });
+              } catch (e) {
+                console.error("Failed to parse swimming match for leaderboard:", e);
+              }
+            });
+
+            const labels = Object.keys(swimGroups);
+            if (labels.length === 0) return null;
+
+            return (
+              <div className="bg-[#0f172a] rounded-[30px] p-6 border-2 border-cyan-500/30 text-white space-y-4 shadow-lg mb-6">
+                <div className="flex items-center gap-2.5 border-b border-cyan-500/20 pb-3">
+                  <Trophy className="w-5 h-5 text-yellow-400 animate-bounce" />
+                  <div>
+                    <h4 className="text-xs font-black uppercase text-cyan-400 tracking-wider">
+                      ចំណាត់ថ្នាក់ហែលទឹកសរុប (Consolidated Swimming Rankings)
+                    </h4>
+                    <p className="text-[10px] text-gray-400">
+                      កីឡាករក្នុងវគ្គជាមួយគ្នា ត្រូវបានចាត់ចំណាត់ថ្នាក់រួមគ្នា (Players in the same stage label are ranked together)
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-6">
+                  {labels.map((label) => {
+                    // Sort swimmers in this label by time ascending (lowest time = fastest!)
+                    const sortedSwimmers = [...swimGroups[label]].sort((a, b) => a.time - b.time);
+
+                    return (
+                      <div key={label} className="bg-slate-900/60 p-4 rounded-2xl border border-slate-800 space-y-3">
+                        <div className="flex justify-between items-center bg-cyan-950/45 px-3 py-1.5 rounded-xl border border-cyan-500/10">
+                          <span className="text-[11px] font-black text-cyan-450 uppercase">
+                            📍 វគ្គប្រកួត៖ {label}
+                          </span>
+                          <span className="text-[9px] font-bold text-gray-400">
+                            ចំនួនកីឡាករ៖ {sortedSwimmers.length} នាក់
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                          {sortedSwimmers.map((sw, index) => {
+                            const isGold = index === 0;
+                            const isSilver = index === 1;
+                            const isBronze = index === 2;
+
+                            // Format as mm:ss.SS
+                            const totalMs = sw.time;
+                            const mins = Math.floor(totalMs / 60000);
+                            const secs = Math.floor((totalMs % 60000) / 1000);
+                            const ms = Math.floor((totalMs % 1000) / 10);
+                            const formattedTime = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}.${ms.toString().padStart(2, '0')}`;
+
+                            return (
+                              <div
+                                key={sw.name + index}
+                                className={`flex items-center justify-between px-3.5 py-2.5 rounded-xl transition ${
+                                  isGold
+                                    ? 'bg-gradient-to-r from-amber-500/20 to-yellow-500/5 border border-yellow-500/40 text-yellow-100'
+                                    : isSilver
+                                    ? 'bg-slate-100/5 border border-slate-400/30 text-slate-100'
+                                    : isBronze
+                                    ? 'bg-amber-700/5 border border-amber-805/30 text-amber-200'
+                                    : 'bg-slate-950/45 border border-slate-900/40 text-gray-300'
+                                }`}
+                              >
+                                <div className="flex items-center gap-3">
+                                  <span className={`w-6 h-6 rounded-lg flex items-center justify-center font-mono text-xs font-black shrink-0 ${
+                                    isGold
+                                      ? 'bg-yellow-400 text-gray-950 text-[10px]'
+                                      : isSilver
+                                      ? 'bg-slate-300 text-gray-900 text-[10px]'
+                                      : isBronze
+                                      ? 'bg-amber-600 text-white text-[10px]'
+                                      : 'bg-slate-900 text-gray-400'
+                                  }`}>
+                                    {isGold ? '🥇' : isSilver ? '🥈' : isBronze ? '🥉' : `${index + 1}`}
+                                  </span>
+                                  <span className="font-extrabold text-xs">{sw.name}</span>
+                                </div>
+
+                                <div className="flex items-center gap-2">
+                                  <span className="text-[10px] uppercase font-black tracking-widest text-[#FFCC00]/80">
+                                    {isGold ? 'Winner' : ''}
+                                  </span>
+                                  <span className="font-mono text-xs font-black text-cyan-400 bg-cyan-950/40 px-2.5 py-1 rounded-lg border border-cyan-500/10">
+                                    ⏱️ {formattedTime}
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
+
           {liveMatches.length === 0 ? (
             <div className="bg-white p-12 text-center rounded-3xl border border-dotted border-gray-200 text-gray-400 flex flex-col items-center justify-center">
               <span className="text-3xl filter grayscale opacity-45 mb-2">🚥</span>
@@ -275,45 +403,122 @@ export default function PublicScores({ matches, participants }: PublicScoresProp
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-4">
-              {liveMatches.map((m) => (
-                <div 
-                  key={m.id}
-                  className="bg-white rounded-[24px] border-l-[6px] border-l-red-500 border border-gray-100 shadow-md p-6 relative overflow-hidden"
-                >
-                  <div className="absolute top-0 right-0 py-1.5 px-4 bg-red-600 text-white font-black text-[9px] uppercase tracking-widest rounded-bl-xl animate-pulse">
-                    Live Score
-                  </div>
+              {liveMatches.map((m) => {
+                const isSwimming = m.sport_name === 'Swimming';
 
-                  <div className="flex flex-col sm:flex-row justify-between items-center gap-6">
-                    <div className="space-y-1 text-center sm:text-left shrink-0">
-                      <span className="px-2 py-0.5 bg-red-50 text-[#D40511] font-black uppercase text-[9px] tracking-wider rounded-md border border-red-100">
-                        {SPORT_CONFIGS[m.sport_name]?.icon} {m.sport_name}
-                      </span>
-                      <h4 className="font-black text-gray-800 text-sm mt-1 uppercase">{m.match_label}</h4>
-                      <div className="flex items-center gap-1 text-[9px] text-[#D40511] font-bold uppercase">
-                        <Clock className="w-3 h-3 animate-spin" />
-                        <span>Live Timing Active</span>
+                if (isSwimming) {
+                  let swimmersList: { id: string; name: string }[] = [];
+                  let stopwatchState = { start_time: null as number | null, is_running: false, times: {} as Record<string, number | null> };
+                  try {
+                    swimmersList = JSON.parse(m.team_a);
+                    stopwatchState = JSON.parse(m.team_b);
+                  } catch (e) {}
+
+                  return (
+                    <div 
+                      key={m.id}
+                      className="bg-[#0f172a] text-white rounded-[24px] border-l-[6px] border-l-cyan-550 border border-slate-800 shadow-md p-6 relative overflow-hidden"
+                    >
+                      <div className="absolute top-0 right-0 py-1.5 px-4 bg-cyan-600 text-white font-black text-[9px] uppercase tracking-widest rounded-bl-xl animate-pulse">
+                        LIVE SWIM HEAT
+                      </div>
+
+                      <div className="space-y-4">
+                        <div className="space-y-1">
+                          <span className="px-2.5 py-0.5 bg-cyan-950 text-cyan-400 font-extrabold uppercase text-[9px] tracking-wider rounded-md border border-cyan-800 inline-block">
+                            ⏱️ SWIMMING • {m.match_label}
+                          </span>
+                          <h4 className="font-black text-white text-md tracking-tight uppercase">គន្លងហែលទឹកផ្សាយផ្ទាល់ (Live Lane Track Feed)</h4>
+                        </div>
+
+                        {/* List lanes */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 pt-1">
+                          {swimmersList.map((sw, idx) => {
+                            const stoppedTime = stopwatchState.times?.[sw.id] ?? stopwatchState.times?.[sw.name];
+                            const isStopped = stoppedTime !== undefined && stoppedTime !== null;
+                            const isTimerRunning = stopwatchState.is_running && !isStopped;
+
+                            // format stopped time
+                            let displayTime = "Ready (ត្រៀម)";
+                            if (isStopped) {
+                              const totalMs = stoppedTime!;
+                              const mins = Math.floor(totalMs / 60000);
+                              const secs = Math.floor((totalMs % 60000) / 1000);
+                              const ms = Math.floor((totalMs % 1000) / 10);
+                              displayTime = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}.${ms.toString().padStart(2, '0')}`;
+                            } else if (isTimerRunning) {
+                              displayTime = "Running... (កំពុងហែល)";
+                            }
+
+                            return (
+                              <div 
+                                key={sw.id || idx}
+                                className={`p-3 rounded-xl flex items-center justify-between border ${
+                                  isStopped
+                                    ? 'bg-slate-900 border-slate-800 text-gray-400'
+                                    : isTimerRunning
+                                    ? 'bg-cyan-950/40 border-cyan-500/30 text-cyan-100 animate-pulse'
+                                    : 'bg-slate-950/60 border-slate-900 text-gray-500'
+                                }`}
+                              >
+                                <div className="flex items-center gap-2.5 text-xs">
+                                  <span className="font-mono font-black text-[9px] text-cyan-400 bg-cyan-950 px-2 py-0.5 rounded border border-cyan-850">
+                                    Lane {idx + 1}
+                                  </span>
+                                  <p className="font-bold truncate max-w-[120px] text-white">{sw.name}</p>
+                                </div>
+                                <span className={`font-mono text-[11px] font-black ${isStopped ? 'text-cyan-400' : 'text-[#FFCC00]'}`}>
+                                  {isStopped ? `⏱️ ${displayTime}` : isTimerRunning ? '🏊‍♂️ ' + displayTime : '⏱️ ' + displayTime}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
                       </div>
                     </div>
+                  );
+                }
 
-                    <div className="flex items-center justify-center gap-3 sm:gap-7 w-full sm:w-auto">
-                      <div className="text-right w-24 sm:w-36">
-                        <p className="font-extrabold text-xs sm:text-sm text-gray-800 line-clamp-1">{m.team_a}</p>
-                        <span className="text-[9px] text-gray-400 uppercase font-black">Competitor A</span>
+                return (
+                  <div 
+                    key={m.id}
+                    className="bg-white rounded-[24px] border-l-[6px] border-l-red-500 border border-gray-100 shadow-md p-6 relative overflow-hidden"
+                  >
+                    <div className="absolute top-0 right-0 py-1.5 px-4 bg-red-600 text-white font-black text-[9px] uppercase tracking-widest rounded-bl-xl animate-pulse">
+                      Live Score
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row justify-between items-center gap-6">
+                      <div className="space-y-1 text-center sm:text-left shrink-0">
+                        <span className="px-2 py-0.5 bg-red-50 text-[#D40511] font-black uppercase text-[9px] tracking-wider rounded-md border border-red-100">
+                          {SPORT_CONFIGS[m.sport_name]?.icon} {m.sport_name}
+                        </span>
+                        <h4 className="font-black text-gray-800 text-sm mt-1 uppercase">{m.match_label}</h4>
+                        <div className="flex items-center gap-1 text-[9px] text-[#D40511] font-bold uppercase">
+                          <Clock className="w-3 h-3 animate-spin" />
+                          <span>Live Timing Active</span>
+                        </div>
                       </div>
 
-                      <div className="px-5 py-2.5 bg-gray-950 text-[#FFCC00] rounded-2xl font-mono text-xl sm:text-2xl font-black tracking-widest shadow-inner">
-                        {m.score_a} - {m.score_b}
-                      </div>
+                      <div className="flex items-center justify-center gap-3 sm:gap-7 w-full sm:w-auto">
+                        <div className="text-right w-24 sm:w-36">
+                          <p className="font-extrabold text-xs sm:text-sm text-gray-800 line-clamp-1">{m.team_a}</p>
+                          <span className="text-[9px] text-gray-400 uppercase font-black">Competitor A</span>
+                        </div>
 
-                      <div className="text-left w-24 sm:w-36">
-                        <p className="font-extrabold text-xs sm:text-sm text-gray-800 line-clamp-1">{m.team_b}</p>
-                        <span className="text-[9px] text-gray-400 uppercase font-black">Competitor B</span>
+                        <div className="px-5 py-2.5 bg-gray-950 text-[#FFCC00] rounded-2xl font-mono text-xl sm:text-2xl font-black tracking-widest shadow-inner">
+                          {m.score_a} - {m.score_b}
+                        </div>
+
+                        <div className="text-left w-24 sm:w-36">
+                          <p className="font-extrabold text-xs sm:text-sm text-gray-800 line-clamp-1">{m.team_b}</p>
+                          <span className="text-[9px] text-gray-400 uppercase font-black">Competitor B</span>
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
 
@@ -380,6 +585,63 @@ export default function PublicScores({ matches, participants }: PublicScoresProp
               </div>
             ) : (
               finishedMatches.map((m) => {
+                const isSwim = m.sport_name === 'Swimming';
+
+                if (isSwim) {
+                  let swimmersList: { id: string; name: string }[] = [];
+                  let stopwatchState = { times: {} as Record<string, number | null> };
+                  try {
+                    swimmersList = JSON.parse(m.team_a);
+                    stopwatchState = JSON.parse(m.team_b);
+                  } catch (e) {}
+
+                  // Sort swimmers by recorded stopped times
+                  const sortedSwimmers = swimmersList
+                    .map(sw => ({
+                      name: sw.name,
+                      time: stopwatchState.times?.[sw.id] ?? stopwatchState.times?.[sw.name] ?? null
+                    }))
+                    .filter(s => s.time !== null)
+                    .sort((a, b) => a.time! - b.time!);
+
+                  return (
+                    <div key={m.id} className="p-3.5 bg-cyan-50/20 border border-cyan-100 rounded-2xl space-y-2">
+                      <div className="flex justify-between items-center">
+                        <span className="text-[9px] font-black text-cyan-700 bg-cyan-100/50 px-2 py-0.5 rounded-md uppercase tracking-tight">
+                          🏊‍♂️ Swimming • {m.match_label}
+                        </span>
+                        <span className="text-[8px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded-md font-black uppercase">
+                          RESOLVED
+                        </span>
+                      </div>
+
+                      <div className="space-y-1.5 pt-1">
+                        {sortedSwimmers.slice(0, 3).map((sw, insideIdx) => {
+                          const totalMs = sw.time!;
+                          const mins = Math.floor(totalMs / 60000);
+                          const secs = Math.floor((totalMs % 60000) / 1000);
+                          const ms = Math.floor((totalMs % 1000) / 10);
+                          const formatted = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}.${ms.toString().padStart(2, '0')}`;
+
+                          return (
+                            <div key={insideIdx} className="flex justify-between items-center text-[11px]">
+                              <span className="font-extrabold text-gray-700 flex items-center gap-1">
+                                <span className="font-mono text-[9px] text-gray-400">#{insideIdx + 1}</span> {sw.name} {insideIdx === 0 ? '🥇' : insideIdx === 1 ? '🥈' : insideIdx === 2 ? '🥉' : ''}
+                              </span>
+                              <span className="font-mono font-bold text-[10px] text-cyan-600">
+                                {formatted}
+                              </span>
+                            </div>
+                          );
+                        })}
+                        {sortedSwimmers.length === 0 && (
+                          <p className="text-[9px] text-gray-400 text-center py-2">No swimmer times logged.</p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                }
+
                 const winnerA = m.score_a > m.score_b;
                 const winnerB = m.score_b > m.score_a;
                 

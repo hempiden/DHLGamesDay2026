@@ -173,13 +173,31 @@ export default function DatabaseSetup({
         </div>
 
         <div className="text-xs space-y-5">
-          <div className="bg-amber-50/55 border border-amber-200/60 p-4 rounded-2xl text-amber-900 leading-relaxed flex gap-3">
-            <Info className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
-            <div className="space-y-1">
-              <p className="font-semibold text-[11px]">ព័ត៌មានប្រព័ន្ធទិន្នន័យ (System Information)</p>
-              <p className="text-gray-600 font-medium text-[10.5px]">
-                អ្នកអាចភ្ជាប់កម្មវិធីនេះទៅកាន់ **Supabase Realtime Database** ផ្ទាល់ខ្លួនរបស់អ្នកបាន។ ប្រសិនបើភ្ជាប់ជោគជ័យ ទិន្នន័យនៃការបញ្ចូលពិន្ទុ កីឡាករ និងការប្រកួត នឹងត្រូវបានរក្សាទុក និង Sync នៅលើ Server ជាក់ស្តែងភ្លាមៗ។
-              </p>
+          <div className="bg-slate-900 text-slate-100 rounded-2xl p-5 border border-slate-800 space-y-4 shadow-md">
+            <div className="flex gap-3">
+              <Info className="w-5.5 h-5.5 text-indigo-400 shrink-0 mt-0.5" />
+              <div className="space-y-1.5 text-[11px]">
+                <p className="font-extrabold text-indigo-300 uppercase tracking-wider">របៀបដំណើរការទិន្នន័យ & Environment Keys (System Architecture Guide)</p>
+                
+                <div className="space-y-2.5 text-gray-300">
+                  <p>
+                    <strong className="text-white">❓ ហេតុអ្វីបានជាគ្មានទិន្នន័យនៅក្នុងតារាង (Why is my table empty?):</strong><br />
+                    តាមលំនាំដើម កម្មវិធីនេះរក្សាទុកទិន្នន័យទាំងអស់នៅលើប្រព័ន្ធ <span className="bg-slate-850 px-1 py-0.5 rounded text-amber-400 font-mono">localStorage</span> របស់ Browser។ រហូតទាល់តែអ្នកចុចប៊ូតុង <strong className="text-emerald-400">"Push Local Data to Supabase"</strong> នៅផ្នែកខាងក្រោម ទើបកីឡាករ និងការប្រកួតទាំងអស់ត្រូវបានបញ្ចូលទៅកាន់ពពក (Supabase Cloud)!
+                  </p>
+
+                  <p>
+                    <strong className="text-white">🔑 ភាពខុសគ្នារវាង Environment Keys (VITE_ vs NEXT_PUBLIC_):</strong><br />
+                    • <span className="text-[#FFCC00] font-mono">VITE_SUPABASE_URL</span> / <span className="text-[#FFCC00] font-mono">_ANON_KEY</span> គឺជាឈ្មោះកូដលំនាំដើមដែលប្រើដោយ <strong className="text-white">Vite.js React builder</strong> (គម្រោងរបស់យើងកំពុងប្រើប្រាស់)។<br />
+                    • <span className="text-cyan-400 font-mono">NEXT_PUBLIC_SUPABASE_URL</span> / <span className="text-cyan-400 font-mono">_PUBLISHABLE_KEY</span> គឺជាឈ្មោះកូដសម្រាប់គម្រោងដែលបង្កើតឡើងដោយ <strong className="text-white">Next.js framework</strong>។<br />
+                    <i>💡 កម្មវិធីរបស់យើងត្រូវបានរចនាឡើងយ៉ាងឆ្លាតវៃ ដោយវាគាំទ្រ និងស្គាល់កូដទាំងពីរប្រភេទនេះដោយស្វ័យប្រវត្តិ។ ដូច្នេះអ្នកអាចបំពេញមួយណាក៏បាននៅក្នុង Vercel variables!</i>
+                  </p>
+
+                  <p>
+                    <strong className="text-white">📊 តារាងទិន្នន័យ (Database Tables Schema):</strong><br />
+                    គម្រោងរបស់ Dhl Games Day ត្រូវការតែ <strong className="text-indigo-300">២ តារាងប៉ុណ្ណោះ matches និង participants</strong>។ ទិន្នន័យគណនីអ្នកប្រើប្រាស់ (Users) ត្រូវបានគ្រប់គ្រងនៅលើម៉ាស៊ីន local space ដើម្បីសុវត្ថិភាពខ្ពស់ និងរហ័សទាន់ចិត្ត។
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
 

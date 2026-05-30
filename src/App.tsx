@@ -10,13 +10,14 @@ import UsersApprovalPanel from './components/UsersApprovalPanel';
 import PublicTeamsView from './components/PublicTeamsView';
 import PublicAthletePhotoUpload from './components/PublicAthletePhotoUpload';
 import AnalyticsDashboard from './components/AnalyticsDashboard';
+import SwimmingTimer from './components/SwimmingTimer';
 import { Match, SportType, Participant, AppUser } from './types';
 import { INITIAL_MATCHES, INITIAL_PARTICIPANTS } from './data';
 import { getSupabaseClient, testSupabaseConnection } from './supabase';
 import { Laptop, Wifi, WifiOff, RefreshCw, Layers, ShieldAlert, Heart, Calendar } from 'lucide-react';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'leaderboard' | 'public_teams' | 'dashboard' | 'scoring' | 'admin' | 'teams' | 'database' | 'users' | 'login'>('leaderboard');
+  const [activeTab, setActiveTab] = useState<'leaderboard' | 'public_teams' | 'dashboard' | 'scoring' | 'admin' | 'teams' | 'database' | 'users' | 'login' | 'swimming'>('leaderboard');
   const [matches, setMatches] = useState<Match[]>([]);
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [isOnline, setIsOnline] = useState<boolean>(typeof window !== 'undefined' ? window.navigator.onLine : true);
@@ -388,6 +389,40 @@ export default function App() {
     return true;
   };
 
+  // Helper component action: Modify arbitrary Match Fields
+  const updateMatchFields = async (id: string, fields: Partial<Match>): Promise<boolean> => {
+    const updated = matches.map((m) => {
+      if (m.id === id) {
+        return { ...m, ...fields, updated_at: new Date().toISOString() };
+      }
+      return m;
+    });
+
+    saveLocalMatches(updated);
+
+    if (isSupabaseEnabled && supabaseConnected) {
+      const client = getSupabaseClient(supabaseUrl, supabaseAnonKey);
+      if (client) {
+        try {
+          const parsedId = isNaN(Number(id)) ? id : Number(id);
+          const { error } = await client
+            .from('matches')
+            .update({ ...fields, updated_at: new Date().toISOString() })
+            .eq('id', parsedId);
+
+          if (error) {
+            console.error('Error syncing updated match fields:', error.message);
+            return false;
+          }
+        } catch (err) {
+          console.error('Network push match fields failed:', err);
+          return false;
+        }
+      }
+    }
+    return true;
+  };
+
   // Helper component action: Finish Match Status
   const finishMatch = async (id: string): Promise<boolean> => {
     const updated = matches.map((m) => {
@@ -731,6 +766,16 @@ export default function App() {
               <LeaderboardView 
                 matches={matches} 
                 participants={participants} 
+              />
+            )}
+
+            {/* NEW TAB: SWIMMING TIMER ENGINE */}
+            {activeTab === 'swimming' && (
+              <SwimmingTimer
+                matches={matches}
+                participants={participants}
+                updateMatchFields={updateMatchFields}
+                currentUser={currentUser}
               />
             )}
 
