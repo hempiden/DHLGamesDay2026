@@ -23,27 +23,65 @@ export default function AdminPanel({
   
   // Form states
   const [sport, setSport] = useState<SportType>('Soccer');
+  const [playMode, setPlayMode] = useState<'team' | 'single'>('team');
   const [teamA, setTeamA] = useState('');
   const [teamB, setTeamB] = useState('');
   const [matchLabel, setMatchLabel] = useState('វគ្គជម្រុះតាមពូល (Group Stage)');
   const [status, setStatus] = useState<'Upcoming' | 'Live' | 'Finished'>('Live');
   const [scheduledDate, setScheduledDate] = useState('');
   const [scheduledTime, setScheduledTime] = useState('');
-
-  // Filter registered teams from the participants table corresponding to the active sport category
-  const registeredTeamsFiltered = participants.filter((p) => p.is_team && p.sport_type === sport);
-  
-  // If there are no team participants for this sport, offer ALL team participants in database, or finally default to DEFAULT_TEAMS
-  const availableTeamNamesList = registeredTeamsFiltered.length > 0
-    ? registeredTeamsFiltered.map((p) => p.name)
-    : participants.filter((p) => p.is_team).length > 0
-    ? participants.filter((p) => p.is_team).map((p) => p.name)
-    : DEFAULT_TEAMS;
   
   // Custom teams toggle
   const [customTeamA, setCustomTeamA] = useState(false);
   const [customTeamB, setCustomTeamB] = useState(false);
 
+  // Memoize available team names list to prevent duplicates and keep reference stable
+  const availableTeamNamesList = React.useMemo(() => {
+    const registeredTeamsFiltered = participants.filter((p) => p.is_team && p.sport_type === sport);
+    const rawTeamNames = registeredTeamsFiltered.length > 0
+      ? registeredTeamsFiltered.map((p) => p.name)
+      : participants.filter((p) => p.is_team).length > 0
+      ? participants.filter((p) => p.is_team).map((p) => p.name)
+      : DEFAULT_TEAMS;
+
+    return Array.from(new Set(
+      rawTeamNames
+        .map(name => name?.trim())
+        .filter(Boolean)
+    ));
+  }, [participants, sport]);
+
+  // Memoize available athlete names list to prevent duplicates and keep reference stable
+  const availableAthleteNamesList = React.useMemo(() => {
+    const registeredAthletesFiltered = participants.filter((p) => !p.is_team && p.sport_type === sport);
+    const rawAthleteNames = registeredAthletesFiltered.length > 0
+      ? registeredAthletesFiltered.map((p) => p.name)
+      : participants.filter((p) => !p.is_team).length > 0
+      ? participants.filter((p) => !p.is_team).map((p) => p.name)
+      : ['ហែម ពីដែន (Piden Hem)', 'សុខ ម៉េង (Sok Meng)', 'លី ណារ៉ូ (Ly Naro)'];
+
+    return Array.from(new Set(
+      rawAthleteNames
+        .map(name => name?.trim())
+        .filter(Boolean)
+    ));
+  }, [participants, sport]);
+
+  // Keep teamA and teamB synchronized with the available options when sport or playMode changes
+  React.useEffect(() => {
+    if (!customTeamA) {
+      const currentList = playMode === 'single' ? availableAthleteNamesList : availableTeamNamesList;
+      setTeamA(currentList[0] || '');
+    }
+  }, [sport, playMode, customTeamA, availableTeamNamesList, availableAthleteNamesList]);
+
+  React.useEffect(() => {
+    if (!customTeamB) {
+      const currentList = playMode === 'single' ? availableAthleteNamesList : availableTeamNamesList;
+      setTeamB(currentList[1] || currentList[0] || '');
+    }
+  }, [sport, playMode, customTeamB, availableTeamNamesList, availableAthleteNamesList]);
+  
   // Hooks for swimming sport
   const [swimmerSlots, setSwimmerSlots] = useState<{ id: string; name: string; isCustom: boolean }[]>([
     { id: 'lane-1', name: '', isCustom: false },
@@ -110,11 +148,12 @@ export default function AdminPanel({
       return;
     }
 
-    const finalA = teamA.trim() || availableTeamNamesList[0];
-    const finalB = teamB.trim() || (availableTeamNamesList[1] || availableTeamNamesList[0]);
+    const currentList = playMode === 'single' ? availableAthleteNamesList : availableTeamNamesList;
+    const finalA = teamA.trim() || currentList[0] || '';
+    const finalB = teamB.trim() || (currentList[1] || currentList[0] || '');
 
     if (finalA === finalB) {
-      alert('ក្រុមទាំង២ មិនអាចដូចគ្នាបានឡើយ! Please choose distinct teams.');
+      alert(playMode === 'single' ? 'កីឡាករទាំង២ មិនអាចដូចគ្នាបានឡើយ! Please choose distinct players.' : 'ក្រុមទាំង២ មិនអាចដូចគ្នាបានឡើយ! Please choose distinct teams.');
       return;
     }
 
@@ -135,7 +174,7 @@ export default function AdminPanel({
     setTeamB('');
     setScheduledDate('');
     setScheduledTime('');
-    alert('ការប្រកួតត្រូវបានបង្កើត! Match created successfully.');
+    alert(playMode === 'single' ? 'ការប្រកួតឯកត្តជនត្រូវបានបង្កើត! Single player match created successfully.' : 'ការប្រកួតក្រុមត្រូវបានបង្កើត! Team match created successfully.');
   };
 
   const registeredSwimmers = participants.filter((p) => !p.is_team && p.sport_type === 'Swimming');
@@ -170,7 +209,11 @@ export default function AdminPanel({
                     <button
                       key={name}
                       type="button"
-                      onClick={() => setSport(name)}
+                      onClick={() => {
+                        setSport(name);
+                        setTeamA('');
+                        setTeamB('');
+                      }}
                       className={`py-2 px-1.5 rounded-xl border-2 text-center flex flex-col items-center justify-center gap-1 transition cursor-pointer ${
                         selected
                           ? 'border-[#FFCC00] bg-yellow-50/20 text-gray-900 font-extrabold'
@@ -184,6 +227,47 @@ export default function AdminPanel({
                 })}
               </div>
             </div>
+
+            {/* Play Mode Toggle (Single vs Team) */}
+            {sport !== 'Swimming' && (
+              <div>
+                <label className="block text-[10px] font-black uppercase text-gray-400 tracking-wider mb-1.5">
+                  ទម្រង់លេង (Play Mode)
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPlayMode('team');
+                      setTeamA('');
+                      setTeamB('');
+                    }}
+                    className={`py-2.5 px-4 border rounded-xl font-bold text-[11px] flex items-center justify-center gap-2 transition cursor-pointer ${
+                      playMode === 'team'
+                        ? 'border-[#FFCC00] bg-yellow-50/20 text-[#1a1a1a] font-extrabold shadow-sm'
+                        : 'border-gray-200 bg-white text-gray-500 hover:bg-gray-50'
+                    }`}
+                  >
+                    <span>👥 លេងជាក្រុម (Team Play)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPlayMode('single');
+                      setTeamA('');
+                      setTeamB('');
+                    }}
+                    className={`py-2.5 px-4 border rounded-xl font-bold text-[11px] flex items-center justify-center gap-2 transition cursor-pointer ${
+                      playMode === 'single'
+                        ? 'border-[#FFCC00] bg-yellow-50/20 text-[#1a1a1a] font-extrabold shadow-sm'
+                        : 'border-gray-200 bg-white text-gray-500 hover:bg-gray-50'
+                    }`}
+                  >
+                    <span>👤 កីឡាករម្នាក់ៗ (Single Player)</span>
+                  </button>
+                </div>
+              </div>
+            )}
 
             {sport === 'Swimming' ? (
               /* Special Swimming Layout with up to 6 swimmer selections */
@@ -283,7 +367,7 @@ export default function AdminPanel({
                 <div className="space-y-1">
                   <div className="flex justify-between items-center">
                     <label className="block text-[10px] font-black uppercase text-gray-400 tracking-wider">
-                      ក្រុមទី ១ (TEAM A)
+                      {playMode === 'single' ? 'កីឡាករទី ១ (ATHLETE A / PLAYER A)' : 'ក្រុមទី ១ (TEAM A)'}
                     </label>
                     <button
                       type="button"
@@ -301,20 +385,20 @@ export default function AdminPanel({
                     <input
                       type="text"
                       required
-                      placeholder="ឧទាហរណ៍៖ DHL Global Office"
+                      placeholder={playMode === 'single' ? 'ឧទាហរណ៍៖ សុខ ដារ៉ា (Sok Dara)' : 'ឧទាហរណ៍៖ DHL Global Office'}
                       value={teamA}
                       onChange={(e) => setTeamA(e.target.value)}
                       className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:border-[#FFCC00] focus:ring-1 focus:ring-[#FFCC00] outline-none placeholder:text-gray-300 font-medium"
                     />
                   ) : (
                     <select
-                      value={teamA || availableTeamNamesList[0] || ''}
+                      value={teamA}
                       onChange={(e) => setTeamA(e.target.value)}
                       className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:border-[#FFCC00] outline-none font-bold text-gray-700 bg-gray-50/50"
                     >
-                      {availableTeamNamesList.map((team) => (
-                        <option key={team} value={team}>
-                          {team}
+                      {(playMode === 'single' ? availableAthleteNamesList : availableTeamNamesList).map((name) => (
+                        <option key={name} value={name}>
+                          {name}
                         </option>
                       ))}
                     </select>
@@ -325,7 +409,7 @@ export default function AdminPanel({
                 <div className="space-y-1 col-span-1">
                   <div className="flex justify-between items-center">
                     <label className="block text-[10px] font-black uppercase text-gray-400 tracking-wider">
-                      ក្រុមទី ២ (TEAM B)
+                      {playMode === 'single' ? 'កីឡាករទី ២ (ATHLETE B / PLAYER B)' : 'ក្រុមទី ២ (TEAM B)'}
                     </label>
                     <button
                       type="button"
@@ -343,20 +427,20 @@ export default function AdminPanel({
                     <input
                       type="text"
                       required
-                      placeholder="ឧទាហរណ៍៖ DHL Custom Express"
+                      placeholder={playMode === 'single' ? 'ឧទាហរណ៍៖ គង់ ចាន់ត្រា (Kong Chantra)' : 'ឧទាហរណ៍៖ DHL Custom Express'}
                       value={teamB}
                       onChange={(e) => setTeamB(e.target.value)}
                       className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:border-[#FFCC00] focus:ring-1 focus:ring-[#FFCC00] outline-none placeholder:text-gray-305 font-medium"
                     />
                   ) : (
                     <select
-                      value={teamB || (availableTeamNamesList[1] || availableTeamNamesList[0] || '')}
+                      value={teamB}
                       onChange={(e) => setTeamB(e.target.value)}
                       className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:border-[#FFCC00] outline-none font-bold text-gray-700 bg-gray-50/50"
                     >
-                      {availableTeamNamesList.map((team) => (
-                        <option key={team} value={team}>
-                          {team}
+                      {(playMode === 'single' ? availableAthleteNamesList : availableTeamNamesList).map((name) => (
+                        <option key={name} value={name}>
+                          {name}
                         </option>
                       ))}
                     </select>
