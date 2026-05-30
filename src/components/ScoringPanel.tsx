@@ -12,6 +12,9 @@ interface ScoringPanelProps {
   finishMatch: (id: string) => Promise<boolean>;
   deleteMatch?: (id: string) => void;
   currentUser: AppUser | null;
+  isSupabaseEnabled?: boolean;
+  supabaseUrl?: string;
+  supabaseAnonKey?: string;
 }
 
 export default function ScoringPanel({ 
@@ -21,7 +24,10 @@ export default function ScoringPanel({
   updateMatchFields,
   finishMatch, 
   deleteMatch,
-  currentUser
+  currentUser,
+  isSupabaseEnabled,
+  supabaseUrl,
+  supabaseAnonKey
 }: ScoringPanelProps) {
   const [selectedSport, setSelectedSport] = useState<SportType | 'All'>('All');
   const [savingId, setSavingId] = useState<string | null>(null);
@@ -127,6 +133,9 @@ export default function ScoringPanel({
             participants={participants}
             updateMatchFields={updateMatchFields}
             currentUser={currentUser}
+            isSupabaseEnabled={isSupabaseEnabled}
+            supabaseUrl={supabaseUrl}
+            supabaseAnonKey={supabaseAnonKey}
           />
         </div>
       ) : (

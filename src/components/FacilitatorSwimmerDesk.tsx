@@ -161,8 +161,21 @@ export default function FacilitatorSwimmerDesk({
     };
 
     // Auto calculate if all have completed
-    const matchSwimmers: { id: string; name: string }[] = JSON.parse(localMatch.team_a);
-    const completedAll = matchSwimmers.every(s => nextTimes[s.id] !== null && nextTimes[s.id] !== undefined);
+    let matchSwimmers: { id: string; name: string }[] = [];
+    try {
+      if (localMatch.team_a.startsWith('[')) {
+        matchSwimmers = JSON.parse(localMatch.team_a);
+      } else if (localMatch.team_a) {
+        const split = localMatch.team_a.split(',').map(s => s.trim()).filter(Boolean);
+        matchSwimmers = split.map((name, i) => ({ id: `swimmer-${i}-${name}`, name }));
+      }
+    } catch (e) {
+      if (localMatch.team_a) {
+        const split = localMatch.team_a.split(',').map(s => s.trim()).filter(Boolean);
+        matchSwimmers = split.map((name, i) => ({ id: `swimmer-${i}-${name}`, name }));
+      }
+    }
+    const completedAll = matchSwimmers.length > 0 && matchSwimmers.every(s => nextTimes[s.id] !== null && nextTimes[s.id] !== undefined);
 
     const nextState = {
       ...swimState,

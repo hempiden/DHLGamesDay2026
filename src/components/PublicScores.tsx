@@ -300,9 +300,16 @@ export default function PublicScores({ matches, participants }: PublicScoresProp
             if (finishedSwimMatches.length === 0) return null;
 
             // Group swimmers by stage label
-            const swimGroups: Record<string, { id: string; name: string; time: number | null; matchLabel: string }[]> = {};
+            const swimGroupsDict: Record<string, Record<string, { id: string; name: string; time: number | null; matchLabel: string }>> = {};
 
-            finishedSwimMatches.forEach((m) => {
+            // Sort matches chronologically so later results come last and overwrite earlier ones
+            const sortedFinishedSwimMatches = [...finishedSwimMatches].sort((a, b) => {
+              const aTime = a.created_at ? new Date(a.created_at).getTime() : 0;
+              const bTime = b.created_at ? new Date(b.created_at).getTime() : 0;
+              return aTime - bTime;
+            });
+
+            sortedFinishedSwimMatches.forEach((m) => {
               try {
                 const swimmersList = JSON.parse(m.team_a) as { id: string; name: string }[];
                 const timerState = JSON.parse(m.team_b) as { times: Record<string, number | null> };
@@ -312,19 +319,24 @@ export default function PublicScores({ matches, participants }: PublicScoresProp
                     ? timerState.times?.[sw.id]
                     : (timerState.times?.[sw.name] !== undefined ? timerState.times?.[sw.name] : null);
                   
-                  if (!swimGroups[m.match_label]) {
-                    swimGroups[m.match_label] = [];
+                  if (!swimGroupsDict[m.match_label]) {
+                    swimGroupsDict[m.match_label] = {};
                   }
-                  swimGroups[m.match_label].push({
+                  swimGroupsDict[m.match_label][sw.name] = {
                     id: sw.id,
                     name: sw.name,
                     time: duration,
                     matchLabel: m.match_label,
-                  });
+                  };
                 });
               } catch (e) {
                 console.error("Failed to parse swimming match for leaderboard:", e);
               }
+            });
+
+            const swimGroups: Record<string, { id: string; name: string; time: number | null; matchLabel: string }[]> = {};
+            Object.keys(swimGroupsDict).forEach((label) => {
+              swimGroups[label] = Object.values(swimGroupsDict[label]);
             });
 
             const labels = Object.keys(swimGroups);

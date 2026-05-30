@@ -380,14 +380,17 @@ export default function App() {
 
   // Helper component action: Modify Match Score
   const updateMatchScore = async (id: string, scoreA: number, scoreB: number): Promise<boolean> => {
-    const updated = matches.map((m) => {
-      if (m.id === id) {
-        return { ...m, score_a: scoreA, score_b: scoreB, updated_at: new Date().toISOString() };
-      }
-      return m;
+    let latestMatches: Match[] = [];
+    setMatches((prev) => {
+      latestMatches = prev.map((m) => {
+        if (m.id === id) {
+          return { ...m, score_a: scoreA, score_b: scoreB, updated_at: new Date().toISOString() };
+        }
+        return m;
+      });
+      localStorage.setItem('dhl_games_day_matches', JSON.stringify(latestMatches));
+      return latestMatches;
     });
-
-    saveLocalMatches(updated);
 
     // Push to Supabase optionally
     if (isSupabaseEnabled && supabaseConnected) {
@@ -417,14 +420,17 @@ export default function App() {
 
   // Helper component action: Modify arbitrary Match Fields
   const updateMatchFields = async (id: string, fields: Partial<Match>): Promise<boolean> => {
-    const updated = matches.map((m) => {
-      if (m.id === id) {
-        return { ...m, ...fields, updated_at: new Date().toISOString() };
-      }
-      return m;
+    let latestMatches: Match[] = [];
+    setMatches((prev) => {
+      latestMatches = prev.map((m) => {
+        if (m.id === id) {
+          return { ...m, ...fields, updated_at: new Date().toISOString() };
+        }
+        return m;
+      });
+      localStorage.setItem('dhl_games_day_matches', JSON.stringify(latestMatches));
+      return latestMatches;
     });
-
-    saveLocalMatches(updated);
 
     if (isSupabaseEnabled && supabaseConnected) {
       const client = getSupabaseClient(supabaseUrl, supabaseAnonKey);
@@ -451,14 +457,17 @@ export default function App() {
 
   // Helper component action: Finish Match Status
   const finishMatch = async (id: string): Promise<boolean> => {
-    const updated = matches.map((m) => {
-      if (m.id === id) {
-        return { ...m, status: 'Finished' as const, updated_at: new Date().toISOString() };
-      }
-      return m;
+    let latestMatches: Match[] = [];
+    setMatches((prev) => {
+      latestMatches = prev.map((m) => {
+        if (m.id === id) {
+          return { ...m, status: 'Finished' as const, updated_at: new Date().toISOString() };
+        }
+        return m;
+      });
+      localStorage.setItem('dhl_games_day_matches', JSON.stringify(latestMatches));
+      return latestMatches;
     });
-
-    saveLocalMatches(updated);
 
     // Push to Supabase optionally
     if (isSupabaseEnabled && supabaseConnected) {
@@ -839,6 +848,9 @@ export default function App() {
                 finishMatch={finishMatch}
                 deleteMatch={deleteMatch}
                 currentUser={currentUser}
+                isSupabaseEnabled={isSupabaseEnabled}
+                supabaseUrl={supabaseUrl}
+                supabaseAnonKey={supabaseAnonKey}
               />
             )}
 

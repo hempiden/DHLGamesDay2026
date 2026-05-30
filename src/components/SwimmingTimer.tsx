@@ -27,6 +27,9 @@ interface SwimmingTimerProps {
   participants: Participant[];
   updateMatchFields: (id: string, fields: Partial<Match>) => Promise<boolean>;
   currentUser: AppUser | null;
+  isSupabaseEnabled?: boolean;
+  supabaseUrl?: string;
+  supabaseAnonKey?: string;
 }
 
 interface SwimmerData {
@@ -40,7 +43,15 @@ interface SwimmingState {
   times: Record<string, number | null>; // swimmer_id to seconds (number)
 }
 
-export default function SwimmingTimer({ matches, participants, updateMatchFields, currentUser }: SwimmingTimerProps) {
+export default function SwimmingTimer({ 
+  matches, 
+  participants, 
+  updateMatchFields, 
+  currentUser,
+  isSupabaseEnabled,
+  supabaseUrl,
+  supabaseAnonKey
+}: SwimmingTimerProps) {
   // 1. Filter active swimming matches (Upcoming or Live)
   const swimmingMatches = useMemo(() => {
     return matches.filter(m => m.sport_name === 'Swimming');
@@ -81,8 +92,12 @@ export default function SwimmingTimer({ matches, participants, updateMatchFields
     if (!activeQRSwimmer || !activeMatch) return '';
     const origin = typeof window !== 'undefined' ? window.location.origin : 'https://dhl-sports-app.vercel.app';
     const path = typeof window !== 'undefined' ? window.location.pathname : '/';
-    return `${origin}${path}?swim_match=${activeMatch.id}&swim_id=${activeQRSwimmer.id}&username=${encodeURIComponent(activeQRSwimmer.name)}`;
-  }, [activeQRSwimmer, activeMatch]);
+    let urlString = `${origin}${path}?swim_match=${activeMatch.id}&swim_id=${activeQRSwimmer.id}&username=${encodeURIComponent(activeQRSwimmer.name)}`;
+    if (isSupabaseEnabled && supabaseUrl && supabaseAnonKey) {
+      urlString += `&s_enabled=true&s_url=${encodeURIComponent(supabaseUrl)}&s_key=${encodeURIComponent(supabaseAnonKey)}`;
+    }
+    return urlString;
+  }, [activeQRSwimmer, activeMatch, isSupabaseEnabled, supabaseUrl, supabaseAnonKey]);
 
   // Parse swimmers from activeMatch.team_a
   const swimmers: SwimmerData[] = useMemo(() => {
