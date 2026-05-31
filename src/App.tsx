@@ -76,11 +76,21 @@ export default function App() {
   const [activeEventId, setActiveEventId] = useState<string>(() => {
     if (typeof window !== 'undefined') {
       const p = new URLSearchParams(window.location.search);
-      const urlId = p.get('event_id');
+      const urlId = p.get('event_id') || p.get('event');
       if (urlId) {
         localStorage.setItem('dhl_active_event_id', urlId);
         return urlId;
       }
+
+      const pathnameParts = window.location.pathname.replace(/^\//, '').split('/');
+      if (pathnameParts.length > 1) {
+        const pathEventId = pathnameParts[1];
+        if (pathEventId && pathEventId !== 'index.html' && pathEventId !== 'assets' && pathEventId !== 'api' && pathEventId !== 'favicon.ico' && pathEventId !== 'org') {
+          localStorage.setItem('dhl_active_event_id', pathEventId);
+          return pathEventId;
+        }
+      }
+
       const saved = localStorage.getItem('dhl_active_event_id');
       if (saved) return saved;
     }
@@ -202,6 +212,24 @@ export default function App() {
       root.style.setProperty('--accent-brand', '#FFCC00');
     }
   }, [activeEventId, events]);
+
+  // Dynamic URL rewrite to format the address bar matching /org-slug/active-event-id
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.history.replaceState) {
+      const pathnameParts = window.location.pathname.replace(/^\//, '').split('/');
+      const firstPart = pathnameParts[0];
+      const isSystemPath = !firstPart || firstPart === 'index.html' || firstPart === 'assets' || firstPart === 'api' || firstPart === 'favicon.ico' || firstPart === 'org';
+      
+      const currentSlug = organization.slug || 'dhl-games';
+      
+      if (!isSystemPath || firstPart === 'dhl-games') {
+        const nextPathname = `/${currentSlug}/${activeEventId}`;
+        if (window.location.pathname !== nextPathname) {
+          window.history.replaceState({}, '', nextPathname + window.location.search + window.location.hash);
+        }
+      }
+    }
+  }, [activeEventId, organization.slug]);
 
   const [matches, setMatches] = useState<Match[]>([]);
   const [participants, setParticipants] = useState<Participant[]>([]);
