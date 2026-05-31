@@ -14,13 +14,14 @@ import SwimmingTimer from './components/SwimmingTimer';
 import FacilitatorSwimmerDesk from './components/FacilitatorSwimmerDesk';
 import EventSettings from './components/EventSettings';
 import SelfRegistrationForm from './components/SelfRegistrationForm';
-import { Match, SportType, Participant, AppUser, EventInfo, Sport } from './types';
+import { Match, SportType, Participant, AppUser, EventInfo, Sport, OrganizationInfo } from './types';
 import { INITIAL_MATCHES, INITIAL_PARTICIPANTS } from './data';
 import { getSupabaseClient, testSupabaseConnection } from './supabase';
 import { Laptop, Wifi, WifiOff, RefreshCw, Layers, ShieldAlert, Heart, Calendar } from 'lucide-react';
+import OrganizationSettings from './components/OrganizationSettings';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'leaderboard' | 'public_teams' | 'dashboard' | 'scoring' | 'admin' | 'teams' | 'database' | 'users' | 'login' | 'settings' | 'enrolment'>(() => {
+  const [activeTab, setActiveTab] = useState<'leaderboard' | 'public_teams' | 'dashboard' | 'scoring' | 'admin' | 'teams' | 'database' | 'users' | 'login' | 'settings' | 'enrolment' | 'organization'>(() => {
     if (typeof window !== 'undefined') {
       const p = new URLSearchParams(window.location.search);
       const tab = p.get('tab');
@@ -35,6 +36,7 @@ export default function App() {
       if (tab === 'login') return 'login';
       if (tab === 'settings') return 'settings';
       if (tab === 'enrolment') return 'enrolment';
+      if (tab === 'organization') return 'organization';
     }
     return 'leaderboard';
   });
@@ -92,6 +94,60 @@ export default function App() {
 
   const showPublicTeamsInHeader = activeEvent?.show_public_teams ?? true;
   const isEnrolmentEnabled = activeEvent?.is_enrolment_enabled ?? true;
+
+  const [organization, setOrganization] = useState<OrganizationInfo>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('dhl_organization_settings');
+      if (saved) {
+        try {
+          return JSON.parse(saved);
+        } catch (err) {
+          console.error('Failed to parse local organization settings:', err);
+        }
+      }
+    }
+    return {
+      name: 'DHL Express Cambodia',
+      logoUrl: 'https://logos-world.net/wp-content/uploads/2020/08/DHL-Logo.png',
+      slug: 'dhl-games',
+      tagline: 'Excellence. Simply delivered.',
+      contactEmail: 'kh.info@dhl.com',
+      contactPhone: '+855 23 999 444',
+      website: 'https://www.dhl.com',
+      address: 'Phnom Penh, Cambodia',
+      footerMotto: 'Excellence. Simply delivered.',
+    };
+  });
+
+  const updateOrganization = async (updated: OrganizationInfo) => {
+    setOrganization(updated);
+    localStorage.setItem('dhl_organization_settings', JSON.stringify(updated));
+
+    if (isSupabaseEnabled && supabaseConnected) {
+      const client = getSupabaseClient(supabaseUrl, supabaseAnonKey);
+      if (client) {
+        try {
+          await client
+            .from('organization_settings')
+            .upsert({
+              id: 'current',
+              name: updated.name,
+              logo_url: updated.logoUrl,
+              slug: updated.slug,
+              tagline: updated.tagline,
+              contact_email: updated.contactEmail,
+              contact_phone: updated.contactPhone,
+              website: updated.website,
+              address: updated.address,
+              footer_motto: updated.footerMotto,
+              updated_at: new Date().toISOString()
+            });
+        } catch (err) {
+          console.warn('Failed to sync organization settings inside Supabase:', err);
+        }
+      }
+    }
+  };
 
   const updateIsEnrolmentEnabled = async (val: boolean) => {
     const updatedEvents = events.map(e => {
@@ -496,6 +552,34 @@ export default function App() {
       if (tested) {
         if (!silent) setIsSyncing(true);
         try {
+          // Fetch remote organization settings table
+          try {
+            const orgResult = await client
+              .from('organization_settings')
+              .select('*')
+              .eq('id', 'current')
+              .maybeSingle();
+
+            if (orgResult && orgResult.data && active) {
+              const d = orgResult.data;
+              const remoteOrg: OrganizationInfo = {
+                name: d.name || 'DHL Express Cambodia',
+                logoUrl: d.logo_url || 'https://logos-world.net/wp-content/uploads/2020/08/DHL-Logo.png',
+                slug: d.slug || 'dhl-games',
+                tagline: d.tagline || 'Excellence. Simply delivered.',
+                contactEmail: d.contact_email || 'kh.info@dhl.com',
+                contactPhone: d.contact_phone || '+855 23 999 444',
+                website: d.website || 'https://www.dhl.com',
+                address: d.address || 'Phnom Penh, Cambodia',
+                footerMotto: d.footer_motto || 'Excellence. Simply delivered.',
+              };
+              setOrganization(remoteOrg);
+              localStorage.setItem('dhl_organization_settings', JSON.stringify(remoteOrg));
+            }
+          } catch (errOrg) {
+            console.warn('Silent note: organization_settings table could not be fetched or does not exist yet.', errOrg);
+          }
+
           // Fetch remote events table
           const eventsResult = await client
             .from('events')
@@ -1343,10 +1427,6 @@ export default function App() {
                 events={events}
                 participants={filteredParticipants}
                 addParticipant={addParticipant}
-                matches={filteredMatches}
-                supabaseUrl={supabaseUrl}
-                supabaseAnonKey={supabaseAnonKey}
-                isSupabaseEnabled={isSupabaseEnabled}
               />
             )}
 
@@ -1380,6 +1460,18 @@ export default function App() {
                 onUpdateUserRole={handleUpdateUserRole}
                 onDeleteUser={handleDeleteUser}
                 currentUser={currentUser}
+              />
+            )}
+
+            {/* TAB 9: ORGANIZATION BRANDING & SETTINGS */}
+            {activeTab === 'organization' && currentUser && currentUser.role === 'super_admin' && (
+              <OrganizationSettings
+                organization={organization}
+                onUpdateOrganization={updateOrganization}
+                isSupabaseEnabled={isSupabaseEnabled}
+                supabaseConnected={supabaseConnected}
+                supabaseUrl={supabaseUrl}
+                supabaseAnonKey={supabaseAnonKey}
               />
             )}
           </>
@@ -1418,6 +1510,17 @@ export default function App() {
               >
                 🛡️ Admins & Approvals
               </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('organization')}
+                className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all duration-150 cursor-pointer shrink-0 ${
+                  activeTab === 'organization'
+                    ? 'bg-amber-500 text-slate-900 shadow-xs ring-2 ring-amber-300'
+                    : 'bg-amber-50 text-amber-700 hover:bg-amber-100'
+                }`}
+              >
+                🏢 Org Settings
+              </button>
             </div>
           )}
           <div className="flex items-center gap-1.5 text-center sm:text-left">
@@ -1425,9 +1528,20 @@ export default function App() {
             <span className="text-[10px] font-bold text-[#D40511] font-mono tracking-tight">{currentTime || '12:00:00 PM'}</span>
           </div>
         </div>
-        <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-1">
-          <span className="text-[#FFCC00] font-extrabold pr-1">★</span>
-          <span>Excellence. Simply delivered.</span>
+        <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
+          {organization.logoUrl ? (
+            <img 
+              src={organization.logoUrl} 
+              alt="Org" 
+              className="h-3 max-w-full object-contain filter hover:brightness-95 hover:contrast-110 duration-200 shrink-0"
+              onError={(e) => {
+                (e.target as HTMLImageElement).src = 'https://logos-world.net/wp-content/uploads/2020/08/DHL-Logo.png';
+              }} 
+            />
+          ) : (
+            <span className="text-[#FFCC00] font-extrabold pr-1">★</span>
+          )}
+          <span>{organization.footerMotto || organization.tagline || 'Excellence. Simply delivered.'}</span>
           <span className="text-red-500 animate-pulse pl-0.5 font-sans">❤️</span>
         </div>
       </footer>

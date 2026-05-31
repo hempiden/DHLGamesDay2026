@@ -86,3 +86,16 @@ export interface AppUser {
   created_at?: string;
 }
 
+export interface OrganizationInfo {
+  name: string;
+  logoUrl: string;
+  slug: string;
+  tagline: string;
+  contactEmail: string;
+  contactPhone: string;
+  website: string;
+  address: string;
+  footerMotto: string;
+}
+
+

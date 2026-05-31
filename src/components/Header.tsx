@@ -3,8 +3,8 @@ import { Award, Layers, ToggleLeft, RefreshCw, AlertCircle, Laptop, Settings, Wi
 import { AppUser, EventInfo } from '../types';
 
 interface HeaderProps {
-  activeTab: 'leaderboard' | 'public_teams' | 'dashboard' | 'scoring' | 'admin' | 'teams' | 'database' | 'users' | 'login' | 'settings' | 'enrolment';
-  setActiveTab: (tab: 'leaderboard' | 'public_teams' | 'dashboard' | 'scoring' | 'admin' | 'teams' | 'database' | 'users' | 'login' | 'settings' | 'enrolment') => void;
+  activeTab: 'leaderboard' | 'public_teams' | 'dashboard' | 'scoring' | 'admin' | 'teams' | 'database' | 'users' | 'login' | 'settings' | 'enrolment' | 'organization';
+  setActiveTab: (tab: 'leaderboard' | 'public_teams' | 'dashboard' | 'scoring' | 'admin' | 'teams' | 'database' | 'users' | 'login' | 'settings' | 'enrolment' | 'organization') => void;
   isOnline: boolean;
   supabaseConnected: boolean;
   currentUser: AppUser | null;

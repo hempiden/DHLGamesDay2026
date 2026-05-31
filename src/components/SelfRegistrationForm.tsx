@@ -1,7 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import { Users, CheckCircle, Trophy, HelpCircle, UserPlus, Image, FileText, Share2, ClipboardCheck } from 'lucide-react';
-import { EventInfo, Participant, SportType, Match } from '../types';
-import PublicTeamsView from './PublicTeamsView';
+import { Users, CheckCircle, Trophy, HelpCircle, UserPlus, Image, Share2, ClipboardCheck } from 'lucide-react';
+import { EventInfo, Participant, SportType } from '../types';
 
 interface SelfRegistrationFormProps {
   isEnrolmentEnabled: boolean;
@@ -9,10 +8,6 @@ interface SelfRegistrationFormProps {
   events: EventInfo[];
   participants: Participant[];
   addParticipant: (name: string, sport_type: SportType, is_team: boolean, team_id: string | null, photo_url?: string) => Promise<string | null>;
-  matches?: Match[];
-  supabaseUrl?: string;
-  supabaseAnonKey?: string;
-  isSupabaseEnabled?: boolean;
 }
 
 export default function SelfRegistrationForm({
@@ -21,10 +16,6 @@ export default function SelfRegistrationForm({
   events,
   participants,
   addParticipant,
-  matches = [],
-  supabaseUrl,
-  supabaseAnonKey,
-  isSupabaseEnabled = false,
 }: SelfRegistrationFormProps) {
   const [fullname, setFullname] = useState('');
   const [selectedSport, setSelectedSport] = useState('');
@@ -32,11 +23,6 @@ export default function SelfRegistrationForm({
   const [photoUrl, setPhotoUrl] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [registeredUser, setRegisteredUser] = useState<{ name: string; sport: string; teamName: string; photo: string } | null>(null);
-
-  // Segment Selector
-  const [activeSegment, setActiveSegment] = useState<'form' | 'roster'>(() => {
-    return isEnrolmentEnabled ? 'form' : 'roster';
-  });
 
   const [copiedLink, setCopiedLink] = useState(false);
 
@@ -113,7 +99,7 @@ export default function SelfRegistrationForm({
   return (
     <div className="max-w-5xl mx-auto px-4 py-8 space-y-6">
       
-      {/* 1. Page Header & Segment / Share controls */}
+      {/* 1. Page Header & Share controls */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white p-5 rounded-3xl border border-gray-150 shadow-sm">
         <div className="flex items-center gap-3">
           <div className="bg-emerald-50 text-emerald-600 p-2.5 rounded-2xl border border-emerald-100 shadow-xs shrink-0">
@@ -121,7 +107,7 @@ export default function SelfRegistrationForm({
           </div>
           <div>
             <h2 className="text-base sm:text-lg font-black text-gray-800 uppercase tracking-wide leading-tight">
-              ចុះឈ្មោះ & បញ្ជីកីឡាករ (Athlete Enrollment & Rosters)
+              ចុះឈ្មោះកីឡាករ (Athlete Enrollment)
             </h2>
             <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mt-0.5">
               Event: {activeEvent?.khmerName || activeEvent?.name}
@@ -131,34 +117,6 @@ export default function SelfRegistrationForm({
 
         {/* Control Actions Bar */}
         <div className="flex flex-wrap items-center gap-2.5 select-none shrink-0">
-          {/* Segment Toggle buttons */}
-          <div className="flex bg-gray-100 p-1 rounded-2xl border border-gray-200">
-            {isEnrolmentEnabled && (
-              <button
-                type="button"
-                onClick={() => setActiveSegment('form')}
-                className={`px-4 py-2 rounded-xl text-[11px] font-black uppercase tracking-wide transition duration-150 cursor-pointer ${
-                  activeSegment === 'form'
-                    ? 'bg-emerald-600 text-white shadow-sm'
-                    : 'text-gray-500 hover:bg-gray-200'
-                }`}
-              >
-                ទម្រង់ចុះឈ្មោះ (Sign-Up Form)
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={() => setActiveSegment('roster')}
-              className={`px-4 py-2 rounded-xl text-[11px] font-black uppercase tracking-wide transition duration-150 cursor-pointer ${
-                activeSegment === 'roster'
-                  ? 'bg-slate-900 text-white shadow-sm'
-                  : 'text-gray-500 hover:bg-gray-200'
-              }`}
-            >
-              បញ្ជីឈ្មោះកីឡាករ & ក្រុម (Roster View)
-            </button>
-          </div>
-
           {/* Share Register Funnel Direct Link */}
           <button
             type="button"
@@ -184,8 +142,8 @@ export default function SelfRegistrationForm({
         </div>
       </div>
 
-      {/* 2. Content view segment swapping */}
-      {activeSegment === 'form' && isEnrolmentEnabled ? (
+      {/* 2. Form view */}
+      {isEnrolmentEnabled ? (
         <div className="max-w-xl mx-auto">
           {registeredUser ? (
             <div className="bg-white rounded-3xl p-6 sm:p-8 border border-emerald-150 shadow-lg text-center space-y-6 animate-scale-up">
@@ -327,7 +285,7 @@ export default function SelfRegistrationForm({
                       className="w-full bg-gray-50 border border-gray-200 rounded-xl pl-10 pr-4 py-3 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-xs font-mono"
                     />
                   </div>
-                  <span className="text-[9px] text-gray-405 leading-relaxed block mt-1 font-semibold">
+                  <span className="text-[9px] text-gray-450 leading-relaxed block mt-1 font-semibold">
                     អ្នកអាចប្រើប្រាស់តំណភ្ជាប់រូបភាពផ្ទាល់ខ្លួនពី Telegram, Google, Facebook ឬ Unsplash។
                   </span>
                 </div>
@@ -347,20 +305,11 @@ export default function SelfRegistrationForm({
           )}
         </div>
       ) : (
-        <div className="bg-white p-6 rounded-3xl border border-gray-150 shadow-sm">
-          {!isEnrolmentEnabled && (
-            <div className="bg-red-50/60 text-red-700 p-4 rounded-2xl border border-red-150 text-xs font-bold mb-6 flex items-center gap-2">
-              <Users className="w-5 h-5 shrink-0" />
-              <span>ទម្រង់ចុះឈ្មោះកីឡាករដោយខ្លួនឯង ត្រូវបានបិទជាបណ្ដោះអាសន្ន ប៉ុន្តែអ្នកអាចស្វែងរក និងមើលកីឡាករដែលបានចុះឈ្មោះក្នុងបញ្ជីខាងក្រោម។ (Self-registration is currently closed by administration. Direct directory is read-only).</span>
-            </div>
-          )}
-          <PublicTeamsView
-            participants={participants}
-            supabaseUrl={supabaseUrl}
-            supabaseAnonKey={supabaseAnonKey}
-            isSupabaseEnabled={isSupabaseEnabled}
-            matches={matches}
-          />
+        <div className="max-w-xl mx-auto bg-white p-6 rounded-3xl border border-gray-150 shadow-sm text-center">
+          <div className="bg-red-50/60 text-red-700 p-4 rounded-2xl border border-red-150 text-xs font-bold mb-6 flex items-center justify-center gap-2">
+            <Users className="w-5 h-5 shrink-0" />
+            <span>ទម្រង់ចុះឈ្មោះកីឡាករដោយខ្លួនឯង ត្រូវបានបិទជាបណ្ដោះអាសន្ន។ (Self-registration is currently closed by administration).</span>
+          </div>
         </div>
       )}
     </div>
