@@ -12,13 +12,36 @@ import PublicAthletePhotoUpload from './components/PublicAthletePhotoUpload';
 import AnalyticsDashboard from './components/AnalyticsDashboard';
 import SwimmingTimer from './components/SwimmingTimer';
 import FacilitatorSwimmerDesk from './components/FacilitatorSwimmerDesk';
+import EventSettings from './components/EventSettings';
 import { Match, SportType, Participant, AppUser } from './types';
 import { INITIAL_MATCHES, INITIAL_PARTICIPANTS } from './data';
 import { getSupabaseClient, testSupabaseConnection } from './supabase';
 import { Laptop, Wifi, WifiOff, RefreshCw, Layers, ShieldAlert, Heart, Calendar } from 'lucide-react';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'leaderboard' | 'public_teams' | 'dashboard' | 'scoring' | 'admin' | 'teams' | 'database' | 'users' | 'login'>('leaderboard');
+  const [activeTab, setActiveTab] = useState<'leaderboard' | 'public_teams' | 'dashboard' | 'scoring' | 'admin' | 'teams' | 'database' | 'users' | 'login' | 'settings'>(() => {
+    if (typeof window !== 'undefined') {
+      const p = new URLSearchParams(window.location.search);
+      const tab = p.get('tab');
+      if (tab === 'public_teams') return 'public_teams';
+      if (tab === 'leaderboard') return 'leaderboard';
+      if (tab === 'dashboard') return 'dashboard';
+      if (tab === 'scoring') return 'scoring';
+      if (tab === 'admin') return 'admin';
+      if (tab === 'teams') return 'teams';
+      if (tab === 'database') return 'database';
+      if (tab === 'users') return 'users';
+      if (tab === 'login') return 'login';
+      if (tab === 'settings') return 'settings';
+    }
+    return 'leaderboard';
+  });
+  
+  const [showPublicTeamsInHeader, setShowPublicTeamsInHeader] = useState<boolean>(() => {
+    const saved = localStorage.getItem('dhl_games_day_show_public_teams');
+    return saved === 'true'; // Default to false
+  });
+
   const [matches, setMatches] = useState<Match[]>([]);
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [isOnline, setIsOnline] = useState<boolean>(typeof window !== 'undefined' ? window.navigator.onLine : true);
@@ -490,6 +513,28 @@ export default function App() {
               return prev;
             });
           }
+
+          // Fetch remote event_settings table
+          const settingsResult = await client
+            .from('event_settings')
+            .select('*');
+
+          if (settingsResult.error) {
+            // Safe fallback if table doesn't exist yet
+            console.warn('Supabase event_settings fetch notice (Table may not exist yet):', settingsResult.error.message);
+          } else if (settingsResult.data && active) {
+            const publicTeamsVal = settingsResult.data.find((s: any) => s.key === 'show_public_teams');
+            if (publicTeamsVal) {
+              const isVal = publicTeamsVal.value === 'true';
+              setShowPublicTeamsInHeader((prev) => {
+                if (prev !== isVal) {
+                  localStorage.setItem('dhl_games_day_show_public_teams', String(isVal));
+                  return isVal;
+                }
+                return prev;
+              });
+            }
+          }
         } catch (err) {
           console.error('Database Sync Issue:', err);
         } finally {
@@ -517,6 +562,24 @@ export default function App() {
   const saveLocalMatches = (updated: Match[]) => {
     setMatches(updated);
     localStorage.setItem('dhl_games_day_matches', JSON.stringify(updated));
+  };
+
+  const updateShowPublicTeamsInHeader = async (val: boolean) => {
+    setShowPublicTeamsInHeader(val);
+    localStorage.setItem('dhl_games_day_show_public_teams', String(val));
+
+    if (isSupabaseEnabled && supabaseConnected) {
+      const client = getSupabaseClient(supabaseUrl, supabaseAnonKey);
+      if (client) {
+        try {
+          await client
+            .from('event_settings')
+            .upsert({ key: 'show_public_teams', value: String(val) });
+        } catch (err) {
+          console.error('Failed to sync settings to Supabase settings:', err);
+        }
+      }
+    }
   };
 
   // Helper component action: Modify Match Score
@@ -934,6 +997,7 @@ export default function App() {
         supabaseConnected={supabaseConnected}
         currentUser={currentUser}
         onLogout={handleLogout}
+        showPublicTeamsInHeader={showPublicTeamsInHeader}
       />
 
       {/* Synchronizing indicator banner */}
@@ -1024,6 +1088,16 @@ export default function App() {
                 assignPlayerToTeam={assignPlayerToTeam}
                 deleteParticipant={deleteParticipant}
                 resetParticipantsToDefault={resetParticipantsToDefault}
+              />
+            )}
+
+            {/* TAB 8: EVENT CUSTOM SETTINGS */}
+            {activeTab === 'settings' && currentUser && (
+              <EventSettings
+                showPublicTeamsInHeader={showPublicTeamsInHeader}
+                onUpdateShowPublicTeamsInHeader={updateShowPublicTeamsInHeader}
+                isSupabaseEnabled={isSupabaseEnabled}
+                supabaseConnected={supabaseConnected}
               />
             )}
 

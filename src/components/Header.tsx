@@ -3,16 +3,17 @@ import { Award, Layers, ToggleLeft, RefreshCw, AlertCircle, Laptop, Settings, Wi
 import { AppUser } from '../types';
 
 interface HeaderProps {
-  activeTab: 'leaderboard' | 'public_teams' | 'dashboard' | 'scoring' | 'admin' | 'teams' | 'database' | 'users' | 'login';
-  setActiveTab: (tab: 'leaderboard' | 'public_teams' | 'dashboard' | 'scoring' | 'admin' | 'teams' | 'database' | 'users' | 'login') => void;
+  activeTab: 'leaderboard' | 'public_teams' | 'dashboard' | 'scoring' | 'admin' | 'teams' | 'database' | 'users' | 'login' | 'settings';
+  setActiveTab: (tab: 'leaderboard' | 'public_teams' | 'dashboard' | 'scoring' | 'admin' | 'teams' | 'database' | 'users' | 'login' | 'settings') => void;
   isOnline: boolean;
   supabaseConnected: boolean;
   currentUser: AppUser | null;
   onLogout: () => void;
+  showPublicTeamsInHeader: boolean;
 }
 
 
-export default function Header({ activeTab, setActiveTab, isOnline, supabaseConnected, currentUser, onLogout }: HeaderProps) {
+export default function Header({ activeTab, setActiveTab, isOnline, supabaseConnected, currentUser, onLogout, showPublicTeamsInHeader }: HeaderProps) {
   return (
     <header className="sticky top-0 z-50 bg-white border-b-4 border-[#FFCC00] shadow-md transition-all duration-300">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -62,18 +63,20 @@ export default function Header({ activeTab, setActiveTab, isOnline, supabaseConn
               <span>លទ្ធផល (Live Board)</span>
             </button>
 
-            <button
-              id="tab-public-teams"
-              onClick={() => setActiveTab('public_teams')}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs uppercase cursor-pointer tracking-wide transition-all duration-200 active:scale-95 whitespace-nowrap ${
-                activeTab === 'public_teams'
-                  ? 'bg-[#D40511] text-white shadow-md shadow-[#D40511]/15'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
-            >
-              <Users className="w-4 h-4 animate-pulse" />
-              <span>បញ្ជីឈ្មោះក្រុម (Public Teams)</span>
-            </button>
+            {showPublicTeamsInHeader && (
+              <button
+                id="tab-public-teams"
+                onClick={() => setActiveTab('public_teams')}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs uppercase cursor-pointer tracking-wide transition-all duration-200 active:scale-95 whitespace-nowrap ${
+                  activeTab === 'public_teams'
+                    ? 'bg-[#D40511] text-white shadow-md shadow-[#D40511]/15'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                <Users className="w-4 h-4 animate-pulse" />
+                <span>បញ្ជីឈ្មោះក្រុម (Public Teams)</span>
+              </button>
+            )}
 
 
 
@@ -129,6 +132,19 @@ export default function Header({ activeTab, setActiveTab, isOnline, supabaseConn
                 >
                   <Settings className="w-4 h-4" />
                   <span>រៀបចំការប្រកួត (Setup Game)</span>
+                </button>
+
+                <button
+                  id="tab-settings"
+                  onClick={() => setActiveTab('settings')}
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs uppercase cursor-pointer tracking-wide transition-all duration-200 active:scale-95 whitespace-nowrap ${
+                    activeTab === 'settings'
+                      ? 'bg-amber-600 text-white shadow-md shadow-amber-600/15'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  <Settings className="w-4 h-4 font-bold" />
+                  <span>ការកំណត់ (Event Settings)</span>
                 </button>
               </>
             ) : (
