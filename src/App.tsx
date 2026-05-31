@@ -546,7 +546,7 @@ export default function App() {
       if (isSupabaseEnabled && supabaseConnected) {
         const client = getSupabaseClient(supabaseUrl, supabaseAnonKey);
         if (client) {
-          client.from('events').insert({
+          const insertPromise = client.from('events').insert({
             id: defaultOrgEvent.id,
             name: defaultOrgEvent.name,
             khmer_name: defaultOrgEvent.khmerName,
@@ -558,8 +558,21 @@ export default function App() {
             show_public_teams: true,
             is_enrolment_enabled: true,
             organization_slug: organization.slug
-          }).then(({ error }) => {
-            if (error) console.error('Failed to sync auto-seeded org event:', error.message);
+          }) as any;
+          
+          insertPromise.then(({ error }: any) => {
+            if (error) {
+              const isFetchErr = error.message?.toLowerCase().includes('fetch') || error.message?.toLowerCase().includes('typeerror') || error.message?.toLowerCase().includes('network');
+              if (isFetchErr) {
+                setSupabaseConnected(false);
+                console.warn('Failed to sync auto-seeded org event offline:', error.message);
+              } else {
+                console.error('Failed to sync auto-seeded org event:', error.message);
+              }
+            }
+          }).catch((err: any) => {
+            setSupabaseConnected(false);
+            console.warn('Failed to sync auto-seeded org event offline exception:', err);
           });
         }
       }
@@ -710,7 +723,8 @@ export default function App() {
                 themeColor: (item.theme_color || item.themeColor || 'dhl') as any,
                 created_by: item.created_by || 'hempiden',
                 show_public_teams: item.show_public_teams ?? false,
-                is_enrolment_enabled: item.is_enrolment_enabled ?? true
+                is_enrolment_enabled: item.is_enrolment_enabled ?? true,
+                organization_slug: item.organization_slug || 'dhl-games'
               }));
 
               setEvents((prev) => {
@@ -743,10 +757,24 @@ export default function App() {
                 theme_color: ev.themeColor || 'dhl',
                 created_by: ev.created_by || 'hempiden',
                 show_public_teams: ev.show_public_teams || false,
-                is_enrolment_enabled: ev.is_enrolment_enabled || true
+                is_enrolment_enabled: ev.is_enrolment_enabled || true,
+                organization_slug: ev.organization_slug || organization.slug || 'dhl-games'
               }));
-              client.from('events').insert(localClean).then(({ error }) => {
-                if (error) console.error('Failed to sync empty remote events:', error.message);
+              const emptySyncPromise = client.from('events').insert(localClean) as any;
+              
+              emptySyncPromise.then(({ error }: any) => {
+                if (error) {
+                  const isFetchErr = error.message?.toLowerCase().includes('fetch') || error.message?.toLowerCase().includes('typeerror') || error.message?.toLowerCase().includes('network');
+                  if (isFetchErr) {
+                    setSupabaseConnected(false);
+                    console.warn('Failed to sync empty remote events offline:', error.message);
+                  } else {
+                    console.error('Failed to sync empty remote events:', error.message);
+                  }
+                }
+              }).catch((err: any) => {
+                setSupabaseConnected(false);
+                console.warn('Failed to sync empty remote events offline exception:', err);
               });
             }
           }

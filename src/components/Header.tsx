@@ -124,43 +124,23 @@ export default function Header({
               </div>
             </div>
 
-            {/* Event Selector Dropdown or Share Button depending on Role */}
-            {currentUser ? (
-              <div id="event-selector-container" className="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl text-xs font-bold shadow-sm">
-                <span className="text-gray-400 text-[9px] uppercase tracking-wider font-extrabold">សកម្មភាព / Event:</span>
-                <select
-                  value={activeEventId}
-                  onChange={(e) => setActiveEventId(e.target.value)}
-                  className="bg-transparent text-gray-800 focus:outline-[#FFCC00] cursor-pointer font-black text-xs pr-1"
-                >
-                  {(currentUser.role === 'super_admin'
-                    ? events
-                    : events.filter(ev => ev.created_by === currentUser.username)
-                  ).map((ev) => (
-                    <option key={ev.id} value={ev.id} className="text-gray-800 font-semibold bg-white">
-                      {ev.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            ) : (
-              <button
-                onClick={handleCopyLink}
-                className={`flex items-center gap-1.5 border px-3.5 py-1.5 rounded-xl text-xs font-bold shadow-sm transition-all active:scale-95 duration-200 cursor-pointer ${
-                  copied 
-                    ? 'bg-green-50 border-green-300 text-green-700 font-extrabold'
-                    : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300'
-                }`}
-                title="ចម្លងតំណភ្ជាប់ព្រឹត្តិការណ៍សម្រាបចែករំលែក / Copy Event Share Link"
-              >
-                {copied ? (
-                  <Check className="w-3.5 h-3.5 text-green-600 animate-bounce" />
-                ) : (
-                  <Share2 className="w-3.5 h-3.5 text-[#D40511]" />
-                )}
-                <span>{copied ? 'ចម្លងរួចរាល់! (Copied!)' : 'ចម្លងតំណភ្ជាប់ (Copy Event Link)'}</span>
-              </button>
-            )}
+            {/* Copy Event Share Link Button */}
+            <button
+              onClick={handleCopyLink}
+              className={`flex items-center gap-1.5 border px-3.5 py-1.5 rounded-xl text-xs font-bold shadow-sm transition-all active:scale-95 duration-200 cursor-pointer ${
+                copied 
+                  ? 'bg-green-50 border-green-300 text-green-700 font-extrabold'
+                  : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300'
+              }`}
+              title="ចម្លងតំណភ្ជាប់ព្រឹត្តិការណ៍សម្រាបចែករំលែក / Copy Event Share Link"
+            >
+              {copied ? (
+                <Check className="w-3.5 h-3.5 text-green-600 animate-bounce" />
+              ) : (
+                <Share2 className="w-3.5 h-3.5 text-[#D40511]" />
+              )}
+              <span>{copied ? 'ចម្លងរួចរាល់! (Copied!)' : 'ចម្លងតំណភ្ជាប់ (Copy Event Link)'}</span>
+            </button>
 
             {/* Mobile Connection Status (visible only on mobile/tablet) */}
             <div className="lg:hidden flex items-center gap-1.5 bg-gray-50 border px-2.5 py-1 rounded-full">
