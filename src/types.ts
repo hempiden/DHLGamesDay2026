@@ -19,6 +19,7 @@ export interface EventInfo {
   show_public_teams?: boolean;
   is_enrolment_enabled?: boolean;
   organization_slug?: string;
+  enabled_languages?: string[];
 }
 
 export interface Match {

@@ -6,9 +6,10 @@ import { SPORT_CONFIGS } from '../data';
 interface PublicScoresProps {
   matches: Match[];
   participants: Participant[];
+  currentLanguage?: 'kh' | 'en';
 }
 
-export default function PublicScores({ matches, participants }: PublicScoresProps) {
+export default function PublicScores({ matches, participants, currentLanguage = 'kh' }: PublicScoresProps) {
   // Select active sport to view scores
   const [selectedSport, setSelectedSport] = useState<SportType | 'All'>('All');
 

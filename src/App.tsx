@@ -294,6 +294,21 @@ export default function App() {
     }
   };
 
+  const [currentLanguage, setCurrentLanguage] = useState<'kh' | 'en'>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('dhl_language');
+      if (saved === 'kh' || saved === 'en') {
+        return saved;
+      }
+    }
+    return 'kh';
+  });
+
+  const changeLanguage = (lang: 'kh' | 'en') => {
+    setCurrentLanguage(lang);
+    localStorage.setItem('dhl_language', lang);
+  };
+
   // App authentication states
   const [currentUser, setCurrentUser] = useState<AppUser | null>(() => {
     const saved = localStorage.getItem('dhl_games_day_current_user');
@@ -724,7 +739,8 @@ export default function App() {
                 created_by: item.created_by || 'hempiden',
                 show_public_teams: item.show_public_teams ?? false,
                 is_enrolment_enabled: item.is_enrolment_enabled ?? true,
-                organization_slug: item.organization_slug || 'dhl-games'
+                organization_slug: item.organization_slug || 'dhl-games',
+                enabled_languages: item.enabled_languages ? item.enabled_languages.split(',') : ['kh', 'en']
               }));
 
               setEvents((prev) => {
@@ -758,7 +774,8 @@ export default function App() {
                 created_by: ev.created_by || 'hempiden',
                 show_public_teams: ev.show_public_teams || false,
                 is_enrolment_enabled: ev.is_enrolment_enabled || true,
-                organization_slug: ev.organization_slug || organization.slug || 'dhl-games'
+                organization_slug: ev.organization_slug || organization.slug || 'dhl-games',
+                enabled_languages: (ev.enabled_languages || ['kh', 'en']).join(',')
               }));
               const emptySyncPromise = client.from('events').insert(localClean) as any;
               
@@ -1482,6 +1499,8 @@ export default function App() {
         activeEventId={activeEventId}
         setActiveEventId={setActiveEventId}
         organization={organization}
+        currentLanguage={currentLanguage}
+        onChangeLanguage={changeLanguage}
       />
 
       {/* Synchronizing indicator banner */}
@@ -1509,6 +1528,7 @@ export default function App() {
               <LeaderboardView 
                 matches={filteredMatches} 
                 participants={filteredParticipants} 
+                currentLanguage={currentLanguage}
               />
             )}
 
@@ -1520,6 +1540,7 @@ export default function App() {
                 supabaseAnonKey={supabaseAnonKey}
                 isSupabaseEnabled={isSupabaseEnabled}
                 matches={filteredMatches}
+                currentLanguage={currentLanguage}
               />
             )}
 
@@ -1616,6 +1637,7 @@ export default function App() {
                 events={filteredEventsByOrg}
                 participants={filteredParticipants}
                 addParticipant={addParticipant}
+                currentLanguage={currentLanguage}
               />
             )}
 

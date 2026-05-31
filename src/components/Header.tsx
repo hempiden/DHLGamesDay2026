@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Award, Layers, ToggleLeft, RefreshCw, AlertCircle, Laptop, Settings, Wifi, WifiOff, Users, Upload, Monitor, Database, ShieldAlert, LogOut, KeyRound, BarChart3, Timer, ChevronDown, Share2, Check } from 'lucide-react';
+import { Award, Layers, ToggleLeft, RefreshCw, AlertCircle, Laptop, Settings, Wifi, WifiOff, Users, Upload, Monitor, Database, ShieldAlert, LogOut, KeyRound, BarChart3, Timer, ChevronDown, Share2, Check, Languages } from 'lucide-react';
 import { AppUser, EventInfo, OrganizationInfo } from '../types';
 
 interface HeaderProps {
@@ -15,6 +15,8 @@ interface HeaderProps {
   activeEventId: string;
   setActiveEventId: (id: string) => void;
   organization?: OrganizationInfo;
+  currentLanguage?: 'kh' | 'en';
+  onChangeLanguage?: (lang: 'kh' | 'en') => void;
 }
 
 
@@ -30,7 +32,9 @@ export default function Header({
   events,
   activeEventId,
   setActiveEventId,
-  organization
+  organization,
+  currentLanguage = 'kh',
+  onChangeLanguage = () => {}
 }: HeaderProps) {
   
   const activeEvent = events.find(e => e.id === activeEventId) || events[0];
@@ -115,42 +119,59 @@ export default function Header({
                 </div>
               )}
               <div className="border-l-2 border-gray-200 pl-3">
-                <h1 className="font-bold text-gray-950 text-base sm:text-lg tracking-tight leading-none uppercase">
-                  {activeEvent?.name || 'GAMES DAY 2026'}
-                </h1>
-                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mt-0.5">
-                  {activeEvent?.khmerName || 'ទិវាហ្គេម DHL ២០២៦'}
-                </p>
+                {currentLanguage === 'kh' ? (
+                  <>
+                    <h1 className="font-bold text-gray-950 text-base sm:text-lg tracking-tight leading-none">
+                      {activeEvent?.khmerName || 'ទិវាហ្គេម DHL ២០២៦'}
+                    </h1>
+                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mt-0.5">
+                      {activeEvent?.name || 'GAMES DAY 2026'}
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <h1 className="font-bold text-gray-950 text-base sm:text-lg tracking-tight leading-none uppercase">
+                      {activeEvent?.name || 'GAMES DAY 2026'}
+                    </h1>
+                    <p className="text-[10px] text-gray-400 font-bold tracking-wider mt-0.5">
+                      {activeEvent?.khmerName || 'ទិវាហ្គេម DHL ២០២៦'}
+                    </p>
+                  </>
+                )}
               </div>
             </div>
 
-            {/* Copy Event Share Link Button */}
-            <button
-              onClick={handleCopyLink}
-              className={`flex items-center gap-1.5 border px-3.5 py-1.5 rounded-xl text-xs font-bold shadow-sm transition-all active:scale-95 duration-200 cursor-pointer ${
-                copied 
-                  ? 'bg-green-50 border-green-300 text-green-700 font-extrabold'
-                  : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300'
-              }`}
-              title="ចម្លងតំណភ្ជាប់ព្រឹត្តិការណ៍សម្រាបចែករំលែក / Copy Event Share Link"
-            >
-              {copied ? (
-                <Check className="w-3.5 h-3.5 text-green-600 animate-bounce" />
-              ) : (
-                <Share2 className="w-3.5 h-3.5 text-[#D40511]" />
-              )}
-              <span>{copied ? 'ចម្លងរួចរាល់! (Copied!)' : 'ចម្លងតំណភ្ជាប់ (Copy Event Link)'}</span>
-            </button>
-
-            {/* Mobile Connection Status (visible only on mobile/tablet) */}
-            <div className="lg:hidden flex items-center gap-1.5 bg-gray-50 border px-2.5 py-1 rounded-full">
-              <span className={`w-2 h-2 rounded-full ${
-                isOnline ? (supabaseConnected ? 'bg-green-500 animate-pulse' : 'bg-yellow-500') : 'bg-red-500'
-              }`}></span>
-              <span className="text-[10px] font-bold tracking-wider text-gray-500">
-                {isOnline ? (supabaseConnected ? 'SUPABASE' : 'LOCAL') : 'OFFLINE'}
-              </span>
-            </div>
+            {/* Mobile Language Switcher (visible only on mobile/tablet) */}
+            {(activeEvent?.enabled_languages || ['kh', 'en']).length > 1 && (
+              <div className="lg:hidden flex items-center gap-1 bg-slate-100 p-0.5 rounded-xl border border-slate-200 shadow-inner select-none">
+                {(activeEvent?.enabled_languages || ['kh', 'en']).includes('kh') && (
+                  <button
+                    type="button"
+                    onClick={() => onChangeLanguage('kh')}
+                    className={`flex items-center gap-1 px-2 py-1.5 rounded-lg text-[10px] font-black tracking-wide transition-all active:scale-95 duration-150 cursor-pointer ${
+                      currentLanguage === 'kh'
+                        ? `${colors.primaryBg} text-white shadow-sm font-extrabold`
+                        : 'text-slate-600 hover:text-slate-800 hover:bg-slate-200/50'
+                    }`}
+                  >
+                    <span>ខ្មែរ</span>
+                  </button>
+                )}
+                {(activeEvent?.enabled_languages || ['kh', 'en']).includes('en') && (
+                  <button
+                    type="button"
+                    onClick={() => onChangeLanguage('en')}
+                    className={`flex items-center gap-1 px-2 py-1.5 rounded-lg text-[10px] font-black tracking-wide transition-all active:scale-95 duration-150 cursor-pointer ${
+                      currentLanguage === 'en'
+                        ? `${colors.primaryBg} text-white shadow-sm font-extrabold`
+                        : 'text-slate-600 hover:text-slate-800 hover:bg-slate-200/50'
+                    }`}
+                  >
+                    <span>EN</span>
+                  </button>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Tab Navigation Menu */}
@@ -165,9 +186,9 @@ export default function Header({
                }`}
              >
                <Award className="w-4 h-4" />
-               <span>លទ្ធផល (Live Board)</span>
+               <span>{currentLanguage === 'kh' ? 'លទ្ធផល (Live Board)' : 'Leaderboard'}</span>
              </button>
-
+ 
             {showPublicTeamsInHeader && (
               <button
                 id="tab-public-teams"
@@ -179,10 +200,10 @@ export default function Header({
                 }`}
               >
                 <Users className="w-4 h-4 animate-pulse" />
-                <span>បញ្ជីឈ្មោះក្រុម (Public Teams)</span>
+                <span>{currentLanguage === 'kh' ? 'បញ្ជីឈ្មោះក្រុម (Public Teams)' : 'Public Teams'}</span>
               </button>
             )}
-
+ 
             {isEnrolmentEnabled && (
               <button
                 id="tab-enrolment"
@@ -194,10 +215,10 @@ export default function Header({
                 }`}
               >
                 <Users className="w-4 h-4" />
-                <span>ចុះឈ្មោះលេងកីឡា (Enrol Athlete)</span>
+                <span>{currentLanguage === 'kh' ? 'ចុះឈ្មោះលេងកីឡា (Enrol Athlete)' : 'Enrol Athlete'}</span>
               </button>
             )}
-
+ 
             <button
               id="tab-dashboard"
               onClick={() => setActiveTab('dashboard')}
@@ -208,9 +229,9 @@ export default function Header({
               }`}
             >
               <BarChart3 className="w-4 h-4" />
-              <span>វិភាគទិន្នន័យ (Dashboard)</span>
+              <span>{currentLanguage === 'kh' ? 'វិភាគទិន្នន័យ (Dashboard)' : 'Analytics Dashboard'}</span>
             </button>
-
+ 
             {currentUser ? (
               <>
                 <button
@@ -223,9 +244,9 @@ export default function Header({
                   }`}
                 >
                   <Layers className="w-4 h-4" />
-                  <span>ផ្ទាំងបញ្ចូលពិន្ទុ (Scoring Panel)</span>
+                  <span>{currentLanguage === 'kh' ? 'ផ្ទាំងបញ្ចូលពិន្ទុ (Scoring Panel)' : 'Scoring Panel'}</span>
                 </button>
-
+ 
                 <button
                   id="tab-settings"
                   onClick={() => setActiveTab('settings')}
@@ -236,7 +257,7 @@ export default function Header({
                   }`}
                 >
                   <Settings className="w-4 h-4 font-bold" />
-                  <span>ការកំណត់ (Event Settings)</span>
+                  <span>{currentLanguage === 'kh' ? 'ការកំណត់ (Event Settings)' : 'Event Settings'}</span>
                 </button>
               </>
             ) : (
@@ -246,7 +267,7 @@ export default function Header({
                 className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs uppercase cursor-pointer tracking-wide transition-all duration-200 active:scale-95 whitespace-nowrap bg-[#FFCC00] text-gray-900 hover:bg-[#ffe054] shadow-sm`}
               >
                 <KeyRound className="w-4 h-4" />
-                <span>ចូលគ្រងប្រព័ន្ធ (Admin Sign In)</span>
+                <span>{currentLanguage === 'kh' ? 'ចូលគ្រងប្រព័ន្ធ (Admin Sign In)' : 'Admin Sign In'}</span>
               </button>
             )}
           </div>
@@ -276,35 +297,38 @@ export default function Header({
               </div>
             )}
 
-            <div className="flex items-center gap-2.5 bg-gray-50 border border-gray-100 px-3 py-1.5 rounded-xl">
-              {isOnline ? (
-                supabaseConnected ? (
-                  <>
-                    <Wifi className="w-4 h-4 text-emerald-500 animate-bounce" />
-                    <div className="text-left">
-                      <p className="text-[10px] font-black text-emerald-600 uppercase leading-none">SUPABASE LIVE</p>
-                      <p className="text-[8px] text-gray-400 font-bold tracking-tight">REAL-TIME SYNCED</p>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <Wifi className="w-4 h-4 text-amber-500" />
-                    <div className="text-left">
-                      <p className="text-[10px] font-black text-amber-600 uppercase leading-none">LOCAL OFFLINE</p>
-                      <p className="text-[8px] text-gray-400 font-bold tracking-tight">STORAGE EMULATED</p>
-                    </div>
-                  </>
-                )
-              ) : (
-                <>
-                  <WifiOff className="w-4 h-4 text-red-500 animate-pulse" />
-                  <div className="text-left">
-                    <p className="text-[10px] font-black text-red-500 uppercase leading-none">DISCONNECTED</p>
-                    <p className="text-[8px] text-gray-400 font-bold tracking-tight">OFFLINE SAVES ONLY</p>
-                  </div>
-                </>
-              )}
-            </div>
+            {/* Desktop Language Switcher (visible only on desktop) */}
+            {(activeEvent?.enabled_languages || ['kh', 'en']).length > 1 && (
+              <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-xl border border-slate-200 shadow-inner select-none">
+                {(activeEvent?.enabled_languages || ['kh', 'en']).includes('kh') && (
+                  <button
+                    type="button"
+                    onClick={() => onChangeLanguage('kh')}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-black tracking-wide transition-all active:scale-95 duration-150 cursor-pointer ${
+                      currentLanguage === 'kh'
+                        ? `${colors.primaryBg} text-white shadow-sm font-extrabold`
+                        : 'text-slate-600 hover:text-slate-800 hover:bg-slate-200/50'
+                    }`}
+                  >
+                    <Languages className="w-3.5 h-3.5" />
+                    <span>ភាសារខ្មែរ</span>
+                  </button>
+                )}
+                {(activeEvent?.enabled_languages || ['kh', 'en']).includes('en') && (
+                  <button
+                    type="button"
+                    onClick={() => onChangeLanguage('en')}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-black tracking-wide transition-all active:scale-95 duration-150 cursor-pointer ${
+                      currentLanguage === 'en'
+                        ? `${colors.primaryBg} text-white shadow-sm font-extrabold`
+                        : 'text-slate-600 hover:text-slate-800 hover:bg-slate-200/50'
+                    }`}
+                  >
+                    <span>English</span>
+                  </button>
+                )}
+              </div>
+            )}
           </div>
 
         </div>

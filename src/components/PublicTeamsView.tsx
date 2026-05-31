@@ -9,6 +9,7 @@ interface PublicTeamsViewProps {
   supabaseAnonKey?: string;
   isSupabaseEnabled?: boolean;
   matches?: Match[];
+  currentLanguage?: 'kh' | 'en';
 }
 
 export default function PublicTeamsView({
@@ -17,6 +18,7 @@ export default function PublicTeamsView({
   supabaseAnonKey,
   isSupabaseEnabled,
   matches = [],
+  currentLanguage = 'kh',
 }: PublicTeamsViewProps) {
   const [selectedSport, setSelectedSport] = useState<SportType | 'All'>('All');
   const [searchQuery, setSearchQuery] = useState('');

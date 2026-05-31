@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
   ToggleLeft, ToggleRight, QrCode, Copy, Check, ExternalLink, Settings2, Sliders, 
   ShieldCheck, Trophy, Layers, Users, Calendar, Plus, Trash2, Edit, CheckCircle, 
-  Clock, Award, HelpCircle, Activity, LayoutGrid, Settings, KeyRound, Play, ChevronRight, AlertTriangle
+  Clock, Award, HelpCircle, Activity, LayoutGrid, Settings, KeyRound, Play, ChevronRight, AlertTriangle, Languages
 } from 'lucide-react';
 import { Match, Participant, AppUser, EventInfo, Sport, SportType } from '../types';
 import { getSupabaseClient } from '../supabase';
@@ -104,7 +104,8 @@ export default function EventSettings({
             created_by: ev.created_by || currentUser?.username || 'hempiden',
             show_public_teams: ev.show_public_teams ?? false,
             is_enrolment_enabled: ev.is_enrolment_enabled ?? true,
-            organization_slug: ev.organization_slug || null
+            organization_slug: ev.organization_slug || null,
+            enabled_languages: (ev.enabled_languages || ['kh', 'en']).join(',')
           });
           if (error) console.error('Failed to sync event upsert:', error.message);
         }
@@ -1007,6 +1008,111 @@ export default function EventSettings({
                     >
                       {isEnrolmentEnabled ? (
                         <ToggleRight className="w-14 h-10 text-emerald-600" />
+                      ) : (
+                        <ToggleLeft className="w-14 h-10 text-gray-300" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Language Switcher & Selector Configuration Card */}
+              <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+                <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-gray-50/50 select-none">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 bg-blue-50 text-blue-600 rounded-2xl border border-blue-105">
+                      <Languages className="w-5 h-5 animate-pulse" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-black text-gray-800 uppercase tracking-wide">
+                        ការកំណត់ភាសាផ្ទាំងព័ត៌មាន (Dashboard Language Settings)
+                      </h3>
+                      <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wide">
+                        Enable or disable language switcher options (ភាសារខ្មែរ & English)
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-6 space-y-6">
+                  {/* Khmer toggle */}
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-gray-50/50 p-4 rounded-2xl border border-gray-100">
+                    <div className="space-y-1 max-w-md">
+                      <h4 className="text-xs font-black text-gray-800 uppercase">
+                        ភាសារខ្មែរ (Khmer Language Option)
+                      </h4>
+                      <p className="text-[11px] text-gray-500 font-medium leading-relaxed">
+                        អនុញ្ញាតឱ្យអ្នកទស្សនា (spectators) ជ្រើសរើសមើលផ្ទាំងព័ត៌មានជា <strong className="text-blue-600 font-bold">ភាសាខ្មែរ</strong>។
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const activeEv = events.find(e => e.id === activeEventId);
+                        const currentLangs = activeEv?.enabled_languages || ['kh', 'en'];
+                        let nextLangs: string[];
+                        if (currentLangs.includes('kh')) {
+                          if (currentLangs.length <= 1) return;
+                          nextLangs = currentLangs.filter(l => l !== 'kh');
+                        } else {
+                          nextLangs = [...currentLangs, 'kh'];
+                        }
+                        const updated = events.map(ev => {
+                          if (ev.id === activeEventId) {
+                            return { ...ev, enabled_languages: nextLangs };
+                          }
+                          return ev;
+                        });
+                        setEvents(updated);
+                        syncEventsToSupabase(updated);
+                      }}
+                      className="focus:outline-none flex items-center select-none cursor-pointer transition active:scale-95 duration-150 animate-fade-in"
+                    >
+                      {(events.find(e => e.id === activeEventId)?.enabled_languages || ['kh', 'en']).includes('kh') ? (
+                        <ToggleRight className="w-14 h-10 text-blue-600" />
+                      ) : (
+                        <ToggleLeft className="w-14 h-10 text-gray-300" />
+                      )}
+                    </button>
+                  </div>
+
+                  {/* English toggle */}
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-gray-50/50 p-4 rounded-2xl border border-gray-100">
+                    <div className="space-y-1 max-w-md">
+                      <h4 className="text-xs font-black text-gray-800 uppercase">
+                        English Language (English Language Option)
+                      </h4>
+                      <p className="text-[11px] text-gray-500 font-medium leading-relaxed">
+                        Allow spectators to toggle and view the tournament web dashboard in <strong className="text-indigo-600 font-bold">English language</strong> mode.
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const activeEv = events.find(e => e.id === activeEventId);
+                        const currentLangs = activeEv?.enabled_languages || ['kh', 'en'];
+                        let nextLangs: string[];
+                        if (currentLangs.includes('en')) {
+                          if (currentLangs.length <= 1) return;
+                          nextLangs = currentLangs.filter(l => l !== 'en');
+                        } else {
+                          nextLangs = [...currentLangs, 'en'];
+                        }
+                        const updated = events.map(ev => {
+                          if (ev.id === activeEventId) {
+                            return { ...ev, enabled_languages: nextLangs };
+                          }
+                          return ev;
+                        });
+                        setEvents(updated);
+                        syncEventsToSupabase(updated);
+                      }}
+                      className="focus:outline-none flex items-center select-none cursor-pointer transition active:scale-95 duration-150 animate-fade-in"
+                    >
+                      {(events.find(e => e.id === activeEventId)?.enabled_languages || ['kh', 'en']).includes('en') ? (
+                        <ToggleRight className="w-14 h-10 text-indigo-600" />
                       ) : (
                         <ToggleLeft className="w-14 h-10 text-gray-300" />
                       )}

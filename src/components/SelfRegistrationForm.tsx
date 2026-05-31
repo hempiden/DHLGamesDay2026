@@ -8,6 +8,7 @@ interface SelfRegistrationFormProps {
   events: EventInfo[];
   participants: Participant[];
   addParticipant: (name: string, sport_type: SportType, is_team: boolean, team_id: string | null, photo_url?: string) => Promise<string | null>;
+  currentLanguage?: 'kh' | 'en';
 }
 
 export default function SelfRegistrationForm({
@@ -16,6 +17,7 @@ export default function SelfRegistrationForm({
   events,
   participants,
   addParticipant,
+  currentLanguage = 'kh',
 }: SelfRegistrationFormProps) {
   const [fullname, setFullname] = useState('');
   const [selectedSport, setSelectedSport] = useState('');
