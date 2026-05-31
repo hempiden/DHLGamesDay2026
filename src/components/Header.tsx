@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Award, Layers, ToggleLeft, RefreshCw, AlertCircle, Laptop, Settings, Wifi, WifiOff, Users, Upload, Monitor, Database, ShieldAlert, LogOut, KeyRound, BarChart3, Timer } from 'lucide-react';
+import { Award, Layers, ToggleLeft, RefreshCw, AlertCircle, Laptop, Settings, Wifi, WifiOff, Users, Upload, Monitor, Database, ShieldAlert, LogOut, KeyRound, BarChart3, Timer, Lock, User } from 'lucide-react';
 import { AppUser } from '../types';
 
 interface HeaderProps {
@@ -9,10 +9,12 @@ interface HeaderProps {
   supabaseConnected: boolean;
   currentUser: AppUser | null;
   onLogout: () => void;
+  onOpenProfile?: () => void;
+  onLockConsole?: () => void;
 }
 
 
-export default function Header({ activeTab, setActiveTab, isOnline, supabaseConnected, currentUser, onLogout }: HeaderProps) {
+export default function Header({ activeTab, setActiveTab, isOnline, supabaseConnected, currentUser, onLogout, onOpenProfile, onLockConsole }: HeaderProps) {
   return (
     <header className="sticky top-0 z-50 bg-white border-b-4 border-[#FFCC00] shadow-md transition-all duration-300">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -152,8 +154,8 @@ export default function Header({ activeTab, setActiveTab, isOnline, supabaseConn
             
             {/* Show User Badge with Logout */}
             {currentUser && (
-              <div className="flex items-center gap-2.5 pl-3 border-l border-gray-200">
-                <div className="text-right leading-none select-none">
+              <div className="flex items-center gap-2 pl-3 border-l border-gray-200">
+                <div className="text-right leading-none select-none mr-1">
                   <p className="text-[10px] font-black text-gray-800 uppercase">
                     {currentUser.name}
                   </p>
@@ -161,6 +163,31 @@ export default function Header({ activeTab, setActiveTab, isOnline, supabaseConn
                     {currentUser.role}
                   </p>
                 </div>
+                
+                {/* Profile Edit Option */}
+                {onOpenProfile && (
+                  <button
+                    type="button"
+                    onClick={onOpenProfile}
+                    className="p-2 bg-gray-50 hover:bg-gray-100 text-gray-600 rounded-xl transition cursor-pointer hover:scale-105"
+                    title="គណនី និង កំណត់លេខសម្ងាត់ (Profile & Password Settings)"
+                  >
+                    <User className="w-3.5 h-3.5" />
+                  </button>
+                )}
+
+                {/* Console Screen Lock */}
+                {onLockConsole && (
+                  <button
+                    type="button"
+                    onClick={onLockConsole}
+                    className="p-2 bg-amber-50 hover:bg-amber-100 text-amber-600 rounded-xl transition cursor-pointer hover:scale-105"
+                    title="ចាក់សោអេក្រង់ (Lock Interactive Console)"
+                  >
+                    <Lock className="w-3.5 h-3.5" />
+                  </button>
+                )}
+
                 <button
                   type="button"
                   onClick={onLogout}

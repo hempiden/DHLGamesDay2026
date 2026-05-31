@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { User, Users, Plus, Trash2, Edit2, ShieldAlert, Check, HelpCircle, UserPlus, ArrowLeftRight, Camera, Image } from 'lucide-react';
+import { User, Users, Plus, Trash2, Edit2, ShieldAlert, Check, HelpCircle, UserPlus, ArrowLeftRight, Camera, Image, Shuffle, Sparkles, RefreshCw } from 'lucide-react';
 import { Participant, SportType } from '../types';
 import { SPORT_CONFIGS } from '../data';
 import AthleteUpload from './AthleteUpload';
@@ -8,7 +8,7 @@ interface TeamManagementProps {
   participants: Participant[];
   isOnline: boolean;
   supabaseConnected: boolean;
-  addParticipant: (name: string, sport_type: SportType, is_team: boolean, team_id: string | null, photo_url?: string) => Promise<boolean>;
+  addParticipant: (name: string, sport_type: SportType, is_team: boolean, team_id: string | null, photo_url?: string) => Promise<any>;
   updateParticipantName: (id: string, name: string) => Promise<boolean>;
   updateParticipantPhoto: (id: string, photoUrl: string | null) => Promise<boolean>;
   assignPlayerToTeam: (playerId: string, teamId: string | null) => Promise<boolean>;
@@ -46,6 +46,254 @@ export default function TeamManagement({
   const [saveNameSuccess, setSaveNameSuccess] = useState(false);
   const [deleteConfirmTeamId, setDeleteConfirmTeamId] = useState<string | null>(null);
   const [showRosterResetConfirm, setShowRosterResetConfirm] = useState(false);
+
+  // Random Teamup Modal States
+  const [showRandomTeamup, setShowRandomTeamup] = useState(false);
+  const [teamupAthletes, setTeamupAthletes] = useState<{ id: string; name: string; gender: 'Male' | 'Female'; selected: boolean }[]>([]);
+  const [teamupGenderMode, setTeamupGenderMode] = useState<'mixed' | 'separate'>('mixed');
+  const [teamupSize, setTeamupSize] = useState<number>(3);
+  const [teamupTargetType, setTeamupTargetType] = useState<'existing' | 'create_new'>('existing');
+  const [targetTeamNamePattern, setTargetTeamNamePattern] = useState(`${selectedSport} Squad`);
+  const [selectedTargetExistingTeamIds, setSelectedTargetExistingTeamIds] = useState<string[]>([]);
+  
+  // Results of generation (stored in state for preview before committing)
+  const [generatedDraftPreview, setGeneratedDraftPreview] = useState<{
+    teamName: string;
+    existingTeamId?: string; // if existing
+    members: { id: string; name: string; gender: 'Male' | 'Female' }[];
+    genderBadge?: 'Male' | 'Female' | 'Mixed';
+  }[]>([]);
+  const [isApplyingDraft, setIsApplyingDraft] = useState(false);
+
+  // Initialize Random Team-up
+  const initRandomTeamupModal = () => {
+    // Collect all athletes for selected sport
+    const sportAthletes = participants.filter(p => !p.is_team && p.sport_type === selectedSport);
+    
+    // Guess gender based on name
+    const prepared = sportAthletes.map(a => {
+      const text = a.name.toLowerCase();
+      let guessedGender: 'Male' | 'Female' = 'Male';
+      
+      const femaleTriggers = [
+        'sokha', 'pisey', 'nara', 'sovanna', 'vibol', 'roth', 'chan', 'leak', 'sokha',
+        'neary', 'leakhena', 'srey', 'bopha', 'moly', 'rath', 'sreypich', 'pich', 'sophia',
+        'kalyan', 'kolab', 'chenda', 'tevy', 'kunthea', 'sophea', 'theary', 'srei', 'pheap',
+        'chanta', 'chantra', 'maly', 'sothy', 'vanny', 'rom', 'chravy'
+      ];
+      
+      if (femaleTriggers.some(t => text.includes(t))) {
+        guessedGender = 'Female';
+      }
+      
+      return {
+        id: a.id,
+        name: a.name,
+        gender: guessedGender,
+        selected: true // default to checked
+      };
+    });
+    
+    setTeamupAthletes(prepared);
+
+    // Default team name pattern
+    setTargetTeamNamePattern(`កងសហគមន៍ ${SPORT_CONFIGS[selectedSport]?.khmerName || selectedSport}`);
+    
+    // Guess target team size based on sport division
+    let defaultSize = 3;
+    if (selectedSport === 'Soccer') defaultSize = 5;
+    else if (selectedSport === 'Volleyball') defaultSize = 6;
+    else if (selectedSport === 'Pingpong') defaultSize = 2;
+    else if (selectedSport === 'Badminton') defaultSize = 2;
+    else if (selectedSport === 'Swimming') defaultSize = 4;
+    setTeamupSize(defaultSize);
+    
+    // Set target team IDs
+    const sportTeams = participants.filter(p => p.is_team && p.sport_type === selectedSport);
+    setSelectedTargetExistingTeamIds(sportTeams.map(t => t.id));
+    
+    // Clear previous previews
+    setGeneratedDraftPreview([]);
+    setShowRandomTeamup(true);
+  };
+
+  const generateRandomGroups = () => {
+    // Get selected athletes
+    const activeAthletes = teamupAthletes.filter(a => a.selected);
+    if (activeAthletes.length === 0) {
+      alert('សូមជ្រើសរើសកីឡាករយ៉ាងហោចណាស់ម្នាក់! Please select at least one athlete.');
+      return;
+    }
+
+    // Shuffle helper function
+    const shuffle = <T,>(array: T[]): T[] => {
+      const arr = [...array];
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      return arr;
+    };
+
+    let groups: {
+      teamName: string;
+      existingTeamId?: string;
+      members: { id: string; name: string; gender: 'Male' | 'Female' }[];
+      genderBadge?: 'Male' | 'Female' | 'Mixed';
+    }[] = [];
+
+    if (teamupGenderMode === 'separate') {
+      // Split by gender
+      const males = shuffle(activeAthletes.filter(a => a.gender === 'Male'));
+      const females = shuffle(activeAthletes.filter(a => a.gender === 'Female'));
+
+      // Group males
+      const maleGroupsCount = Math.max(1, Math.ceil(males.length / teamupSize));
+      const maleChunks: typeof males[] = Array.from({ length: maleGroupsCount }, () => []);
+      males.forEach((m, idx) => {
+        maleChunks[idx % maleGroupsCount].push(m);
+      });
+
+      // Group females
+      const femaleGroupsCount = Math.max(1, Math.ceil(females.length / teamupSize));
+      const femaleChunks: typeof females[] = Array.from({ length: femaleGroupsCount }, () => []);
+      females.forEach((f, idx) => {
+        femaleChunks[idx % femaleGroupsCount].push(f);
+      });
+
+      if (teamupTargetType === 'existing') {
+        const sportTeams = participants.filter(p => p.is_team && p.sport_type === selectedSport && selectedTargetExistingTeamIds.includes(p.id));
+        if (sportTeams.length === 0) {
+          alert('សូមជ្រើសរើសក្រុមគោលដៅយ៉ាងហោចណាស់មួយ! Please select at least one existing target team.');
+          return;
+        }
+
+        let teamIdx = 0;
+        // Males
+        maleChunks.forEach((chunk) => {
+          if (chunk.length === 0) return;
+          const targetTeam = sportTeams[teamIdx % sportTeams.length];
+          groups.push({
+            teamName: `${targetTeam.name} (បុរស ♂️ - Men)`,
+            existingTeamId: targetTeam.id,
+            members: chunk.map(m => ({ id: m.id, name: m.name, gender: m.gender })),
+            genderBadge: 'Male'
+          });
+          teamIdx++;
+        });
+
+        // Females
+        femaleChunks.forEach((chunk) => {
+          if (chunk.length === 0) return;
+          const targetTeam = sportTeams[teamIdx % sportTeams.length];
+          groups.push({
+            teamName: `${targetTeam.name} (នារី ♀️ - Women)`,
+            existingTeamId: targetTeam.id,
+            members: chunk.map(f => ({ id: f.id, name: f.name, gender: f.gender })),
+            genderBadge: 'Female'
+          });
+          teamIdx++;
+        });
+      } else {
+        // Generate automatic groups
+        maleChunks.forEach((chunk, idx) => {
+          if (chunk.length === 0) return;
+          groups.push({
+            teamName: `${targetTeamNamePattern} (បុរស ក្រុមទី ${idx + 1} ♂️)`,
+            members: chunk.map(m => ({ id: m.id, name: m.name, gender: m.gender })),
+            genderBadge: 'Male'
+          });
+        });
+
+        femaleChunks.forEach((chunk, idx) => {
+          if (chunk.length === 0) return;
+          groups.push({
+            teamName: `${targetTeamNamePattern} (នារី ក្រុមទី ${idx + 1} ♀️)`,
+            members: chunk.map(f => ({ id: f.id, name: f.name, gender: f.gender })),
+            genderBadge: 'Female'
+          });
+        });
+      }
+    } else {
+      // Mixed mode
+      const allShuffled = shuffle(activeAthletes);
+      const groupsCount = Math.max(1, Math.ceil(allShuffled.length / teamupSize));
+      const chunks: typeof allShuffled[] = Array.from({ length: groupsCount }, () => []);
+      allShuffled.forEach((ath, idx) => {
+        chunks[idx % groupsCount].push(ath);
+      });
+
+      if (teamupTargetType === 'existing') {
+        const sportTeams = participants.filter(p => p.is_team && p.sport_type === selectedSport && selectedTargetExistingTeamIds.includes(p.id));
+        if (sportTeams.length === 0) {
+          alert('សូមជ្រើសរើសក្រុមគោលដៅយ៉ាងហោចណាស់មួយ! Please select at least one existing target team.');
+          return;
+        }
+
+        chunks.forEach((chunk, idx) => {
+          if (chunk.length === 0) return;
+          const targetTeam = sportTeams[idx % sportTeams.length];
+          groups.push({
+            teamName: targetTeam.name,
+            existingTeamId: targetTeam.id,
+            members: chunk.map(c => ({ id: c.id, name: c.name, gender: c.gender })),
+            genderBadge: 'Mixed'
+          });
+        });
+      } else {
+        chunks.forEach((chunk, idx) => {
+          if (chunk.length === 0) return;
+          groups.push({
+            teamName: `${targetTeamNamePattern} (ក្រុមចម្រុះទី ${idx + 1})`,
+            members: chunk.map(c => ({ id: c.id, name: c.name, gender: c.gender })),
+            genderBadge: 'Mixed'
+          });
+        });
+      }
+    }
+
+    setGeneratedDraftPreview(groups);
+  };
+
+  const applyRandomTeamupPreset = async () => {
+    if (generatedDraftPreview.length === 0) {
+      alert('សូមបង្កើតការបែងចែកសាកល្បងជាមុនសិន! Please generate random preview first.');
+      return;
+    }
+
+    setIsApplyingDraft(true);
+    try {
+      if (teamupTargetType === 'existing') {
+        // Iterate through generatedDraftPreview and associate players
+        for (const grp of generatedDraftPreview) {
+          if (!grp.existingTeamId) continue;
+          for (const member of grp.members) {
+            await assignPlayerToTeam(member.id, grp.existingTeamId);
+          }
+        }
+      } else {
+        // Create new teams, then associate players!
+        for (const grp of generatedDraftPreview) {
+          // Create the team and get the ID from return
+          const newTeamId = await addParticipant(grp.teamName, selectedSport, true, null);
+          if (newTeamId) {
+            for (const member of grp.members) {
+              await assignPlayerToTeam(member.id, String(newTeamId));
+            }
+          }
+        }
+      }
+      
+      alert('ការបង្កើតក្រុមចៃដន្យត្រូវបានរក្សាទុកដោយជោគជ័យ! Random team allocation created and synced successfully.');
+      setShowRandomTeamup(false);
+      setGeneratedDraftPreview([]);
+    } catch (err) {
+      console.error('Failed to commit random team-up:', err);
+      alert('មានបញ្ហាក្នុងការរក្សាទុកទិន្នន័យ! Error saving random team up changes.');
+    } finally {
+      setIsApplyingDraft(false);
+    }
+  };
 
   // Filter calculations
   const teams = participants.filter(p => p.is_team && p.sport_type === selectedSport);
@@ -179,6 +427,14 @@ export default function TeamManagement({
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <button
+            onClick={initRandomTeamupModal}
+            className="flex items-center gap-1.5 px-4 py-2 bg-indigo-600 text-white hover:bg-indigo-700 rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-200 active:scale-95 shadow-sm"
+          >
+            <Shuffle className="w-3.5 h-3.5 text-[#FFCC00]" />
+            <span>🎲 បែងចែកក្រុមចៃដន្យ (Random Team-up)</span>
+          </button>
+
           <button
             onClick={() => {
               setNewPlayerSport(selectedSport);
@@ -757,6 +1013,371 @@ export default function TeamManagement({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {showRandomTeamup && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in font-sans select-none overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-4xl w-full p-6 md:p-8 shadow-2xl border border-gray-100 animate-slide-up my-8 max-h-[90vh] overflow-y-auto">
+            {/* Modal Header */}
+            <div className="flex justify-between items-center pb-4 border-b border-gray-100 mb-6">
+              <h3 className="font-dhl-title text-[#D40511] text-xl italic uppercase flex items-center gap-2">
+                <Shuffle className="w-5 h-5 text-[#FFCC00]" />
+                <span>🎲 ប្រព័ន្ធបែងចែកក្រុមចៃដន្យ ({selectedSport} Random Team-up)</span>
+              </h3>
+              <button
+                onClick={() => {
+                  setShowRandomTeamup(false);
+                  setGeneratedDraftPreview([]);
+                }}
+                className="text-gray-400 hover:text-gray-600 text-lg font-bold cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+              {/* Left Column: Athletes & Genders lists */}
+              <div className="lg:col-span-5 flex flex-col space-y-4">
+                <div className="flex justify-between items-center bg-gray-50 p-3 rounded-2xl border border-gray-100">
+                  <div>
+                    <h4 className="font-black text-xs uppercase tracking-wider text-gray-700">
+                      បញ្ជីឈ្មោះកីឡាករ ({selectedSport})
+                    </h4>
+                    <p className="text-[9px] text-gray-400 font-bold uppercase mt-0.5">
+                      Select players & configure genders
+                    </p>
+                  </div>
+                  <div className="flex gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setTeamupAthletes(prev => prev.map(a => ({ ...a, selected: true })))}
+                      className="px-2 py-1 bg-white hover:bg-gray-100 border border-gray-200 text-gray-600 rounded-lg text-[9px] font-black uppercase transition-all"
+                    >
+                      All
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setTeamupAthletes(prev => prev.map(a => ({ ...a, selected: false })))}
+                      className="px-2 py-1 bg-white hover:bg-gray-100 border border-gray-200 text-gray-600 rounded-lg text-[9px] font-black uppercase transition-all"
+                    >
+                      None
+                    </button>
+                  </div>
+                </div>
+
+                <div className="border border-gray-100 rounded-2xl p-4 bg-white max-h-[350px] overflow-y-auto space-y-2">
+                  {teamupAthletes.length === 0 ? (
+                    <div className="text-center py-12 text-gray-400">
+                      <HelpCircle className="w-8 h-8 opacity-25 mx-auto mb-2" />
+                      <p className="text-[10px] font-bold uppercase">គ្មានកីឡាករ</p>
+                      <p className="text-[9px] text-gray-400 mt-1">No athletes registered in {selectedSport}. Please add athletes first.</p>
+                    </div>
+                  ) : (
+                    teamupAthletes.map((a) => (
+                      <div
+                        key={a.id}
+                        className={`flex justify-between items-center p-2.5 rounded-xl border transition-all ${
+                          a.selected
+                            ? 'bg-amber-50/20 border-amber-200'
+                            : 'bg-gray-50/50 border-gray-100'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <input
+                            type="checkbox"
+                            checked={a.selected}
+                            onChange={() => {
+                              setTeamupAthletes(prev => prev.map(item => item.id === a.id ? { ...item, selected: !item.selected } : item));
+                            }}
+                            className="w-4 h-4 text-emerald-500 focus:ring-[#FFCC00] rounded"
+                          />
+                          <span className={`font-bold text-xs truncate ${a.selected ? 'text-gray-800' : 'text-gray-400 line-through'}`}>
+                            {a.name}
+                          </span>
+                        </div>
+
+                        {/* Gender Toggle Button */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setTeamupAthletes(prev => prev.map(item => item.id === a.id ? { ...item, gender: item.gender === 'Male' ? 'Female' : 'Male' } : item));
+                          }}
+                          className={`px-2.5 py-1 rounded-lg text-[10px] font-black transition-all border shrink-0 flex items-center gap-1 cursor-pointer ${
+                            a.gender === 'Male'
+                              ? 'bg-blue-50 border-blue-200 text-blue-600 hover:bg-blue-100'
+                              : 'bg-pink-50 border-pink-200 text-pink-600 hover:bg-pink-100'
+                          }`}
+                        >
+                          <span>{a.gender === 'Male' ? '♂️' : '♀️'}</span>
+                          <span>{a.gender === 'Male' ? 'ប្រុស' : 'ស្រី'}</span>
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
+                <div className="text-[10px] text-gray-400 font-semibold leading-relaxed bg-gray-50/80 p-3 rounded-xl border border-gray-100">
+                  💡 <span className="font-bold text-gray-650">របៀបកំណត់ភេទចល័ត៖</span> ប្រព័ន្ធនឹងទាយភេទរបស់កីឡាករដោយស្វ័យប្រវត្តិពីប្រព័ន្ធ តែលោកអ្នកអាចចុចលើប៊ូតុងភេទខាងលើ (ប្រុស/ស្រី) ដើម្បីប្តូរបានភ្លាមៗសម្រាប់ការបែងចែកក្រុម។
+                </div>
+              </div>
+
+              {/* Right Column: Grouping options */}
+              <div className="lg:col-span-7 flex flex-col space-y-6">
+                
+                {/* Rule parameters */}
+                <div className="bg-gray-50 p-5 rounded-3xl border border-gray-100 space-y-4">
+                  <h4 className="font-extrabold text-xs uppercase tracking-tight text-gray-700">
+                    លក្ខខណ្ឌបង្កើតក្រុម (Define Sorting Conditions)
+                  </h4>
+
+                  {/* Gender separation mode */}
+                  <div>
+                    <label className="text-[10px] font-black uppercase text-gray-400 block mb-2 mt-1">
+                      ទម្រង់លេង/ភេទ (Gameplay Gender Split)
+                    </label>
+                    <div className="grid grid-cols-2 gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setTeamupGenderMode('mixed')}
+                        className={`p-3 rounded-xl border-2 font-black uppercase italic text-center transition-all cursor-pointer ${
+                          teamupGenderMode === 'mixed'
+                            ? 'bg-[#FFCC00] text-gray-950 border-[#FFCC00] shadow-sm animate-pulse-subtle'
+                            : 'bg-white text-gray-500 border-gray-100 hover:border-gray-200'
+                        }`}
+                      >
+                        <p className="text-[10px] sm:text-xs">លេងរួមគ្នា (Mixed / All Gender)</p>
+                        <span className="text-[8px] opacity-70 font-normal">All athletes drafted together</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setTeamupGenderMode('separate')}
+                        className={`p-3 rounded-xl border-2 font-black uppercase italic text-center transition-all cursor-pointer ${
+                          teamupGenderMode === 'separate'
+                            ? 'bg-[#FFCC00] text-gray-950 border-[#FFCC00] shadow-sm animate-pulse-subtle'
+                            : 'bg-white text-gray-500 border-gray-100 hover:border-gray-200'
+                        }`}
+                      >
+                        <p className="text-[10px] sm:text-xs">បែងចែកប្រុស-ស្រី (Separate Gender)</p>
+                        <span className="text-[8px] opacity-70 font-normal">Separate Men's & Women's groups</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Member count per team */}
+                  <div>
+                    <div className="flex justify-between items-center mb-1.5">
+                      <label className="text-[10px] font-black uppercase text-gray-400">
+                        ចំនួនសមាជិកក្នុងមួយក្រុម (Members Per Team Size)
+                      </label>
+                      <span className="px-2.5 py-1 bg-gray-950 text-[#FFCC00] rounded-xl text-xs font-black">
+                        {teamupSize} នាក់/ក្រុម
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="range"
+                        min="1"
+                        max="12"
+                        value={teamupSize}
+                        onChange={(e) => setTeamupSize(Number(e.target.value))}
+                        className="flex-1 accent-[#D40511] h-1.5 bg-gray-200 rounded-lg cursor-pointer"
+                      />
+                      <div className="flex gap-1.5 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => setTeamupSize(prev => Math.max(1, prev - 1))}
+                          className="w-8 h-8 rounded-lg border border-gray-200 hover:bg-gray-100 font-extrabold text-sm text-gray-600 flex items-center justify-center transition-colors cursor-pointer"
+                        >
+                          -
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setTeamupSize(prev => Math.min(12, prev + 1))}
+                          className="w-8 h-8 rounded-lg border border-gray-200 hover:bg-gray-100 font-extrabold text-sm text-gray-600 flex items-center justify-center transition-colors cursor-pointer"
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Target configuration */}
+                  <div>
+                    <label className="text-[10px] font-black uppercase text-gray-400 block mb-2">
+                      របៀបបែងចែកចូល (Allocation Target Squads)
+                    </label>
+                    <div className="grid grid-cols-2 gap-3 mb-3">
+                      <button
+                        type="button"
+                        onClick={() => setTeamupTargetType('existing')}
+                        className={`p-2.5 rounded-xl border-2 font-black uppercase transition-all text-xs cursor-pointer ${
+                          teamupTargetType === 'existing'
+                            ? 'bg-gray-955 text-[#FFCC00] border-gray-950 shadow-sm'
+                            : 'bg-white text-gray-500 border-gray-100 hover:border-gray-200'
+                        }`}
+                      >
+                        ប្រើប្រាស់ក្រុមមានស្រាប់ (Existing Teams)
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setTeamupTargetType('create_new')}
+                        className={`p-2.5 rounded-xl border-2 font-black uppercase transition-all text-xs cursor-pointer ${
+                          teamupTargetType === 'create_new'
+                            ? 'bg-gray-955 text-[#FFCC00] border-gray-950 shadow-sm'
+                            : 'bg-white text-gray-500 border-gray-100 hover:border-gray-200'
+                        }`}
+                      >
+                        បង្កើតក្រុមថ្មីស្វ័យប្រវត្ត (Create New Teams)
+                      </button>
+                    </div>
+
+                    {teamupTargetType === 'existing' ? (
+                      <div className="space-y-2 bg-white p-3.5 rounded-xl border border-gray-200">
+                        <p className="text-[9px] font-black uppercase text-gray-450 tracking-wider">
+                          ជ្រើសរើសក្រុមគោលដៅ (Select Target Roster Squads):
+                        </p>
+                        {participants.filter(p => p.is_team && p.sport_type === selectedSport).length === 0 ? (
+                          <p className="text-[10px] text-[#D40511] font-bold">⚠ គ្មានក្រុមដែលបង្កើតទុកក្នុងប្រភេទកីឡានេះទេ! សូមជ្រើសរើសបង្កើតក្រុមថ្មីស្វ័យប្រវត្ត។</p>
+                        ) : (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[110px] overflow-y-auto pr-1">
+                            {participants.filter(p => p.is_team && p.sport_type === selectedSport).map(t => {
+                              const isChecked = selectedTargetExistingTeamIds.includes(t.id);
+                              return (
+                                <label key={t.id} className="flex items-center gap-2 p-1.5 hover:bg-gray-50 rounded-lg cursor-pointer text-xs font-bold text-gray-700">
+                                  <input
+                                    type="checkbox"
+                                    checked={isChecked}
+                                    onChange={() => {
+                                      if (isChecked) {
+                                        setSelectedTargetExistingTeamIds(prev => prev.filter(id => id !== t.id));
+                                      } else {
+                                        setSelectedTargetExistingTeamIds(prev => [...prev, t.id]);
+                                      }
+                                    }}
+                                    className="w-3.5 h-3.5 focus:ring-[#FFCC00] text-emerald-500 rounded cursor-pointer"
+                                  />
+                                  <span className="truncate">{t.name}</span>
+                                </label>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="bg-white p-3.5 rounded-xl border border-gray-200 space-y-1.5">
+                        <label className="text-[9px] font-black uppercase text-gray-400 tracking-wider">
+                          លំនាំឈ្មោះក្រុមស្វ័យប្រវត្ត (Base Team Name Pattern):
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={targetTeamNamePattern}
+                          onChange={(e) => setTargetTeamNamePattern(e.target.value)}
+                          className="w-full bg-gray-50 border border-gray-200 px-3 py-2 rounded-xl text-xs font-bold outline-none focus:ring-1 focus:ring-[#FFCC00]"
+                          placeholder="ឧទាហរណ៍៖ Group Red"
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Generate Action Button */}
+                <button
+                  type="button"
+                  onClick={generateRandomGroups}
+                  className="w-full py-3.5 bg-[#D40511] hover:bg-red-700 text-white rounded-2xl font-black uppercase italic tracking-wider shadow-md hover:shadow-lg transition-all text-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <Shuffle className="w-4 h-4 text-[#FFCC00]" />
+                  <span>បែងចែកលាយចៃដន្យសាកល្បង (Generate Random Teams Preview)</span>
+                </button>
+              </div>
+            </div>
+
+            {/* PREVIEW CONTAINER SECTION */}
+            {generatedDraftPreview.length > 0 && (
+              <div className="mt-8 border-t border-gray-150 pt-8 animate-fade-in text-left">
+                <div className="flex justify-between items-center mb-4">
+                  <div>
+                    <h4 className="font-extrabold text-sm text-gray-800 uppercase italic">
+                      លទ្ធផលនៃការបែងចែក (Roster Draft Preview)
+                    </h4>
+                    <p className="text-[10px] text-gray-400 font-bold uppercase">
+                      Confirm result before applying changes to the database
+                    </p>
+                  </div>
+                  <span className="px-2.5 py-0.5 bg-indigo-100 text-indigo-700 font-extrabold rounded-lg text-[10px]">
+                    {generatedDraftPreview.length} GROUPS PLANNED
+                  </span>
+                </div>
+
+                {/* Grid of preview outcome lists */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-[300px] overflow-y-auto pr-1 mb-8">
+                  {generatedDraftPreview.map((grp, gidx) => (
+                    <div key={gidx} className="border border-gray-200 bg-gray-50/40 rounded-2xl p-4 flex flex-col space-y-2.5">
+                      <div className="flex justify-between items-start">
+                        <h5 className="font-extrabold text-xs text-gray-800 line-clamp-1 flex-1 pr-1">{grp.teamName}</h5>
+                        {grp.genderBadge && (
+                          <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider shrink-0 ${
+                            grp.genderBadge === 'Male'
+                              ? 'bg-blue-150 text-blue-700'
+                              : grp.genderBadge === 'Female'
+                              ? 'bg-pink-150 text-pink-700'
+                              : 'bg-indigo-150 text-indigo-700'
+                          }`}>
+                            {grp.genderBadge === 'Male' ? 'BOYS ♂️' : grp.genderBadge === 'Female' ? 'GIRLS ♀️' : 'MIXED 👫'}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="space-y-1.5 border-t border-gray-150 pt-2">
+                        {grp.members.map((m, midx) => (
+                          <div key={m.id} className="flex justify-between items-center text-[11px] font-extrabold text-gray-600 bg-white p-2 rounded-lg border border-gray-150">
+                            <span>{midx + 1}. {m.name}</span>
+                            <span className="text-[9px] opacity-60 font-medium">{m.gender === 'Male' ? 'Male ♂️' : 'Female ♀️'}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Final Commit Button */}
+                <div className="sticky bottom-0 bg-white pt-4 border-t border-gray-150 flex justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setGeneratedDraftPreview([])}
+                    className="px-5 py-3 bg-gray-100 hover:bg-gray-200 text-gray-650 rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer"
+                  >
+                    Reset Draft
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isApplyingDraft}
+                    onClick={applyRandomTeamupPreset}
+                    className={`px-8 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black uppercase italic tracking-wider flex items-center gap-2 shadow-md ${
+                      isApplyingDraft ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer active:scale-95'
+                    }`}
+                  >
+                    {isApplyingDraft ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                        <span>កំពុងរក្សាទុកទិន្នន័យ (Applying Roster...)</span>
+                      </>
+                    ) : (
+                      <>
+                        <Check className="w-4 h-4 text-[#FFCC00]" />
+                        <span>រក្សាទុក និងអនុវត្តក្រុមថ្មី (Apply & Sync Roster)</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+
+              </div>
+            )}
+
           </div>
         </div>
       )}

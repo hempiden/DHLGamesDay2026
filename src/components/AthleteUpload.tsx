@@ -5,7 +5,7 @@ import { SPORT_CONFIGS } from '../data';
 
 interface AthleteUploadProps {
   participants: Participant[];
-  addParticipant: (name: string, sport_type: SportType, is_team: boolean, team_id: string | null, photo_url?: string) => Promise<boolean>;
+  addParticipant: (name: string, sport_type: SportType, is_team: boolean, team_id: string | null, photo_url?: string) => Promise<any>;
   updateParticipantName: (id: string, name: string) => Promise<boolean>;
   updateParticipantPhoto: (id: string, photoUrl: string | null) => Promise<boolean>;
   assignPlayerToTeam: (playerId: string, teamId: string | null) => Promise<boolean>;

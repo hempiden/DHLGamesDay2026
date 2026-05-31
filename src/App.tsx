@@ -8,6 +8,8 @@ import DatabaseSetup from './components/DatabaseSetup';
 import LoginView from './components/LoginView';
 import UsersApprovalPanel from './components/UsersApprovalPanel';
 import PublicTeamsView from './components/PublicTeamsView';
+import ProfileOverlay from './components/ProfileOverlay';
+import ConsoleLockOverlay from './components/ConsoleLockOverlay';
 import PublicAthletePhotoUpload from './components/PublicAthletePhotoUpload';
 import AnalyticsDashboard from './components/AnalyticsDashboard';
 import SwimmingTimer from './components/SwimmingTimer';
@@ -86,6 +88,12 @@ export default function App() {
     return null;
   });
 
+  const [isConsoleLocked, setIsConsoleLocked] = useState<boolean>(() => {
+    return localStorage.getItem('dhl_games_day_console_locked') === 'true';
+  });
+
+  const [showProfileModal, setShowProfileModal] = useState<boolean>(false);
+
   const [users, setUsers] = useState<AppUser[]>(() => {
     const saved = localStorage.getItem('dhl_games_day_users');
     if (saved) {
@@ -131,13 +139,88 @@ export default function App() {
   const handleLoginSuccess = (user: AppUser) => {
     setCurrentUser(user);
     localStorage.setItem('dhl_games_day_current_user', JSON.stringify(user));
+    
+    // Auto unlock console on new success login
+    setIsConsoleLocked(false);
+    localStorage.removeItem('dhl_games_day_console_locked');
+
+    // Sync newly logged in user into offline state cache list if not present
+    setUsers((prev) => {
+      const exists = prev.some((u) => u.id === user.id);
+      if (!exists) {
+        const updated = [user, ...prev];
+        localStorage.setItem('dhl_games_day_users', JSON.stringify(updated));
+        return updated;
+      } else {
+        const updated = prev.map((u) => u.id === user.id ? user : u);
+        localStorage.setItem('dhl_games_day_users', JSON.stringify(updated));
+        return updated;
+      }
+    });
+
     setActiveTab('leaderboard');
   };
 
   const handleLogout = () => {
     setCurrentUser(null);
     localStorage.removeItem('dhl_games_day_current_user');
+    
+    setIsConsoleLocked(false);
+    localStorage.removeItem('dhl_games_day_console_locked');
+    
     setActiveTab('leaderboard');
+  };
+
+  const handleLockConsole = () => {
+    setIsConsoleLocked(true);
+    localStorage.setItem('dhl_games_day_console_locked', 'true');
+  };
+
+  const handleUnlockConsole = (password: string): boolean => {
+    if (currentUser && currentUser.passwordPlain === password) {
+      setIsConsoleLocked(false);
+      localStorage.removeItem('dhl_games_day_console_locked');
+      return true;
+    }
+    return false;
+  };
+
+  const handleUpdatePassword = async (newPasswordPlain: string): Promise<{ success: boolean; error?: string }> => {
+    if (!currentUser) return { success: false, error: 'សំណួរផុតកំណត់ការចូល (No active session)' };
+
+    const updatedUser = { ...currentUser, passwordPlain: newPasswordPlain };
+    
+    // Update local users array
+    const updatedUsersList = users.map(u => u.id === currentUser.id ? updatedUser : u);
+    setUsers(updatedUsersList);
+    localStorage.setItem('dhl_games_day_users', JSON.stringify(updatedUsersList));
+
+    // Update active currentUser
+    setCurrentUser(updatedUser);
+    localStorage.setItem('dhl_games_day_current_user', JSON.stringify(updatedUser));
+
+    // Update remote Supabase if connected
+    if (isSupabaseEnabled && supabaseConnected) {
+      const client = getSupabaseClient(supabaseUrl, supabaseAnonKey);
+      if (client) {
+        try {
+          const { error } = await client
+            .from('admin_users')
+            .update({ password_plain: newPasswordPlain })
+            .eq('id', currentUser.id);
+
+          if (error) {
+            console.error('Failed to sync new password to Supabase:', error.message);
+            return { success: true, error: 'បានរក្សាទុកក្នុងឧបករណ៍ ប៉ុន្តែមិនអាចរួមកម្រងពពក (Saved locally, cloud sync failed: ' + error.message + ')' };
+          }
+        } catch (err: any) {
+          console.error('Database connection exception:', err);
+          return { success: true, error: 'បានរក្សាទុកក្នុងឧបករណ៍ ប៉ុន្តែមានបញ្ហាភ្ជាប់ពពក (Saved locally, database exception)' };
+        }
+      }
+    }
+
+    return { success: true };
   };
 
   const handleRegisterUser = (name: string, username: string, email: string, passwordPlain: string) => {
@@ -154,10 +237,30 @@ export default function App() {
     const updated = [newUser, ...users];
     setUsers(updated);
     localStorage.setItem('dhl_games_day_users', JSON.stringify(updated));
+
+    if (isSupabaseEnabled && supabaseConnected) {
+      const client = getSupabaseClient(supabaseUrl, supabaseAnonKey);
+      if (client) {
+        client.from('admin_users').insert({
+          id: newUser.id,
+          name: newUser.name,
+          username: newUser.username,
+          email: newUser.email,
+          role: newUser.role,
+          status: newUser.status,
+          password_plain: newUser.passwordPlain,
+          created_at: newUser.created_at
+        }).then(({ error }) => {
+          if (error) {
+            console.error('Failed to sync new user to Supabase:', error.message);
+          }
+        });
+      }
+    }
     return { success: true };
   };
 
-  const handleUpdateUserStatus = (userId: string, status: 'approved' | 'rejected' | 'pending') => {
+  const handleUpdateUserStatus = async (userId: string, status: 'approved' | 'rejected' | 'pending') => {
     const updated = users.map((u) => {
       if (u.id === userId) {
         const updatedUser = { ...u, status };
@@ -171,9 +274,20 @@ export default function App() {
     });
     setUsers(updated);
     localStorage.setItem('dhl_games_day_users', JSON.stringify(updated));
+
+    if (isSupabaseEnabled && supabaseConnected) {
+      const client = getSupabaseClient(supabaseUrl, supabaseAnonKey);
+      if (client) {
+        try {
+          await client.from('admin_users').update({ status }).eq('id', userId);
+        } catch (err) {
+          console.error('Failed to update user status in Supabase:', err);
+        }
+      }
+    }
   };
 
-  const handleUpdateUserRole = (userId: string, role: 'admin' | 'super_admin') => {
+  const handleUpdateUserRole = async (userId: string, role: 'admin' | 'super_admin') => {
     const updated = users.map((u) => {
       if (u.id === userId) {
         const updatedUser = { ...u, role };
@@ -187,12 +301,34 @@ export default function App() {
     });
     setUsers(updated);
     localStorage.setItem('dhl_games_day_users', JSON.stringify(updated));
+
+    if (isSupabaseEnabled && supabaseConnected) {
+      const client = getSupabaseClient(supabaseUrl, supabaseAnonKey);
+      if (client) {
+        try {
+          await client.from('admin_users').update({ role }).eq('id', userId);
+        } catch (err) {
+          console.error('Failed to update user role in Supabase:', err);
+        }
+      }
+    }
   };
 
-  const handleDeleteUser = (userId: string) => {
+  const handleDeleteUser = async (userId: string) => {
     const updated = users.filter((u) => u.id !== userId);
     setUsers(updated);
     localStorage.setItem('dhl_games_day_users', JSON.stringify(updated));
+
+    if (isSupabaseEnabled && supabaseConnected) {
+      const client = getSupabaseClient(supabaseUrl, supabaseAnonKey);
+      if (client) {
+        try {
+          await client.from('admin_users').delete().eq('id', userId);
+        } catch (err) {
+          console.error('Failed to delete user in Supabase:', err);
+        }
+      }
+    }
   };
 
   // Supabase states
@@ -374,6 +510,65 @@ export default function App() {
               if (JSON.stringify(prev) !== JSON.stringify(mappedParticipants)) {
                 localStorage.setItem('dhl_games_day_participants', JSON.stringify(mappedParticipants));
                 return mappedParticipants;
+              }
+              return prev;
+            });
+          }
+
+          // Fetch remote admin_users table
+          const usersResult = await client
+            .from('admin_users')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+          if (usersResult.error) {
+            // Safe fallback if table doesn't exist yet, we will just keep local list
+            console.warn('Supabase admin_users fetch notice (Table may not exist yet):', usersResult.error.message);
+          } else if (usersResult.data && active) {
+            const mappedUsers: AppUser[] = usersResult.data.map((item: any) => ({
+              id: String(item.id),
+              username: item.username,
+              email: item.email,
+              name: item.name,
+              role: item.role as 'admin' | 'super_admin',
+              status: item.status as 'pending' | 'approved' | 'rejected',
+              passwordPlain: item.password_plain || item.passwordPlain || '',
+              created_at: item.created_at
+            }));
+
+            // Always ensure the Super Admin preset 'hempiden' exists in our list
+            const adminPresetIdx = mappedUsers.findIndex((p) => p.username === 'hempiden');
+            if (adminPresetIdx === -1) {
+              const hempidenPreset: AppUser = {
+                id: 'super_admin_hempiden',
+                username: 'hempiden',
+                email: 'piden.hem@dhl.com',
+                name: 'Piden Hem',
+                role: 'super_admin',
+                status: 'approved',
+                passwordPlain: 'P1d#nXGamesDay',
+                created_at: new Date().toISOString()
+              };
+              mappedUsers.unshift(hempidenPreset);
+              // Proactively write preset back to Supabase if table exists
+              client.from('admin_users').insert({
+                id: hempidenPreset.id,
+                username: hempidenPreset.username,
+                email: hempidenPreset.email,
+                name: hempidenPreset.name,
+                role: hempidenPreset.role,
+                status: hempidenPreset.status,
+                password_plain: hempidenPreset.passwordPlain,
+                created_at: hempidenPreset.created_at
+              }).then(({ error }) => {
+                if (error) console.log('Supabase user preset insertion note:', error.message);
+              });
+            }
+
+            setUsers((prev) => {
+              if (JSON.stringify(prev) !== JSON.stringify(mappedUsers)) {
+                localStorage.setItem('dhl_games_day_users', JSON.stringify(mappedUsers));
+                return mappedUsers;
               }
               return prev;
             });
@@ -622,7 +817,7 @@ export default function App() {
     localStorage.setItem('dhl_games_day_participants', JSON.stringify(updated));
   };
 
-  const addParticipant = async (name: string, sport_type: SportType, is_team: boolean, team_id: string | null, photo_url?: string): Promise<boolean> => {
+  const addParticipant = async (name: string, sport_type: SportType, is_team: boolean, team_id: string | null, photo_url?: string): Promise<string | null> => {
     const newId = `p-${Date.now()}`;
     const newPar: Participant = {
       id: newId,
@@ -652,19 +847,21 @@ export default function App() {
           
           if (error) {
             console.error('Supabase insert participant failed:', error.message);
-            return false;
+            return null;
           }
           if (data && data[0]) {
-            const updatedWithDbId = updated.map(p => p.id === newId ? { ...p, id: String(data[0].id) } : p);
+            const finalId = String(data[0].id);
+            const updatedWithDbId = updated.map(p => p.id === newId ? { ...p, id: finalId } : p);
             saveLocalParticipants(updatedWithDbId);
+            return finalId;
           }
         } catch (err) {
           console.error('Remote insert participant failed:', err);
-          return false;
+          return null;
         }
       }
     }
-    return true;
+    return newPar.id;
   };
 
   const updateParticipantName = async (id: string, name: string): Promise<boolean> => {
@@ -820,6 +1017,8 @@ export default function App() {
         supabaseConnected={supabaseConnected}
         currentUser={currentUser}
         onLogout={handleLogout}
+        onOpenProfile={() => setShowProfileModal(true)}
+        onLockConsole={handleLockConsole}
       />
 
       {/* Synchronizing indicator banner */}
@@ -922,6 +1121,7 @@ export default function App() {
                 setSupabaseAnonKey={setSupabaseAnonKey}
                 isSupabaseEnabled={isSupabaseEnabled}
                 setIsSupabaseEnabled={setIsSupabaseEnabled}
+                users={users}
               />
             )}
 
@@ -931,6 +1131,10 @@ export default function App() {
                 onLoginSuccess={handleLoginSuccess}
                 users={users}
                 onRegisterUser={handleRegisterUser}
+                isSupabaseEnabled={isSupabaseEnabled}
+                supabaseConnected={supabaseConnected}
+                supabaseUrl={supabaseUrl}
+                supabaseAnonKey={supabaseAnonKey}
               />
             )}
 
@@ -993,6 +1197,24 @@ export default function App() {
           <span className="text-red-500 animate-pulse pl-0.5 font-sans">❤️</span>
         </div>
       </footer>
+
+      {/* Profile & Security Modal Overlay */}
+      {showProfileModal && currentUser && (
+        <ProfileOverlay
+          currentUser={currentUser}
+          onClose={() => setShowProfileModal(false)}
+          onUpdatePassword={handleUpdatePassword}
+        />
+      )}
+
+      {/* Screen Security Lock Overlay */}
+      {isConsoleLocked && currentUser && (
+        <ConsoleLockOverlay
+          currentUser={currentUser}
+          onUnlock={handleUnlockConsole}
+          onLogout={handleLogout}
+        />
+      )}
 
     </div>
   );

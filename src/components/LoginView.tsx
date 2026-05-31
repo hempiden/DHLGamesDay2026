@@ -1,30 +1,45 @@
 import React, { useState } from 'react';
-import { Shield, KeySquare, User, Mail, Sparkles, CheckCircle2, ArrowRight, LogIn, UserPlus } from 'lucide-react';
+import { Shield, KeySquare, User, Mail, Sparkles, CheckCircle2, ArrowRight, LogIn, UserPlus, Eye, EyeOff, Loader2, CloudCheck } from 'lucide-react';
 import { AppUser } from '../types';
 
 interface LoginViewProps {
   onLoginSuccess: (user: AppUser) => void;
   users: AppUser[];
   onRegisterUser: (name: string, username: string, email: string, passwordPlain: string) => { success: boolean; error?: string };
+  isSupabaseEnabled?: boolean;
+  supabaseConnected?: boolean;
+  supabaseUrl?: string;
+  supabaseAnonKey?: string;
 }
 
-export default function LoginView({ onLoginSuccess, users, onRegisterUser }: LoginViewProps) {
+export default function LoginView({
+  onLoginSuccess,
+  users,
+  onRegisterUser,
+  isSupabaseEnabled = false,
+  supabaseConnected = false,
+  supabaseUrl = '',
+  supabaseAnonKey = ''
+}: LoginViewProps) {
   const [activeForm, setActiveForm] = useState<'login' | 'register'>('login');
   
   // Login form state
   const [loginIdentifier, setLoginIdentifier] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [loginError, setLoginError] = useState('');
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
 
   // Register form state
   const [regName, setRegName] = useState('');
   const [regUsername, setRegUsername] = useState('');
   const [regEmail, setRegEmail] = useState('');
   const [regPassword, setRegPassword] = useState('');
+  const [showRegPassword, setShowRegPassword] = useState(false);
   const [regSuccess, setRegSuccess] = useState(false);
   const [regError, setRegError] = useState('');
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError('');
 
@@ -33,8 +48,68 @@ export default function LoginView({ onLoginSuccess, users, onRegisterUser }: Log
       return;
     }
 
-    // Accept username or email
     const cleanedId = loginIdentifier.trim().toLowerCase();
+
+    // 1. Live Cloud DB verification if enabled
+    if (isSupabaseEnabled && supabaseConnected && supabaseUrl && supabaseAnonKey) {
+      setIsVerifying(true);
+      try {
+        const { getSupabaseClient } = await import('../supabase');
+        const client = getSupabaseClient(supabaseUrl, supabaseAnonKey);
+        if (client) {
+          const { data, error } = await client
+            .from('admin_users')
+            .select('*')
+            // Match username or email
+            .or(`username.ilike.${cleanedId},email.ilike.${cleanedId}`);
+
+          if (error) {
+            console.warn('Supabase dynamic query error during login, falling back to local list:', error.message);
+          } else if (data && data.length > 0) {
+            const dbUser = data[0];
+            const mappedUser: AppUser = {
+              id: String(dbUser.id),
+              username: dbUser.username,
+              email: dbUser.email,
+              name: dbUser.name,
+              role: dbUser.role as 'admin' | 'super_admin',
+              status: dbUser.status as 'pending' | 'approved' | 'rejected',
+              passwordPlain: dbUser.password_plain || dbUser.passwordPlain || '',
+              created_at: dbUser.created_at
+            };
+
+            if (mappedUser.passwordPlain !== loginPassword) {
+              setLoginError('លេខសម្ងាត់មិនត្រឹមត្រូវឡើយ (Incorrect password - Cloud Verified)');
+              setIsVerifying(false);
+              return;
+            }
+
+            if (mappedUser.status === 'pending') {
+              setLoginError('គណនីរបស់អ្នកកំពុងរង់ចាំការអនុញ្ញាតពី Super Admin (Account pending super admin approval - Cloud Verified)');
+              setIsVerifying(false);
+              return;
+            }
+
+            if (mappedUser.status === 'rejected') {
+              setLoginError('គណនីរបស់អ្នកត្រូវបានបដិសេធការចូលប្រើប្រាស់ (Account login access denied - Cloud Verified)');
+              setIsVerifying(false);
+              return;
+            }
+
+            // Successfully authenticated via Cloud!
+            setIsVerifying(false);
+            onLoginSuccess(mappedUser);
+            return;
+          }
+        }
+      } catch (err) {
+        console.error('Unexpected error checking cloud account, attempting local verify:', err);
+      } finally {
+        setIsVerifying(false);
+      }
+    }
+
+    // 2. Off-line sandbox fallback
     const user = users.find(
       (u) => u.username.toLowerCase() === cleanedId || u.email.toLowerCase() === cleanedId
     );
@@ -167,6 +242,15 @@ export default function LoginView({ onLoginSuccess, users, onRegisterUser }: Log
         {activeForm === 'login' ? (
           /* LOGIN FORM */
           <form onSubmit={handleLogin} className="space-y-5">
+            {isSupabaseEnabled && supabaseConnected && (
+              <div className="flex items-center gap-1.5 px-3 py-1.5 bg-sky-50 border border-sky-100 rounded-xl text-sky-700 animate-fade-in self-start w-fit">
+                <Loader2 className="w-3 h-3 text-sky-500 animate-spin" />
+                <span className="text-[9px] font-bold uppercase tracking-wider">
+                  Cloud Live Auth Active ⚡
+                </span>
+              </div>
+            )}
+
             <div>
               <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">
                 ឈ្មោះអ្នកប្រើប្រាស់ ឬ អ៊ីមែល (Username or Email)
@@ -179,8 +263,9 @@ export default function LoginView({ onLoginSuccess, users, onRegisterUser }: Log
                   type="text"
                   value={loginIdentifier}
                   onChange={(e) => setLoginIdentifier(e.target.value)}
+                  disabled={isVerifying}
                   placeholder="e.g., hempiden / piden.hem@dhl.com"
-                  className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#D40511]/15 focus:border-[#D40511] transition duration-200 placeholder:text-gray-300"
+                  className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#D40511]/15 focus:border-[#D40511] transition duration-200 placeholder:text-gray-300 disabled:opacity-50"
                 />
               </div>
             </div>
@@ -194,12 +279,20 @@ export default function LoginView({ onLoginSuccess, users, onRegisterUser }: Log
                   <KeySquare className="w-4 h-4" />
                 </span>
                 <input
-                  type="password"
+                  type={showLoginPassword ? 'text' : 'password'}
                   value={loginPassword}
                   onChange={(e) => setLoginPassword(e.target.value)}
+                  disabled={isVerifying}
                   placeholder="••••••••••••••"
-                  className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#D40511]/15 focus:border-[#D40511] transition duration-200 placeholder:text-gray-300"
+                  className="w-full pl-10 pr-12 py-3 bg-gray-50 border border-gray-200 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#D40511]/15 focus:border-[#D40511] transition duration-200 placeholder:text-gray-300 disabled:opacity-50"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowLoginPassword(!showLoginPassword)}
+                  className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600 focus:outline-none cursor-pointer"
+                >
+                  {showLoginPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
               </div>
             </div>
 
@@ -212,13 +305,21 @@ export default function LoginView({ onLoginSuccess, users, onRegisterUser }: Log
 
             <button
               type="submit"
-              className="w-full py-3.5 bg-[#D40511] hover:bg-[#b0040d] text-white rounded-2xl font-black text-xs uppercase tracking-wider shadow-md shadow-[#D40511]/15 hover:shadow-lg transition duration-150 active:scale-98 cursor-pointer flex items-center justify-center gap-2"
+              disabled={isVerifying}
+              className="w-full py-3.5 bg-[#D40511] hover:bg-[#b0040d] text-white rounded-2xl font-black text-xs uppercase tracking-wider shadow-md shadow-[#D40511]/15 hover:shadow-lg transition duration-150 active:scale-98 cursor-pointer flex items-center justify-center gap-2 disabled:opacity-55"
             >
-              <span>ចូលគណនីគ្រប់គ្រង (Verify & Access All Panels)</span>
-              <ArrowRight className="w-4 h-4" />
+              {isVerifying ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>កំពុងផ្ទៀងផ្ទាត់ (Verifying Credentials...)</span>
+                </>
+              ) : (
+                <>
+                  <span>ចូលគណនីគ្រប់គ្រង (Verify & Access All Panels)</span>
+                  <ArrowRight className="w-4 h-4" />
+                </>
+              )}
             </button>
-
-
           </form>
         ) : (
           /* REGISTRATION FORM */
@@ -310,12 +411,19 @@ export default function LoginView({ onLoginSuccess, users, onRegisterUser }: Log
                       <KeySquare className="w-4 h-4" />
                     </span>
                     <input
-                      type="password"
+                      type={showRegPassword ? 'text' : 'password'}
                       value={regPassword}
                       onChange={(e) => setRegPassword(e.target.value)}
                       placeholder="••••••••"
-                      className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#D40511]/15 focus:border-[#D40511] transition duration-200 placeholder:text-gray-300"
+                      className="w-full pl-10 pr-12 py-2.5 bg-gray-50 border border-gray-200 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#D40511]/15 focus:border-[#D40511] transition duration-200 placeholder:text-gray-300"
                     />
+                    <button
+                      type="button"
+                      onClick={() => setShowRegPassword(!showRegPassword)}
+                      className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600 focus:outline-none cursor-pointer"
+                    >
+                      {showRegPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
                   </div>
                 </div>
 
