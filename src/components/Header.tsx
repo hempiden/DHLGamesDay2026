@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Award, Layers, ToggleLeft, RefreshCw, AlertCircle, Laptop, Settings, Wifi, WifiOff, Users, Upload, Monitor, Database, ShieldAlert, LogOut, KeyRound, BarChart3, Timer, ChevronDown } from 'lucide-react';
-import { AppUser, EventInfo } from '../types';
+import { AppUser, EventInfo, OrganizationInfo } from '../types';
 
 interface HeaderProps {
   activeTab: 'leaderboard' | 'public_teams' | 'dashboard' | 'scoring' | 'admin' | 'teams' | 'database' | 'users' | 'login' | 'settings' | 'enrolment' | 'organization';
@@ -14,6 +14,7 @@ interface HeaderProps {
   events: EventInfo[];
   activeEventId: string;
   setActiveEventId: (id: string) => void;
+  organization?: OrganizationInfo;
 }
 
 
@@ -28,7 +29,8 @@ export default function Header({
   isEnrolmentEnabled,
   events,
   activeEventId,
-  setActiveEventId
+  setActiveEventId,
+  organization
 }: HeaderProps) {
   
   const activeEvent = events.find(e => e.id === activeEventId) || events[0];
@@ -72,11 +74,23 @@ export default function Header({
           {/* Brand Logo & Title */}
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div className="flex items-center gap-4">
-              <div className={`${colors.primaryBg} px-3 py-1.5 rounded-sm transform -skew-x-12 shadow-sm`}>
-                <span className="text-white font-black italic tracking-tighter text-lg leading-none select-none">
-                  {brandAcronym}
-                </span>
-              </div>
+              {organization?.logoUrl ? (
+                <img 
+                  src={organization.logoUrl} 
+                  alt={organization.name || "Logo"} 
+                  className="h-10 max-w-[140px] object-contain filter hover:brightness-95 hover:contrast-110 duration-200"
+                  onError={(e) => {
+                    // Fallback to text acronym if download fails
+                    (e.target as HTMLElement).style.display = 'none';
+                  }} 
+                />
+              ) : (
+                <div className={`${colors.primaryBg} px-3 py-1.5 rounded-sm transform -skew-x-12 shadow-sm`}>
+                  <span className="text-white font-black italic tracking-tighter text-lg leading-none select-none">
+                    {brandAcronym}
+                  </span>
+                </div>
+              )}
               <div className="border-l-2 border-gray-200 pl-3">
                 <h1 className="font-bold text-gray-950 text-base sm:text-lg tracking-tight leading-none uppercase">
                   {activeEvent?.name || 'GAMES DAY 2026'}

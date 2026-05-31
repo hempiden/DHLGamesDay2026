@@ -96,17 +96,7 @@ export default function App() {
   const isEnrolmentEnabled = activeEvent?.is_enrolment_enabled ?? true;
 
   const [organization, setOrganization] = useState<OrganizationInfo>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('dhl_organization_settings');
-      if (saved) {
-        try {
-          return JSON.parse(saved);
-        } catch (err) {
-          console.error('Failed to parse local organization settings:', err);
-        }
-      }
-    }
-    return {
+    let baseOrg: OrganizationInfo = {
       name: 'DHL Express Cambodia',
       logoUrl: 'https://logos-world.net/wp-content/uploads/2020/08/DHL-Logo.png',
       slug: 'dhl-games',
@@ -117,6 +107,27 @@ export default function App() {
       address: 'Phnom Penh, Cambodia',
       footerMotto: 'Excellence. Simply delivered.',
     };
+
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('dhl_organization_settings');
+      if (saved) {
+        try {
+          baseOrg = { ...baseOrg, ...JSON.parse(saved) };
+        } catch (err) {
+          console.error('Failed to parse local organization settings:', err);
+        }
+      }
+
+      // If there is a dynamic slug in the URL pathname, prioritize it
+      const pathname = window.location.pathname.replace(/^\//, '').split('/')[0];
+      if (pathname && pathname !== 'index.html' && pathname !== 'assets' && pathname !== 'api' && pathname !== 'favicon.ico' && pathname !== 'org') {
+        baseOrg.slug = pathname;
+        if (baseOrg.slug !== 'dhl-games' && (!saved || JSON.parse(saved).slug !== pathname)) {
+          baseOrg.name = pathname.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+        }
+      }
+    }
+    return baseOrg;
   });
 
   const updateOrganization = async (updated: OrganizationInfo) => {
@@ -470,6 +481,73 @@ export default function App() {
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [currentTime, setCurrentTime] = useState<string>('');
 
+  const filteredEventsByOrg = React.useMemo(() => {
+    return events.filter(e => {
+      const orgSlug = e.organization_slug || 'dhl-games';
+      return orgSlug === organization.slug;
+    });
+  }, [events, organization.slug]);
+
+  // Seeding default template sports event for selected organization if none exist
+  useEffect(() => {
+    const hasOrgEvents = events.some(e => (e.organization_slug || 'dhl-games') === organization.slug);
+    if (!hasOrgEvents) {
+      const defaultOrgEvent: EventInfo = {
+        id: `event-${organization.slug}-${Date.now()}`,
+        name: `${organization.name} Games Day`,
+        khmerName: `ទិវាហ្គេម ${organization.name}`,
+        date: new Date().toISOString().split('T')[0],
+        description: `Official sports tournament events of ${organization.name}.`,
+        sports: [
+          { name: 'Soccer', khmerName: 'បាល់ទាត់', icon: '⚽', scoringMethod: 'score' },
+          { name: 'Volleyball', khmerName: 'បាល់ទះ', icon: '🏐', scoringMethod: 'score' },
+          { name: 'Pingpong', khmerName: 'វាយកូនឃ្លីលើតុ', icon: '🏓', scoringMethod: 'score' },
+          { name: 'Badminton', khmerName: 'វាយសី', icon: '🏸', scoringMethod: 'score' },
+          { name: 'Swimming', khmerName: 'ហែលទឹក', icon: '🏊', scoringMethod: 'measure' },
+        ],
+        created_by: currentUser?.username || 'hempiden',
+        show_public_teams: true,
+        is_enrolment_enabled: true,
+        organization_slug: organization.slug
+      };
+      
+      const newEvents = [...events, defaultOrgEvent];
+      setEvents(newEvents);
+      setActiveEventId(defaultOrgEvent.id);
+      
+      if (isSupabaseEnabled && supabaseConnected) {
+        const client = getSupabaseClient(supabaseUrl, supabaseAnonKey);
+        if (client) {
+          client.from('events').insert({
+            id: defaultOrgEvent.id,
+            name: defaultOrgEvent.name,
+            khmer_name: defaultOrgEvent.khmerName,
+            date: defaultOrgEvent.date,
+            description: defaultOrgEvent.description,
+            sports: defaultOrgEvent.sports,
+            theme_color: 'dhl',
+            created_by: defaultOrgEvent.created_by,
+            show_public_teams: true,
+            is_enrolment_enabled: true,
+            organization_slug: organization.slug
+          }).then(({ error }) => {
+            if (error) console.error('Failed to sync auto-seeded org event:', error.message);
+          });
+        }
+      }
+    }
+  }, [organization.slug, events, currentUser, isSupabaseEnabled, supabaseConnected]);
+
+  // Ensure active event is selected correctly from current organization's subset
+  useEffect(() => {
+    if (filteredEventsByOrg.length > 0) {
+      const exists = filteredEventsByOrg.some(e => e.id === activeEventId);
+      if (!exists) {
+        setActiveEventId(filteredEventsByOrg[0].id);
+      }
+    }
+  }, [filteredEventsByOrg, activeEventId]);
+
   // 1. Live Session Clock Timer
   useEffect(() => {
     const updateTime = () => {
@@ -554,11 +632,16 @@ export default function App() {
         try {
           // Fetch remote organization settings table
           try {
-            const orgResult = await client
-              .from('organization_settings')
-              .select('*')
-              .eq('id', 'current')
-              .maybeSingle();
+            const pathname = typeof window !== 'undefined' ? window.location.pathname.replace(/^\//, '').split('/')[0] : '';
+            const hasCustomSlug = pathname && pathname !== 'index.html' && pathname !== 'assets' && pathname !== 'api' && pathname !== 'favicon.ico' && pathname !== 'org';
+            
+            let query = client.from('organization_settings').select('*');
+            if (hasCustomSlug) {
+              query = query.eq('slug', pathname);
+            } else {
+              query = query.eq('id', 'current');
+            }
+            const orgResult = await query.maybeSingle();
 
             if (orgResult && orgResult.data && active) {
               const d = orgResult.data;
@@ -677,7 +760,13 @@ export default function App() {
           }
 
           if (matchesError) {
-            console.error('Supabase fetch error:', matchesError.message);
+            const isFetchErr = matchesError.message?.toLowerCase().includes('fetch') || matchesError.message?.toLowerCase().includes('typeerror') || matchesError.message?.toLowerCase().includes('network');
+            if (isFetchErr) {
+              setSupabaseConnected(false);
+              console.warn('Supabase matches fetch offline:', matchesError.message);
+            } else {
+              console.error('Supabase fetch error:', matchesError.message);
+            }
           } else if (matchesData && active) {
             const mappedMatches: Match[] = matchesData.map((item: any) => ({
               id: String(item.id),
@@ -742,7 +831,13 @@ export default function App() {
           }
           
           if (pError) {
-            console.error('Supabase participants fetch error:', pError.message);
+            const isFetchErr = pError.message?.toLowerCase().includes('fetch') || pError.message?.toLowerCase().includes('typeerror') || pError.message?.toLowerCase().includes('network');
+            if (isFetchErr) {
+              setSupabaseConnected(false);
+              console.warn('Supabase participants fetch offline:', pError.message);
+            } else {
+              console.error('Supabase participants fetch error:', pError.message);
+            }
           } else if (pData && active) {
             const mappedParticipants: Participant[] = pData.map((item: any) => ({
               id: String(item.id),
@@ -822,8 +917,14 @@ export default function App() {
           }
 
 
-        } catch (err) {
-          console.error('Database Sync Issue:', err);
+        } catch (err: any) {
+          const isFetchErr = err?.message?.toLowerCase().includes('fetch') || err?.message?.toLowerCase().includes('typeerror') || err?.message?.toLowerCase().includes('network');
+          if (isFetchErr) {
+            setSupabaseConnected(false);
+            console.warn('Database Sync Connection offline:', err.message);
+          } else {
+            console.error('Database Sync Issue:', err);
+          }
         } finally {
           if (!silent && active) {
             setIsSyncing(false);
@@ -1118,7 +1219,13 @@ export default function App() {
           }).select('id');
           
           if (error) {
-            console.error('Supabase insert participant failed:', error.message);
+            const isFetchErr = error.message?.toLowerCase().includes('fetch') || error.message?.toLowerCase().includes('typeerror') || error.message?.toLowerCase().includes('network');
+            if (isFetchErr) {
+              setSupabaseConnected(false);
+              console.warn('Supabase insert participant offline:', error.message);
+            } else {
+              console.error('Supabase insert participant failed:', error.message);
+            }
             return null;
           }
           if (data && data[0]) {
@@ -1156,7 +1263,13 @@ export default function App() {
             .eq('id', parsedId);
 
           if (error) {
-            console.error('Supabase update name error:', error.message);
+            const isFetchErr = error.message?.toLowerCase().includes('fetch') || error.message?.toLowerCase().includes('typeerror') || error.message?.toLowerCase().includes('network');
+            if (isFetchErr) {
+              setSupabaseConnected(false);
+              console.warn('Supabase update name offline:', error.message);
+            } else {
+              console.error('Supabase update name error:', error.message);
+            }
             return false;
           }
         } catch (err) {
@@ -1188,7 +1301,13 @@ export default function App() {
             .eq('id', parsedId);
 
           if (error) {
-            console.error('Supabase update photo error:', error.message);
+            const isFetchErr = error.message?.toLowerCase().includes('fetch') || error.message?.toLowerCase().includes('typeerror') || error.message?.toLowerCase().includes('network');
+            if (isFetchErr) {
+              setSupabaseConnected(false);
+              console.warn('Supabase update photo offline:', error.message);
+            } else {
+              console.error('Supabase update photo error:', error.message);
+            }
             return false;
           }
         } catch (err) {
@@ -1222,7 +1341,13 @@ export default function App() {
             .eq('id', parsedPlayerId);
 
           if (error) {
-            console.error('Supabase assign roster error:', error.message);
+            const isFetchErr = error.message?.toLowerCase().includes('fetch') || error.message?.toLowerCase().includes('typeerror') || error.message?.toLowerCase().includes('network');
+            if (isFetchErr) {
+              setSupabaseConnected(false);
+              console.warn('Supabase assign roster offline:', error.message);
+            } else {
+              console.error('Supabase assign roster error:', error.message);
+            }
             return false;
           }
         } catch (err) {
@@ -1245,7 +1370,13 @@ export default function App() {
           const parsedId = isNaN(Number(id)) ? id : Number(id);
           const { error } = await client.from('participants').delete().eq('id', parsedId);
           if (error) {
-            console.error('Supabase delete participant error:', error.message);
+            const isFetchErr = error.message?.toLowerCase().includes('fetch') || error.message?.toLowerCase().includes('typeerror') || error.message?.toLowerCase().includes('network');
+            if (isFetchErr) {
+              setSupabaseConnected(false);
+              console.warn('Supabase delete participant offline:', error.message);
+            } else {
+              console.error('Supabase delete participant error:', error.message);
+            }
             return false;
           }
         } catch (err) {
@@ -1291,9 +1422,10 @@ export default function App() {
         onLogout={handleLogout}
         showPublicTeamsInHeader={showPublicTeamsInHeader}
         isEnrolmentEnabled={isEnrolmentEnabled}
-        events={events}
+        events={filteredEventsByOrg}
         activeEventId={activeEventId}
         setActiveEventId={setActiveEventId}
+        organization={organization}
       />
 
       {/* Synchronizing indicator banner */}
@@ -1412,10 +1544,11 @@ export default function App() {
                 assignPlayerToTeam={assignPlayerToTeam}
                 deleteParticipant={deleteParticipant}
                 resetParticipantsToDefault={resetParticipantsToDefault}
-                events={events}
+                events={filteredEventsByOrg}
                 setEvents={setEvents}
                 activeEventId={activeEventId}
                 setActiveEventId={setActiveEventId}
+                organizationSlug={organization?.slug}
               />
             )}
 
@@ -1424,7 +1557,7 @@ export default function App() {
               <SelfRegistrationForm
                 isEnrolmentEnabled={isEnrolmentEnabled}
                 activeEventId={activeEventId}
-                events={events}
+                events={filteredEventsByOrg}
                 participants={filteredParticipants}
                 addParticipant={addParticipant}
               />
@@ -1468,10 +1601,6 @@ export default function App() {
               <OrganizationSettings
                 organization={organization}
                 onUpdateOrganization={updateOrganization}
-                isSupabaseEnabled={isSupabaseEnabled}
-                supabaseConnected={supabaseConnected}
-                supabaseUrl={supabaseUrl}
-                supabaseAnonKey={supabaseAnonKey}
               />
             )}
           </>

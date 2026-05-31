@@ -1,24 +1,15 @@
 import React, { useState } from 'react';
-import { Building2, Save, Globe, Mail, Phone, MapPin, Sparkles, CheckCircle, Info, Link, FileText, LayoutGrid } from 'lucide-react';
+import { Building2, Save, Globe, Mail, Phone, MapPin, Sparkles, CheckCircle } from 'lucide-react';
 import { OrganizationInfo } from '../types';
-import { getSupabaseClient } from '../supabase';
 
 interface OrganizationSettingsProps {
   organization: OrganizationInfo;
   onUpdateOrganization: (updated: OrganizationInfo) => Promise<void>;
-  isSupabaseEnabled: boolean;
-  supabaseConnected: boolean;
-  supabaseUrl?: string;
-  supabaseAnonKey?: string;
 }
 
 export default function OrganizationSettings({
   organization,
   onUpdateOrganization,
-  isSupabaseEnabled,
-  supabaseConnected,
-  supabaseUrl,
-  supabaseAnonKey,
 }: OrganizationSettingsProps) {
   const [name, setName] = useState(organization.name);
   const [logoUrl, setLogoUrl] = useState(organization.logoUrl);
@@ -71,7 +62,7 @@ export default function OrganizationSettings({
     try {
       await onUpdateOrganization(updated);
       setSuccess(true);
-      setTimeout(() => setSuccess(false), 4000);
+      setTimeout(() => setSuccess(false), 4500);
     } catch (err) {
       console.error(err);
       alert('Failed to save organization settings.');
@@ -79,38 +70,6 @@ export default function OrganizationSettings({
       setSaving(false);
     }
   };
-
-  const sqlSchema = `
--- COPY AND PASTE THIS INTO SUPABASE SQL EDITOR TO CREATE TABLES:
-CREATE TABLE IF NOT EXISTS organization_settings (
-  id VARCHAR PRIMARY KEY DEFAULT 'current',
-  name TEXT NOT NULL,
-  logo_url TEXT,
-  slug TEXT NOT NULL,
-  tagline TEXT,
-  contact_email TEXT,
-  contact_phone TEXT,
-  website TEXT,
-  address TEXT,
-  footer_motto TEXT,
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
-);
-
--- Insert fallback organization values
-INSERT INTO organization_settings (id, name, logo_url, slug, tagline, contact_email, contact_phone, website, address, footer_motto)
-VALUES (
-  'current',
-  'DHL Express Cambodia',
-  'https://logos-world.net/wp-content/uploads/2020/08/DHL-Logo.png',
-  'dhl-games',
-  'Excellence. Simply delivered.',
-  'kh.info@dhl.com',
-  '+855 23 999 444',
-  'https://www.dhl.com',
-  'Phnom Penh, Cambodia',
-  'Excellence. Simply delivered.'
-) ON CONFLICT (id) DO NOTHING;
-  `.trim();
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8 space-y-6 animate-fade-in">
@@ -176,17 +135,14 @@ VALUES (
                 <label className="text-[10px] font-extrabold text-gray-400 uppercase tracking-wide">
                   អត្តសញ្ញាណ Slug (URL Slug / Subdomain ID) <strong className="text-red-500">*</strong>
                 </label>
-                <div className="relative flex items-center">
-                  <span className="absolute left-3 font-mono font-bold text-gray-400">/org/</span>
-                  <input
-                    type="text"
-                    required
-                    placeholder="dhl-games"
-                    value={slug}
-                    onChange={(e) => handleSlugChange(e.target.value)}
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl pl-12 pr-3 py-2.5 outline-none focus:ring-2 focus:ring-yellow-400 font-mono font-bold"
-                  />
-                </div>
+                <input
+                  type="text"
+                  required
+                  placeholder="dhl-games"
+                  value={slug}
+                  onChange={(e) => handleSlugChange(e.target.value)}
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 outline-none focus:ring-2 focus:ring-yellow-400 font-mono font-bold"
+                />
               </div>
             </div>
 
@@ -233,7 +189,7 @@ VALUES (
                 className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 outline-none focus:ring-2 focus:ring-yellow-400 font-bold text-gray-800"
               />
               <span className="text-[9px] text-gray-400 block mt-0.5 leading-tight">
-                This text will immediately replace the hardcoded "Excellence. Simply delivered." at the bottom-right of the screen.
+                This text will immediately replace the hardcoded logo motto / slogan at the bottom-right of the screen.
               </span>
             </div>
 
@@ -375,70 +331,7 @@ VALUES (
               </div>
             </div>
           </div>
-
-          {/* Cloud Synchronization Status Info */}
-          <div className="bg-gradient-to-br from-indigo-900 to-slate-900 text-indigo-100 rounded-3xl p-6 shadow-md border border-indigo-950 space-y-3">
-            <div className="flex items-center gap-2 pb-1 border-b border-indigo-805">
-              <Info className="w-4 h-4 text-indigo-350 shrink-0" />
-              <h4 className="text-[10px] font-black uppercase tracking-wider text-white">SUPABASE CLOUD SYNC</h4>
-            </div>
-            
-            <p className="text-[10px] text-indigo-200 leading-relaxed font-bold">
-              {isSupabaseEnabled && supabaseConnected ? (
-                <span className="text-emerald-400 flex items-center gap-1.5">
-                  ● Cloud database syncing has been verified. Settings are stored live in Supabase.
-                </span>
-              ) : (
-                <span className="text-amber-400 flex items-center gap-1.5">
-                  ◯ Operating on Local Sandbox storage. Credentials not activated yet.
-                </span>
-              )}
-            </p>
-
-            <button
-              type="button"
-              onClick={() => {
-                const el = document.getElementById('sql-schema-area');
-                if (el) el.scrollIntoView({ behavior: 'smooth' });
-              }}
-              className="text-[9px] bg-slate-800 hover:bg-slate-700 text-[#FFCC00] font-black uppercase py-1.5 px-3 rounded-lg flex items-center gap-1 transition"
-            >
-              <FileText className="w-3 h-3" />
-              View SQL Schema Migration Settings
-            </button>
-          </div>
         </div>
-      </div>
-
-      {/* SQL Migration Instruction area */}
-      <div id="sql-schema-area" className="bg-slate-950 rounded-3xl p-6 sm:p-8 border border-slate-900 space-y-4">
-        <div className="flex items-center justify-between gap-4 border-b border-slate-900 pb-3">
-          <div className="flex items-center gap-2">
-            <FileText className="w-4 h-4 text-amber-500" />
-            <div>
-              <h4 className="text-[11px] font-black uppercase text-slate-300 tracking-wider">
-                SUPABASE SQL SCHEMA MIGRATION SCRIPT
-              </h4>
-              <p className="text-[9px] text-gray-500 font-bold uppercase mt-0.5">
-                Run this single script in your Supabase SQL Editor if you get a table mismatch or DB integrity alert
-              </p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={() => {
-              navigator.clipboard.writeText(sqlSchema);
-              alert('SQL schema copied to clipboard!');
-            }}
-            className="px-3 py-1 bg-slate-850 hover:bg-slate-800 text-slate-100 border border-slate-800 text-[10px] font-black uppercase rounded-lg transition"
-          >
-            Copy SQL
-          </button>
-        </div>
-
-        <pre className="p-4 bg-slate-900 rounded-2xl text-[9.5px] font-mono text-[#FFCC00] overflow-x-auto whitespace-pre leading-relaxed border border-slate-850 select-all max-h-48 no-scrollbar">
-          {sqlSchema}
-        </pre>
       </div>
 
     </div>

@@ -45,6 +45,7 @@ interface EventSettingsProps {
   setActiveEventId: (id: string) => void;
   isEnrolmentEnabled: boolean;
   setIsEnrolmentEnabled: (val: boolean) => void;
+  organizationSlug?: string;
 }
 
 export default function EventSettings({
@@ -74,6 +75,7 @@ export default function EventSettings({
   setActiveEventId,
   isEnrolmentEnabled,
   setIsEnrolmentEnabled,
+  organizationSlug,
 }: EventSettingsProps) {
 
   // Filter events dynamically to support administrative data isolation per creator session
@@ -101,7 +103,8 @@ export default function EventSettings({
             theme_color: ev.themeColor || 'dhl',
             created_by: ev.created_by || currentUser?.username || 'hempiden',
             show_public_teams: ev.show_public_teams ?? false,
-            is_enrolment_enabled: ev.is_enrolment_enabled ?? true
+            is_enrolment_enabled: ev.is_enrolment_enabled ?? true,
+            organization_slug: ev.organization_slug || null
           });
           if (error) console.error('Failed to sync event upsert:', error.message);
         }
@@ -213,7 +216,8 @@ export default function EventSettings({
       sports: initialSports,
       created_by: currentUser?.username || 'hempiden',
       show_public_teams: true,
-      is_enrolment_enabled: true
+      is_enrolment_enabled: true,
+      organization_slug: organizationSlug || 'dhl-games'
     };
 
     const updated = [...events, brandNew];
