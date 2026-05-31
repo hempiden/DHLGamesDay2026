@@ -123,7 +123,7 @@ export default function OrganizationSettings({
                 <input
                   type="text"
                   required
-                  placeholder="DHL Express Cambodia"
+                  placeholder="Corporate Arena"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 outline-none focus:ring-2 focus:ring-yellow-400 font-bold"
@@ -287,7 +287,7 @@ export default function OrganizationSettings({
                   alt={name || 'Logo'}
                   className="max-h-16 max-w-full object-contain filter"
                   onError={(e) => {
-                    (e.target as HTMLImageElement).src = 'https://logos-world.net/wp-content/uploads/2020/08/DHL-Logo.png';
+                    (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1517649763962-0c623066013b?auto=format&fit=crop&q=80&w=400';
                   }}
                 />
               ) : (

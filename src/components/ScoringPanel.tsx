@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Match, SportType, Participant, AppUser } from '../types';
-import { SPORT_CONFIGS, getSportConfig, getActiveSports, isSportMeasure } from '../data';
+import { SPORT_CONFIGS, getSportConfig, getActiveSports, isSportMeasure, isSportDistance, getSportDistanceUnit } from '../data';
 import { Play, Check, Trophy, Trash2, ArrowRight, ShieldCheck, AlertCircle, Plus, Minus } from 'lucide-react';
 import SwimmingTimer from './SwimmingTimer';
 
@@ -70,7 +70,15 @@ export default function ScoringPanel({
 
   const adjustScore = (matchId: string, team: 'a' | 'b', originalValue: number, amount: number) => {
     const current = getScore(matchId, team, originalValue);
-    setLocalScore(matchId, team, current + amount);
+    const m = matches.find((match) => match.id === matchId);
+    const sportName = m?.sport_name || '';
+    if (isSportDistance(sportName)) {
+      const unit = getSportDistanceUnit(sportName);
+      const step = unit === 'm' ? 10 : 100; 
+      setLocalScore(matchId, team, Math.max(0, current + amount * step));
+    } else {
+      setLocalScore(matchId, team, Math.max(0, current + amount));
+    }
   };
 
   const handleUpdate = async (matchId: string, origA: number, origB: number) => {
@@ -225,81 +233,107 @@ export default function ScoringPanel({
 
                 {/* Score Editing Content */}
                 <div className="p-6">
-                  <div className="grid grid-cols-11 gap-1 items-center mb-8 relative">
-                    
-                    {/* Team A Entry */}
-                    <div className="col-span-5 text-center">
-                      <div className="text-xs font-black text-gray-700 uppercase mb-3 truncate" title={m.team_a}>
-                        {m.team_a}
-                      </div>
-                      
-                      {/* Interactive score controller layout */}
-                      <div className="flex items-center justify-center gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => adjustScore(m.id, 'a', m.score_a, -1)}
-                          className="w-8 h-8 rounded-lg bg-gray-100 hover:bg-red-50 hover:text-red-600 flex items-center justify-center text-gray-500 font-bold active:scale-90 transition-all select-none"
-                        >
-                          <Minus className="w-3.5 h-3.5" />
-                        </button>
+                  {(() => {
+                    const isDistance = isSportDistance(m.sport_name);
+                    const distUnit = isDistance ? getSportDistanceUnit(m.sport_name) : 'm';
+                    const distFactor = distUnit === 'm' ? 100 : 1000;
+
+                    return (
+                      <div className="grid grid-cols-11 gap-1 items-center mb-8 relative">
                         
-                        <input
-                          type="number"
-                          id={`score-a-${m.id}`}
-                          value={currentA}
-                          onChange={(e) => setLocalScore(m.id, 'a', parseInt(e.target.value))}
-                          className="score-input w-20 h-24 text-center text-5xl bg-gray-50 border-2 border-gray-100 focus:border-[#FFCC00] focus:bg-white rounded-2xl outline-none transition font-black score-display selection:bg-yellow-100 text-gray-800"
-                        />
+                        {/* Team A Entry */}
+                        <div className="col-span-5 text-center">
+                          <div className="text-xs font-black text-gray-700 uppercase mb-3 truncate" title={m.team_a}>
+                            {m.team_a}
+                          </div>
+                          
+                          {/* Interactive score controller layout */}
+                          <div className="flex flex-col items-center gap-1.5">
+                            <div className="flex items-center justify-center gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => adjustScore(m.id, 'a', m.score_a, -1)}
+                                className="w-8 h-8 rounded-lg bg-gray-100 hover:bg-red-50 hover:text-red-600 flex items-center justify-center text-gray-500 font-bold active:scale-90 transition-all select-none"
+                              >
+                                <Minus className="w-3.5 h-3.5" />
+                              </button>
+                              
+                              <input
+                                type="number"
+                                id={`score-a-${m.id}`}
+                                step={isDistance ? "0.01" : "1"}
+                                value={isDistance ? Number((currentA / distFactor).toFixed(2)) : currentA}
+                                onChange={(e) => {
+                                  const val = parseFloat(e.target.value);
+                                  setLocalScore(m.id, 'a', isDistance ? Math.round((isNaN(val) ? 0 : val) * distFactor) : (isNaN(val) ? 0 : Math.round(val)));
+                                }}
+                                className={`score-input h-24 text-center text-5xl bg-gray-50 border-2 border-gray-100 focus:border-[#FFCC00] focus:bg-white rounded-2xl outline-none transition font-black score-display selection:bg-yellow-100 text-gray-800 ${isDistance ? 'w-28 text-3xl' : 'w-20'}`}
+                              />
 
-                        <button
-                          type="button"
-                          onClick={() => adjustScore(m.id, 'a', m.score_a, 1)}
-                          className="w-8 h-8 rounded-lg bg-gray-100 hover:bg-emerald-50 hover:text-emerald-600 flex items-center justify-center text-gray-500 font-bold active:scale-90 transition-all select-none"
-                        >
-                          <Plus className="w-3.5 h-3.5" />
-                        </button>
+                              <button
+                                type="button"
+                                onClick={() => adjustScore(m.id, 'a', m.score_a, 1)}
+                                className="w-8 h-8 rounded-lg bg-gray-100 hover:bg-emerald-50 hover:text-emerald-600 flex items-center justify-center text-gray-500 font-bold active:scale-90 transition-all select-none"
+                              >
+                                <Plus className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                            {isDistance && (
+                              <span className="text-[10px] font-extrabold text-amber-600 uppercase tracking-widest">{distUnit === 'm' ? 'ម៉ែត្រ (m)' : 'គីឡូម៉ែត្រ (km)'}</span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Separator Col */}
+                        <div className="col-span-1 text-center font-dhl text-2xl text-gray-300 italic self-center pt-6 leading-none">
+                          :
+                        </div>
+
+                        {/* Team B Entry */}
+                        <div className="col-span-5 text-center">
+                          <div className="text-xs font-black text-gray-700 uppercase mb-3 truncate" title={m.team_b}>
+                            {m.team_b}
+                          </div>
+
+                          {/* Interactive score controller layout */}
+                          <div className="flex flex-col items-center gap-1.5">
+                            <div className="flex items-center justify-center gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => adjustScore(m.id, 'b', m.score_b, -1)}
+                                className="w-8 h-8 rounded-lg bg-gray-100 hover:bg-red-50 hover:text-red-600 flex items-center justify-center text-gray-500 font-bold active:scale-90 transition-all select-none"
+                              >
+                                <Minus className="w-3.5 h-3.5" />
+                              </button>
+
+                              <input
+                                type="number"
+                                id={`score-b-${m.id}`}
+                                step={isDistance ? "0.01" : "1"}
+                                value={isDistance ? Number((currentB / distFactor).toFixed(2)) : currentB}
+                                onChange={(e) => {
+                                  const val = parseFloat(e.target.value);
+                                  setLocalScore(m.id, 'b', isDistance ? Math.round((isNaN(val) ? 0 : val) * distFactor) : (isNaN(val) ? 0 : Math.round(val)));
+                                }}
+                                className={`score-input h-24 text-center text-5xl bg-gray-50 border-2 border-gray-100 focus:border-[#FFCC00] focus:bg-white rounded-2xl outline-none transition font-black score-display selection:bg-yellow-100 text-gray-800 ${isDistance ? 'w-28 text-3xl' : 'w-20'}`}
+                              />
+
+                              <button
+                                type="button"
+                                onClick={() => adjustScore(m.id, 'b', m.score_b, 1)}
+                                className="w-8 h-8 rounded-lg bg-gray-100 hover:bg-emerald-50 hover:text-emerald-600 flex items-center justify-center text-gray-500 font-bold active:scale-90 transition-all select-none"
+                              >
+                                <Plus className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                            {isDistance && (
+                              <span className="text-[10px] font-extrabold text-amber-600 uppercase tracking-widest">{distUnit === 'm' ? 'ម៉ែត្រ (m)' : 'គីឡូម៉ែត្រ (km)'}</span>
+                            )}
+                          </div>
+                        </div>
                       </div>
-                    </div>
-
-                    {/* Separator Col */}
-                    <div className="col-span-1 text-center font-dhl text-2xl text-gray-300 italic self-center pt-6 leading-none">
-                      :
-                    </div>
-
-                    {/* Team B Entry */}
-                    <div className="col-span-5 text-center">
-                      <div className="text-xs font-black text-gray-700 uppercase mb-3 truncate" title={m.team_b}>
-                        {m.team_b}
-                      </div>
-
-                      {/* Interactive score controller layout */}
-                      <div className="flex items-center justify-center gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => adjustScore(m.id, 'b', m.score_b, -1)}
-                          className="w-8 h-8 rounded-lg bg-gray-100 hover:bg-red-50 hover:text-red-600 flex items-center justify-center text-gray-500 font-bold active:scale-90 transition-all select-none"
-                        >
-                          <Minus className="w-3.5 h-3.5" />
-                        </button>
-
-                        <input
-                          type="number"
-                          id={`score-b-${m.id}`}
-                          value={currentB}
-                          onChange={(e) => setLocalScore(m.id, 'b', parseInt(e.target.value))}
-                          className="score-input w-20 h-24 text-center text-5xl bg-gray-50 border-2 border-gray-100 focus:border-[#FFCC00] focus:bg-white rounded-2xl outline-none transition font-black score-display selection:bg-yellow-100 text-gray-800"
-                        />
-
-                        <button
-                          type="button"
-                          onClick={() => adjustScore(m.id, 'b', m.score_b, 1)}
-                          className="w-8 h-8 rounded-lg bg-gray-100 hover:bg-emerald-50 hover:text-emerald-600 flex items-center justify-center text-gray-500 font-bold active:scale-90 transition-all select-none"
-                        >
-                          <Plus className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
+                    );
+                  })()}
 
                   {/* Operational buttons container */}
                   <div className="flex gap-2">

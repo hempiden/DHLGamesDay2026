@@ -91,7 +91,7 @@ export default function PublicAthletePhotoUpload({
   return (
     <div className="max-w-md mx-auto my-8 p-6 sm:p-8 bg-white rounded-3xl border-4 border-[#FFCC00] shadow-2xl font-sans relative overflow-hidden">
       
-      {/* Decorative DHL slant element */}
+      {/* Decorative brand slant element */}
       <div className="absolute top-0 right-0 w-24 h-2 bg-[#D40511] transform rotate-45 translate-x-8 translate-y-2" />
       
       {/* Header */}
@@ -100,7 +100,7 @@ export default function PublicAthletePhotoUpload({
           <Camera className="w-6 h-6 text-[#D40511]" />
         </div>
         <span className="px-2.5 py-0.5 rounded-full bg-[#D40511]/10 text-[#D40511] font-black text-[9px] uppercase tracking-wider">
-          DHL Games Day Profile Hub
+          Games Day Profile Hub
         </span>
         <h2 className="font-dhl-title text-xl text-gray-950 italic mt-1 leading-tight uppercase">
           បញ្ចូលរូបថតកីឡាករ (ATHLETE PHOTO UPLOAD)

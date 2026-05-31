@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Users, CheckCircle, Trophy, HelpCircle, UserPlus, Image, Share2, ClipboardCheck } from 'lucide-react';
-import { EventInfo, Participant, SportType } from '../types';
+import { EventInfo, Participant, SportType, getTranslatedText } from '../types';
 
 interface SelfRegistrationFormProps {
   isEnrolmentEnabled: boolean;
@@ -9,6 +9,7 @@ interface SelfRegistrationFormProps {
   participants: Participant[];
   addParticipant: (name: string, sport_type: SportType, is_team: boolean, team_id: string | null, photo_url?: string) => Promise<string | null>;
   currentLanguage?: 'kh' | 'en';
+  translations?: Record<string, { kh: string; en: string }>;
 }
 
 export default function SelfRegistrationForm({
@@ -18,7 +19,12 @@ export default function SelfRegistrationForm({
   participants,
   addParticipant,
   currentLanguage = 'kh',
+  translations,
 }: SelfRegistrationFormProps) {
+  const t = (key: string, defaultKh: string, defaultEn: string): string => {
+    return getTranslatedText(key, defaultKh, defaultEn, currentLanguage, translations);
+  };
+
   const [fullname, setFullname] = useState('');
   const [selectedSport, setSelectedSport] = useState('');
   const [selectedTeam, setSelectedTeam] = useState('none');
@@ -109,7 +115,7 @@ export default function SelfRegistrationForm({
           </div>
           <div>
             <h2 className="text-base sm:text-lg font-black text-gray-800 uppercase tracking-wide leading-tight">
-              ចុះឈ្មោះកីឡាករ (Athlete Enrollment)
+              {t('enrol_title', 'ចុះឈ្មោះកីឡាករ', 'Athlete Enrollment')}
             </h2>
             <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mt-0.5">
               Event: {activeEvent?.khmerName || activeEvent?.name}
@@ -155,13 +161,13 @@ export default function SelfRegistrationForm({
               
               <div className="space-y-2">
                 <h2 className="text-xl font-black text-gray-800 uppercase tracking-wide">
-                  ចុះឈ្មោះបានជោគជ័យ!
+                  {t('registration_success_title', 'ចុះឈ្មោះបានជោគជ័យ!', 'Registration Successful!')}
                 </h2>
                 <p className="text-xs text-gray-400 font-bold uppercase tracking-wider">
-                  Athlete Registration Complete
+                  {t('registration_success_desc', 'ការចុះឈ្មោះកីឡាករបានបញ្ចប់', 'Athlete Registration Complete')}
                 </p>
                 <p className="text-[13px] text-gray-600 font-medium KhmerFont leading-relaxed">
-                  អបអរសាទរ! ព័ត៌មានរបស់អ្នកត្រូវបានរក្សាទុកក្នុងបញ្ជីឈ្មោះកីឡាករផ្លូវការរួចរាល់ហើយ។
+                  {t('registration_success_body', 'អបអរសាទរ! ព័ត៌មានរបស់អ្នកត្រូវបានរក្សាទុកក្នុងបញ្ជីឈ្មោះកីឡាករផ្លូវការរួចរាល់ហើយ។', 'Congratulations! Your details have been successfully saved into our official athletes roster.')}
                 </p>
               </div>
 
@@ -178,11 +184,11 @@ export default function SelfRegistrationForm({
                   <h4 className="text-sm font-black text-gray-800">{registeredUser.name}</h4>
                   <p className="text-[11px] text-gray-500 font-bold uppercase flex items-center gap-1 leading-none">
                     <Trophy className="w-3.5 h-3.5 text-amber-500" />
-                    <span>ខ្ទង់កីឡា៖</span> {registeredUser.sport}
+                    <span>{t('sport_category', 'វិញ្ញាសាកីឡា៖', 'SportCategory:')}</span> {registeredUser.sport}
                   </p>
                   <p className="text-[11px] text-gray-500 font-bold uppercase flex items-center gap-1 leading-none">
                     <Users className="w-3.5 h-3.5 text-blue-500" />
-                    <span>ក្រុមលេង៖</span> {registeredUser.teamName}
+                    <span>{t('team_assigned', 'ក្រុមលេង៖', 'AssignedTeam:')}</span> {registeredUser.teamName}
                   </p>
                 </div>
               </div>
@@ -193,7 +199,7 @@ export default function SelfRegistrationForm({
                   onClick={() => setRegisteredUser(null)}
                   className="w-full bg-[#1a1a1a] hover:bg-gray-800 text-white font-bold py-3 px-6 rounded-2xl uppercase text-xs tracking-wider transition cursor-pointer"
                 >
-                  ចុះឈ្មោះសមាជិកម្នាក់ទៀត (Register Another member)
+                  {t('btn_register_another', 'ចុះឈ្មោះសមាជិកម្នាក់ទៀត', 'Register Another member')}
                 </button>
               </div>
             </div>
@@ -202,8 +208,10 @@ export default function SelfRegistrationForm({
               <div className="bg-[#FFFDE7] rounded-2xl p-4 border border-yellow-250 flex gap-2.5">
                 <HelpCircle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
                 <div className="text-[11px] text-amber-800 font-medium leading-relaxed">
-                  <strong className="block text-xs font-black uppercase mb-1">ណែនាំការចុះឈ្មោះ (Instructions)</strong>
-                  សូមបំពេញឈ្មោះពេញរបស់អ្នក ជ្រើសរើសប្រភេទកីឡាដែលអ្នកចង់លេង និងជ្រើសរើសក្រុមដែលទទួលបានការប្រកាសពីគណៈកម្មការ។
+                  <strong className="block text-xs font-black uppercase mb-1">
+                    {t('enrol_inst_title', 'ណែនាំការចុះឈ្មោះ', 'Instructions')}
+                  </strong>
+                  {t('enrol_inst_body', 'សូមបំពេញឈ្មោះពេញរបស់អ្នក ជ្រើសរើសប្រភេទកីឡាដែលអ្នកចង់លេង និងជ្រើសរើសក្រុមដែលទទួលបានការប្រកាសពីគណៈកម្មការ។', 'Please fill in your full name, select the sport event you would like to participate in, and pick your assigned team squad.')}
                 </div>
               </div>
 
@@ -211,12 +219,12 @@ export default function SelfRegistrationForm({
                 {/* Full Name */}
                 <div className="space-y-1">
                   <label className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wide">
-                    ឈ្មោះពេញរបស់អ្នក (Your Full Name) <strong className="text-red-500">*</strong>
+                    {t('your_fullname', 'ឈ្មោះពេញរបស់អ្នក', 'Your Full Name')} <strong className="text-red-500">*</strong>
                   </label>
                   <input
                     type="text"
                     required
-                    placeholder="ឧ. សុខ ពិសិដ្ឋ"
+                    placeholder={currentLanguage === 'kh' ? 'ឧ. សុខ ពិសិដ្ឋ' : 'e.g. Sok Piseth'}
                     value={fullname}
                     onChange={(e) => setFullname(e.target.value)}
                     className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-xs font-bold shadow-sm"
@@ -226,7 +234,7 @@ export default function SelfRegistrationForm({
                 {/* Sport list */}
                 <div className="space-y-1">
                   <label className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wide">
-                    ជ្រើសរើសប្រភេទកីឡា (Select Sport Event) <strong className="text-red-500">*</strong>
+                    {t('select_sport_event', 'ជ្រើសរើសប្រភេទកីឡា', 'Select Sport Event')} <strong className="text-red-500">*</strong>
                   </label>
                   <select
                     required
@@ -237,10 +245,10 @@ export default function SelfRegistrationForm({
                     }}
                     className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-xs font-bold"
                   >
-                    <option value="">-- សូមជ្រើសរើសវិញ្ញាសាដែលចង់លេង --</option>
+                    <option value="">-- {t('select_sport_event_placeholder', 'សូមជ្រើសរើសវិញ្ញាសាដែលចង់លេង', 'Select Sport Event')} --</option>
                     {activeSports.map((sp) => (
                       <option key={sp.name} value={sp.name}>
-                        {sp.icon} {sp.khmerName} ({sp.name})
+                        {sp.icon} {currentLanguage === 'kh' ? sp.khmerName : sp.name}
                       </option>
                     ))}
                   </select>
@@ -249,7 +257,7 @@ export default function SelfRegistrationForm({
                 {/* Team list */}
                 <div className="space-y-1">
                   <label className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wide">
-                    ជ្រើសរើសក្រុមលេង (Choose Your Team - Optional)
+                    {t('choose_team', 'ជ្រើសរើសក្រុមលេង (ជាជម្រើស)', 'Choose Your Team (Optional)')}
                   </label>
                   <select
                     value={selectedTeam}
@@ -258,10 +266,10 @@ export default function SelfRegistrationForm({
                     className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-xs font-bold disabled:opacity-50"
                   >
                     {!selectedSport ? (
-                      <option value="none">-- សូមជ្រើសរើសកីឡាជាមុនសិន --</option>
+                      <option value="none">-- {t('choose_team_placeholder_no_sport', 'សូមជ្រើសរើសកីឡាជាមុនសិន', 'Select Sport first')} --</option>
                     ) : (
                       <>
-                        <option value="none">មិនទាន់មានក្រុម (Free Agent / No Team)</option>
+                        <option value="none">{t('choose_team_free_agent', 'មិនទាន់មានក្រុម (Free Agent)', 'No Team / Free Agent')}</option>
                         {availableTeams.map((team) => (
                           <option key={team.id} value={team.id}>
                             {team.name}
@@ -275,7 +283,7 @@ export default function SelfRegistrationForm({
                 {/* Photo URL optionally */}
                 <div className="space-y-1">
                   <label className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wide">
-                    តំណភ្ជាប់រូបភាព Profile (Profile Photo URL - Optional)
+                    {t('profile_photo_url', 'តំណភ្ជាប់រូបភាព Profile', 'Profile Photo URL (Optional)')}
                   </label>
                   <div className="relative flex items-center">
                     <Image className="absolute left-3 w-4 h-4 text-gray-400 font-bold" />
@@ -288,7 +296,7 @@ export default function SelfRegistrationForm({
                     />
                   </div>
                   <span className="text-[9px] text-gray-450 leading-relaxed block mt-1 font-semibold">
-                    អ្នកអាចប្រើប្រាស់តំណភ្ជាប់រូបភាពផ្ទាល់ខ្លួនពី Telegram, Google, Facebook ឬ Unsplash។
+                    {t('profile_photo_desc', 'អ្នកអាចប្រើប្រាស់តំណភ្ជាប់រូបភាពផ្ទាល់ខ្លួនពី Telegram, Google, Facebook ឬ Unsplash។', 'Provide any raw image link from platforms like Telegram, Drive, or Facebook.')}
                   </span>
                 </div>
 
@@ -299,7 +307,7 @@ export default function SelfRegistrationForm({
                     disabled={isSubmitting}
                     className="w-full bg-emerald-600 text-white py-3.5 px-6 rounded-2xl font-black uppercase text-xs tracking-wider transition-all duration-150 transform active:scale-95 cursor-pointer shadow-md disabled:opacity-50 select-none"
                   >
-                    {isSubmitting ? 'កំពុងបញ្ចូលទិន្នន័យ (Registration in progress...)' : 'បញ្ជូនព័ត៌មានចុះឈ្មោះ (Complete Registration)'}
+                    {isSubmitting ? t('submitting_registration', 'កំពុងបញ្ចូលទិន្នន័យ...', 'Registration in progress...') : t('btn_submit_registration', 'បញ្ជូនព័ត៌មានចុះឈ្មោះ', 'Complete Registration')}
                   </button>
                 </div>
               </form>
@@ -310,7 +318,9 @@ export default function SelfRegistrationForm({
         <div className="max-w-xl mx-auto bg-white p-6 rounded-3xl border border-gray-150 shadow-sm text-center">
           <div className="bg-red-50/60 text-red-700 p-4 rounded-2xl border border-red-150 text-xs font-bold mb-6 flex items-center justify-center gap-2">
             <Users className="w-5 h-5 shrink-0" />
-            <span>ទម្រង់ចុះឈ្មោះកីឡាករដោយខ្លួនឯង ត្រូវបានបិទជាបណ្ដោះអាសន្ន។ (Self-registration is currently closed by administration).</span>
+            <span>
+              {t('self_enrol_closed', 'ទម្រង់ចុះឈ្មោះកីឡាករដោយខ្លួនឯង ត្រូវបានបិទជាបណ្ដោះអាសន្ន។', 'Athlete self-registration is closed currently by administrator.')}
+            </span>
           </div>
         </div>
       )}

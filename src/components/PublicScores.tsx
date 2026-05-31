@@ -1,15 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { Award, Trophy, Zap, Users, AlertCircle, RefreshCw, Star, CheckCircle, Flame, Calendar, Clock, ArrowRight, X, Maximize2 } from 'lucide-react';
-import { Match, Participant, SportType } from '../types';
-import { SPORT_CONFIGS } from '../data';
+import { Match, Participant, SportType, getTranslatedText } from '../types';
+import { SPORT_CONFIGS, isSportDistance, formatSportScore } from '../data';
 
 interface PublicScoresProps {
   matches: Match[];
   participants: Participant[];
   currentLanguage?: 'kh' | 'en';
+  translations?: Record<string, { kh: string; en: string }>;
 }
 
-export default function PublicScores({ matches, participants, currentLanguage = 'kh' }: PublicScoresProps) {
+export default function PublicScores({ matches, participants, currentLanguage = 'kh', translations }: PublicScoresProps) {
+  const t = (key: string, defaultKh: string, defaultEn: string): string => {
+    return getTranslatedText(key, defaultKh, defaultEn, currentLanguage, translations);
+  };
+
   // Select active sport to view scores
   const [selectedSport, setSelectedSport] = useState<SportType | 'All'>('All');
 
@@ -103,24 +108,32 @@ export default function PublicScores({ matches, participants, currentLanguage = 
         <div className="absolute top-0 right-0 p-4 animate-pulse">
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-600 text-white text-[9px] font-black tracking-widest uppercase">
             <span className="w-2 h-2 rounded-full bg-white animate-ping"></span>
-            LIVE BROADCASTING
+            {t('header_live_broadcasting', 'ផ្សាយផ្ទាល់ពីទីលាន', 'LIVE BROADCASTING')}
           </span>
         </div>
 
         <div className="relative z-10 max-w-3xl space-y-3">
           <div className="flex items-center gap-2.5">
             <div className="bg-[#D40511] px-3.5 py-1.5 transform -skew-x-12 inline-block">
-              <span className="text-white font-black italic tracking-tighter text-sm sm:text-base">DHL GAMES 2026</span>
+              <span className="text-white font-black italic tracking-tighter text-sm sm:text-base">CHAMPIONSHIPS 2026</span>
             </div>
-            <span className="bg-gray-800 text-gray-300 font-bold px-2.5 py-1 text-[9px] rounded-md tracking-wider uppercase">SPECTATOR DECK</span>
+            <span className="bg-gray-800 text-gray-300 font-bold px-2.5 py-1 text-[9px] rounded-md tracking-wider uppercase">
+              {t('header_spectator_deck', 'ផ្ទាំងទស្សនាលទ្ធផល', 'SPECTATOR DECK')}
+            </span>
           </div>
           
           <h2 className="font-dhl-title text-2xl sm:text-4xl text-[#FFCC00] italic uppercase leading-tight tracking-tight drop-shadow-sm">
-            មហាជនមើលពិន្ទុផ្ទាល់ <br className="hidden sm:inline" />
-            <span className="text-white">SPECTATORS LIVE ACTION PORTAL</span>
+            {currentLanguage === 'kh' ? (
+              <>
+                {t('header_portal_khmer', 'មហាជនមើលពិន្ទុផ្ទាល់', 'មហាជនមើលពិន្ទុផ្ទាល់')} <br className="hidden sm:inline" />
+                <span className="text-white text-base sm:text-lg block not-italic font-sans font-bold tracking-wide mt-1 uppercase">SPECTATORS LIVE ACTION PORTAL</span>
+              </>
+            ) : (
+              <span className="text-white">{t('header_portal_khmer', 'មហាជនមើលពិន្ទុផ្ទាល់', 'SPECTATORS LIVE ACTION PORTAL')}</span>
+            )}
           </h2>
           <p className="text-gray-400 text-xs font-medium max-w-xl leading-relaxed">
-            Stay aligned with the continuous scoreboard, real-time sports updates, and celebrate the registered athletes delivering excellence across the arena.
+            {t('header_portal_subtitle', 'ទទួលបានពិន្ទុថ្មីៗឥតឈប់ឈរ កាលវិភាគប្រកួត និងសកម្មភាពលេចធ្លោពីកីឡាករគ្រប់រូបក្នុងទីលានភ្លាមៗ។', 'Stay aligned with the continuous scoreboard, real-time sports updates, and celebrate the registered athletes delivering excellence across the arena.')}
           </p>
         </div>
         
@@ -132,7 +145,7 @@ export default function PublicScores({ matches, participants, currentLanguage = 
       <div className="bg-white p-4 rounded-3xl border border-gray-100 shadow-sm">
         <div className="flex items-center gap-2 text-gray-500 text-xs font-black uppercase tracking-wider mb-3.5 pl-1.5">
           <Flame className="w-4 h-4 text-[#D40511] animate-bounce" />
-          <span>ជ្រើសរើសប្រភេទកីឡាដើម្បីមើល (Select Sport to Filter)</span>
+          <span>{t('select_sport_filter', 'ជ្រើសរើសប្រភេទកីឡាដើម្បីមើល (Select Sport to Filter)', 'Select Sport Category to Filter')}</span>
         </div>
         
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2.5">
@@ -145,7 +158,9 @@ export default function PublicScores({ matches, participants, currentLanguage = 
             }`}
           >
             <span className="text-xl mb-1">🌍</span>
-            <span className="text-[10px] font-black uppercase tracking-wider">All Sports</span>
+            <span className="text-[10px] font-black uppercase tracking-wider">
+              {t('all_sports_filter', 'វិញ្ញាសាទាំងអស់', 'All Sports')}
+            </span>
           </button>
 
           {(Object.keys(SPORT_CONFIGS) as SportType[]).map((sportKey) => {
@@ -175,7 +190,7 @@ export default function PublicScores({ matches, participants, currentLanguage = 
           <div className="flex items-center gap-2 pl-1">
             <Trophy className="w-5 h-5 text-amber-500 animate-spin" />
             <h3 className="font-dhl-title text-base sm:text-lg text-gray-800 italic uppercase">
-              អបអរសាទរក្រុមឈ្នះ (CONGRATULATIONS CHAMPIONS SESSIONS)
+              {t('congrats_victory', 'អបអរសាទរម្ចាស់ជ័យជំនះ!', 'Victory Celebration!')}
             </h3>
           </div>
 
@@ -207,13 +222,17 @@ export default function PublicScores({ matches, participants, currentLanguage = 
 
                     <div className="relative z-10 space-y-1.5">
                       <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#FFCC00] text-gray-950 font-black tracking-widest text-[8px] uppercase">
-                        ★ {item.match.sport_name} GRAND WINNER ★
+                        ★ {item.match.sport_name} {t('winner_badge', 'ជ័យជម្នះ (Winner)', 'Winner').toUpperCase()} ★
                       </span>
                       <h4 className="text-white text-xl font-black uppercase tracking-tight italic drop-shadow-sm">
                         {item.winningTeamName}
                       </h4>
                       <p className="text-gray-300 text-[10px] uppercase font-bold tracking-wider">
-                        Defeated opponent with a glorious final score of <span className="text-[#FFCC00] font-black">{item.winningScore} - {item.losingScore}</span>!
+                        {currentLanguage === 'kh' ? (
+                          <span>បានឈ្នះគូប្រកួតជាមួយពិន្ទុចុងក្រោយដ៏ល្អឥតខ្ចោះគឺ <span className="text-[#FFCC00] font-black">{item.winningScore} - {item.losingScore}</span>!</span>
+                        ) : (
+                          <span>Defeated opponent with a glorious final score of <span className="text-[#FFCC00] font-black">{item.winningScore} - {item.losingScore}</span>!</span>
+                        )}
                       </p>
                     </div>
                   </div>
@@ -221,14 +240,16 @@ export default function PublicScores({ matches, participants, currentLanguage = 
                   {/* Registered Roster Members Congratulation Deck */}
                   <div className="p-6 flex-1 flex flex-col justify-between space-y-6">
                     <div>
-                      <h5 className="text-[10px] font-black text-gray-400 uppercase tracking-wider mb-3">
-                        សមាជិកជ័យលាភី (COMMENDED WINNING PLAYERS ROSTER)
+                      <h5 className="text-[10px] font-black text-gray-400 uppercase tracking-wider mb-3 animate-fade-in">
+                        {t('team_roster_members', 'សមាជិកក្រុមដែលបានចុះឈ្មោះ', 'Registered Team Members').toUpperCase()}
                       </h5>
                       
                       {roster.length === 0 ? (
                         <div className="py-6 text-center text-gray-400">
                           <Users className="w-8 h-8 opacity-20 mx-auto mb-1" />
-                          <p className="text-[9px] font-bold uppercase">No players assigned to this roster yet</p>
+                          <p className="text-[9px] font-bold uppercase">
+                            {t('empty_roster_msg', 'មិនទាន់មានឈ្មោះសមាជិកនៅឡើយទេ (Roster Empty)', 'No members in this roster yet.')}
+                          </p>
                           <p className="text-[8px] text-gray-400 normal-case mt-0.5">Edit this team under the Teams tab to link players for their medals.</p>
                         </div>
                       ) : (
@@ -288,7 +309,7 @@ export default function PublicScores({ matches, participants, currentLanguage = 
           <div className="flex items-center gap-2 pl-1.5">
             <Zap className="w-5 h-5 text-red-500 animate-pulse" />
             <h3 className="font-dhl-title text-base sm:text-lg text-gray-800 italic uppercase">
-              ការប្រកួតកំពង់ប្រព្រឹត្តទៅ (Live Match Tension Deck)
+              {t('live_matches_title', 'ការប្រកួតកំពុងលេង (Live)', 'Live Matches')}
             </h3>
           </div>
 
@@ -456,7 +477,9 @@ export default function PublicScores({ matches, participants, currentLanguage = 
           {liveMatches.length === 0 ? (
             <div className="bg-white p-12 text-center rounded-3xl border border-dotted border-gray-200 text-gray-400 flex flex-col items-center justify-center">
               <span className="text-3xl filter grayscale opacity-45 mb-2">🚥</span>
-              <p className="text-xs font-bold uppercase tracking-wide text-gray-500">គ្មានការប្រកួតបច្ចុប្បន្នទេ (No matches are currently active)</p>
+              <p className="text-xs font-bold uppercase tracking-wide text-gray-500">
+                {t('no_live_matches', 'មិនទាន់មានការប្រកួតកំពុងលេង នាពេលបច្ចុប្បន្នទេ។', 'There are no live matches in play currently.')}
+              </p>
               <p className="text-[10px] text-gray-400 max-w-sm mt-1 normal-case leading-relaxed">
                 Matches are either scheduled to start next or have fully resolved. Check scheduled listings below.
               </p>
@@ -607,8 +630,8 @@ export default function PublicScores({ matches, participants, currentLanguage = 
                           <span className="text-[9px] text-gray-400 uppercase font-black">Competitor A</span>
                         </div>
 
-                        <div className="px-5 py-2.5 bg-gray-950 text-[#FFCC00] rounded-2xl font-mono text-xl sm:text-2xl font-black tracking-widest shadow-inner group-hover:scale-105 duration-100">
-                          {m.score_a} - {m.score_b}
+                        <div className="px-5 py-2.5 bg-gray-950 text-[#FFCC00] rounded-2xl font-mono text-xl sm:text-2xl font-black tracking-widest shadow-inner group-hover:scale-105 duration-100 flex items-center gap-2">
+                          {formatSportScore(m.score_a, m.sport_name)} - {formatSportScore(m.score_b, m.sport_name)}
                         </div>
 
                         <div className="text-left w-24 sm:w-36">
@@ -636,7 +659,7 @@ export default function PublicScores({ matches, participants, currentLanguage = 
             <div className="flex items-center gap-2 pl-1.5">
               <Calendar className="w-5 h-5 text-blue-500" />
               <h3 className="font-dhl-title text-base sm:text-lg text-gray-800 italic uppercase">
-                ការប្រកួតដែលគ្រោងទុកបន្ទាប់ (Scheduled Matches Feed)
+                {t('upcoming_matches_title', 'ការប្រកួតនាពេលខាងមុខ (Upcoming)', 'Upcoming Fixtures')}
               </h3>
             </div>
 
@@ -728,7 +751,7 @@ export default function PublicScores({ matches, participants, currentLanguage = 
           <div className="flex items-center gap-2 pl-1.5">
             <CheckCircle className="w-5 h-5 text-emerald-500" />
             <h3 className="font-dhl-title text-base sm:text-lg text-gray-800 italic uppercase">
-              លទ្ធផលដែលបានបញ្ចបញ្ចប់ (Game Results)
+              {t('finished_matches_title', 'ការប្រកួតដែលបានបញ្ចប់ (Finished)', 'Finished Matches')}
             </h3>
           </div>
 
@@ -736,7 +759,9 @@ export default function PublicScores({ matches, participants, currentLanguage = 
             {finishedMatches.length === 0 ? (
               <div className="py-12 text-center text-gray-400">
                 <AlertCircle className="w-7 h-7 mx-auto opacity-20 mb-1" />
-                <p className="text-[10px] font-black uppercase">No finished matches available yet</p>
+                <p className="text-[10px] font-black uppercase">
+                  {t('no_finished_matches', 'មិនទាន់មានការប្រកួតដែលបានបញ្ចប់នៅឡើយទេ។', 'No matches have finished in this category yet.')}
+                </p>
                 <p className="text-[9px] text-gray-400">Completed events will register scores here live.</p>
               </div>
             ) : (
@@ -840,7 +865,7 @@ export default function PublicScores({ matches, participants, currentLanguage = 
                           {m.team_a} {winnerA && '🏆'}
                         </span>
                         <span className={`font-mono text-xs ${winnerA ? 'font-black text-gray-900' : 'text-gray-400'}`}>
-                          {m.score_a}
+                          {formatSportScore(m.score_a, m.sport_name)}
                         </span>
                       </div>
                       <div className="flex justify-between items-center">
@@ -848,7 +873,7 @@ export default function PublicScores({ matches, participants, currentLanguage = 
                           {m.team_b} {winnerB && '🏆'}
                         </span>
                         <span className={`font-mono text-xs ${winnerB ? 'font-black text-gray-900' : 'text-gray-400'}`}>
-                          {m.score_b}
+                          {formatSportScore(m.score_b, m.sport_name)}
                         </span>
                       </div>
                     </div>
@@ -905,7 +930,7 @@ export default function PublicScores({ matches, participants, currentLanguage = 
               <div className="relative z-10 flex flex-col md:flex-row justify-between items-center bg-slate-900/60 backdrop-blur-md border border-cyan-500/30 px-6 py-4 rounded-[32px] gap-4 mb-8">
                 <div className="flex items-center gap-4">
                   <div className="bg-[#D40511] px-4 py-1.5 transform -skew-x-12 inline-block shadow-lg">
-                    <span className="text-white font-black italic tracking-tighter text-sm">DHL GAMES 2026</span>
+                    <span className="text-white font-black italic tracking-tighter text-sm">CHAMPIONSHIPS 2026</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="w-3 h-3 rounded-full bg-cyan-400 animate-ping"></span>
@@ -1003,7 +1028,7 @@ export default function PublicScores({ matches, participants, currentLanguage = 
 
               {/* Informational footer */}
               <div className="relative z-10 border-t border-slate-900 pt-4 flex flex-col sm:flex-row justify-between items-center gap-3 text-xs text-gray-400 mt-8">
-                <span>DHL GIANTS SWIMMING CHAMPIONSHIPS • SPECTATOR DISPLAY</span>
+                <span>SWIMMING CHAMPIONSHIPS • SPECTATOR DISPLAY</span>
                 <span>Press escape [ESC] or click close to return to board</span>
               </div>
             </div>
@@ -1018,15 +1043,15 @@ export default function PublicScores({ matches, participants, currentLanguage = 
               {/* Backglow decoration for big-screen stadium board */}
               <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-[#D40511]/10 rounded-full blur-[140px] pointer-events-none"></div>
 
-              {/* Header section */}
+               {/* Header section */}
               <div className="relative z-10 flex flex-col md:flex-row justify-between items-center bg-zinc-950/80 border border-zinc-805 px-6 py-4 rounded-[32px] gap-4 mb-4">
                 <div className="flex items-center gap-4">
                   <div className="bg-[#D40511] px-4 py-1.5 transform -skew-x-12 inline-block shadow-lg">
-                    <span className="text-white font-black italic tracking-tighter text-sm">DHL GAMES 2026</span>
+                    <span className="text-white font-black italic tracking-tighter text-sm">CHAMPIONSHIPS 2026</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="w-3 h-3 rounded-full bg-red-600 animate-ping"></span>
-                    <span className="text-[#D40511] font-extrabold text-xs uppercase tracking-widest font-mono">LIVE STADIUM SCREEN</span>
+                    <span className="text-red-600 font-extrabold text-xs uppercase tracking-widest font-mono">LIVE STADIUM SCREEN</span>
                   </div>
                 </div>
 
@@ -1078,14 +1103,14 @@ export default function PublicScores({ matches, participants, currentLanguage = 
                 {/* Score section in the center */}
                 <div className="flex flex-col justify-center items-center">
                   <div className="bg-gradient-to-b from-neutral-900 to-black border-4 border-zinc-800 px-12 sm:px-16 py-10 rounded-[48px] shadow-2xl flex items-center gap-6 sm:gap-10 sm:scale-110">
-                    <span className="text-7xl sm:text-[10rem] font-mono font-black text-[#FFCC00] leading-none drop-shadow-[0_0_20px_rgba(255,204,0,0.5)]">
-                      {m.score_a}
+                    <span className={`${isSportDistance(m.sport_name) ? 'text-5xl sm:text-[6rem]' : 'text-7xl sm:text-[10rem]'} font-mono font-black text-[#FFCC00] leading-none drop-shadow-[0_0_20px_rgba(255,204,0,0.5)]`}>
+                      {formatSportScore(m.score_a, m.sport_name)}
                     </span>
                     <span className="text-4xl sm:text-[6rem] font-black text-zinc-700 leading-none select-none tracking-tighter">
                       -
                     </span>
-                    <span className="text-7xl sm:text-[10rem] font-mono font-black text-[#FFCC00] leading-none drop-shadow-[0_0_20px_rgba(255,204,0,0.5)]">
-                      {m.score_b}
+                    <span className={`${isSportDistance(m.sport_name) ? 'text-5xl sm:text-[6rem]' : 'text-7xl sm:text-[10rem]'} font-mono font-black text-[#FFCC00] leading-none drop-shadow-[0_0_20px_rgba(255,204,0,0.5)]`}>
+                      {formatSportScore(m.score_b, m.sport_name)}
                     </span>
                   </div>
                   <div className="flex items-center gap-1.5 py-1 px-4 bg-red-950/30 border border-red-900/30 rounded-full text-[10px] font-black uppercase tracking-widest text-red-400 mt-6 animate-pulse">
@@ -1126,7 +1151,7 @@ export default function PublicScores({ matches, participants, currentLanguage = 
 
               {/* Informational footer */}
               <div className="relative z-10 border-t border-zinc-900 py-4 flex flex-col sm:flex-row justify-between items-center gap-3 text-xs text-gray-500 mt-4">
-                <span>DHL SPORTS TOURNAMENT ARENA CODES • SLIDESHOW OVERVIEW</span>
+                <span>SPORTS TOURNAMENT ARENA CODES • SLIDESHOW OVERVIEW</span>
                 <span>Press escape [ESC] or click close to return to board</span>
               </div>
             </div>

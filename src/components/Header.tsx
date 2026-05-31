@@ -17,6 +17,7 @@ interface HeaderProps {
   organization?: OrganizationInfo;
   currentLanguage?: 'kh' | 'en';
   onChangeLanguage?: (lang: 'kh' | 'en') => void;
+  translations?: Record<string, { kh: string; en: string }>;
 }
 
 
@@ -34,11 +35,19 @@ export default function Header({
   setActiveEventId,
   organization,
   currentLanguage = 'kh',
-  onChangeLanguage = () => {}
+  onChangeLanguage = () => {},
+  translations
 }: HeaderProps) {
   
   const activeEvent = events.find(e => e.id === activeEventId) || events[0];
   const theme = activeEvent?.themeColor || 'dhl';
+
+  const t = (key: string, defaultKh: string, defaultEn: string): string => {
+    if (translations && translations[key]) {
+      return currentLanguage === 'kh' ? translations[key].kh : translations[key].en;
+    }
+    return currentLanguage === 'kh' ? defaultKh : defaultEn;
+  };
 
   const [copied, setCopied] = useState(false);
 
@@ -91,7 +100,7 @@ export default function Header({
   const colors = themeColors[theme] || themeColors.dhl;
   const brandAcronym = activeEvent?.name 
     ? activeEvent.name.split(' ').map(w => w[0]).join('').substring(0, 3).toUpperCase() 
-    : 'DHL';
+    : 'CO';
 
   return (
     <header className={`sticky top-0 z-50 bg-white ${colors.borderHex} shadow-md transition-all duration-300`}>
@@ -122,7 +131,7 @@ export default function Header({
                 {currentLanguage === 'kh' ? (
                   <>
                     <h1 className="font-bold text-gray-950 text-base sm:text-lg tracking-tight leading-none">
-                      {activeEvent?.khmerName || 'ទិវាហ្គេម DHL ២០២៦'}
+                      {activeEvent?.khmerName || 'ទិវាប្រកួតកីឡាក្រុមហ៊ុន ២០២៦'}
                     </h1>
                     <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mt-0.5">
                       {activeEvent?.name || 'GAMES DAY 2026'}
@@ -134,7 +143,7 @@ export default function Header({
                       {activeEvent?.name || 'GAMES DAY 2026'}
                     </h1>
                     <p className="text-[10px] text-gray-400 font-bold tracking-wider mt-0.5">
-                      {activeEvent?.khmerName || 'ទិវាហ្គេម DHL ២០២៦'}
+                      {activeEvent?.khmerName || 'ទិវាប្រកួតកីឡាក្រុមហ៊ុន ២០២៦'}
                     </p>
                   </>
                 )}
@@ -186,7 +195,7 @@ export default function Header({
                }`}
              >
                <Award className="w-4 h-4" />
-               <span>{currentLanguage === 'kh' ? 'លទ្ធផល (Live Board)' : 'Leaderboard'}</span>
+               <span>{t('menu_leaderboard', 'លទ្ធផល (Live Board)', 'Leaderboard')}</span>
              </button>
  
             {showPublicTeamsInHeader && (
@@ -200,7 +209,7 @@ export default function Header({
                 }`}
               >
                 <Users className="w-4 h-4 animate-pulse" />
-                <span>{currentLanguage === 'kh' ? 'បញ្ជីឈ្មោះក្រុម (Public Teams)' : 'Public Teams'}</span>
+                <span>{t('menu_public_teams', 'បញ្ជីឈ្មោះក្រុម (Public Teams)', 'Public Teams')}</span>
               </button>
             )}
  
@@ -215,7 +224,7 @@ export default function Header({
                 }`}
               >
                 <Users className="w-4 h-4" />
-                <span>{currentLanguage === 'kh' ? 'ចុះឈ្មោះលេងកីឡា (Enrol Athlete)' : 'Enrol Athlete'}</span>
+                <span>{t('menu_enrol', 'ចុះឈ្មោះលេងកីឡា (Enrol Athlete)', 'Enrol Athlete')}</span>
               </button>
             )}
  
@@ -229,7 +238,7 @@ export default function Header({
               }`}
             >
               <BarChart3 className="w-4 h-4" />
-              <span>{currentLanguage === 'kh' ? 'វិភាគទិន្នន័យ (Dashboard)' : 'Analytics Dashboard'}</span>
+              <span>{t('menu_dashboard', 'វិភាគទិន្នន័យ (Dashboard)', 'Analytics Dashboard')}</span>
             </button>
  
             {currentUser ? (
@@ -243,8 +252,8 @@ export default function Header({
                       : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                   }`}
                 >
-                  <Layers className="w-4 h-4" />
-                  <span>{currentLanguage === 'kh' ? 'ផ្ទាំងបញ្ចូលពិន្ទុ (Scoring Panel)' : 'Scoring Panel'}</span>
+                  <Layers className="w-4 h-4 text-emerald-500 animate-pulse" />
+                  <span>{t('menu_scoring', 'ផ្ទាំងបញ្ចូលពិន្ទុ (Scoring Panel)', 'Scoring Panel')}</span>
                 </button>
  
                 <button
@@ -256,8 +265,8 @@ export default function Header({
                       : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                   }`}
                 >
-                  <Settings className="w-4 h-4 font-bold" />
-                  <span>{currentLanguage === 'kh' ? 'ការកំណត់ (Event Settings)' : 'Event Settings'}</span>
+                  <Settings className="w-4 h-4 font-bold animate-spin-slow" />
+                  <span>{t('menu_settings', 'ការកំណត់ (Event Settings)', 'Event Settings')}</span>
                 </button>
               </>
             ) : (
@@ -267,7 +276,7 @@ export default function Header({
                 className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs uppercase cursor-pointer tracking-wide transition-all duration-200 active:scale-95 whitespace-nowrap bg-[#FFCC00] text-gray-900 hover:bg-[#ffe054] shadow-sm`}
               >
                 <KeyRound className="w-4 h-4" />
-                <span>{currentLanguage === 'kh' ? 'ចូលគ្រងប្រព័ន្ធ (Admin Sign In)' : 'Admin Sign In'}</span>
+                <span>{t('menu_admin_signin', 'ចូលគ្រប់គ្រងប្រព័ន្ធ (Admin Sign In)', 'Admin Sign In')}</span>
               </button>
             )}
           </div>

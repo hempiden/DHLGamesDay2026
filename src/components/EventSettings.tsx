@@ -4,10 +4,83 @@ import {
   ShieldCheck, Trophy, Layers, Users, Calendar, Plus, Trash2, Edit, CheckCircle, 
   Clock, Award, HelpCircle, Activity, LayoutGrid, Settings, KeyRound, Play, ChevronRight, AlertTriangle, Languages
 } from 'lucide-react';
-import { Match, Participant, AppUser, EventInfo, Sport, SportType } from '../types';
+import { Match, Participant, AppUser, EventInfo, Sport, SportType, DEFAULT_TRANSLATIONS } from '../types';
 import { getSupabaseClient } from '../supabase';
 import AdminPanel from './AdminPanel';
 import TeamManagement from './TeamManagement';
+
+const KEY_DESCRIPTIONS: Record<string, { label: string; desc: string }> = {
+  menu_leaderboard: { label: 'ផ្ទាំងលទ្ធផល (Live Board Tab)', desc: 'The first main tab in the top header.' },
+  menu_public_teams: { label: 'បញ្ជីឈ្មោះក្រុម (Public Teams Tab)', desc: 'The second main tab for listing public teams & rosters.' },
+  menu_enrol: { label: 'ចុះឈ្មោះលេងកីឡា (Enrol Athlete Tab)', desc: 'Dynamic public self-registration action tab.' },
+  menu_dashboard: { label: 'វិភាគទិន្នន័យ (Dashboard Tab)', desc: 'Analytics summary and sport charts tab.' },
+  menu_scoring: { label: 'ផ្ទាំងបញ្ចូលពិន្ទុ (Scoring Panel Tab)', desc: 'Admin scoring interface tab.' },
+  menu_settings: { label: 'ការកំណត់ព្រឹត្តិការណ៍ (Event Settings Tab)', desc: 'Admin event architecture setting tab.' },
+  menu_admin_signin: { label: 'ចូលគ្រប់គ្រងប្រព័ន្ធ (Admin Sign-In Tab)', desc: 'Admin authentication button label.' },
+  status_upcoming: { label: 'ស្លាក: មិនទាន់ប្រកួត (Upcoming Status Indicator)', desc: 'Label displayed when a match has not started yet.' },
+  status_live: { label: 'ស្លាក: កំពុងប្រកួត (Live Status Indicator)', desc: 'Label displayed when a match is currently ongoing.' },
+  status_finished: { label: 'ស្លាក: បញ្ចប់ការប្រកួត (Finished Status Indicator)', desc: 'Label displayed when a match is completed.' },
+  select_sport: { label: 'សំណួរជ្រើសរើសកីឡា (Select Sport Instruction)', desc: 'Helper text instructing viewers to select a sport above scoreboard.' },
+  scheduled_title: { label: 'ចំណងជើង: កាលវិភាគប្រកួត (Scheduled Matches Title)', desc: 'Header for the list of upcoming fixtures.' },
+  athlete_name: { label: 'វាល: ឈ្មោះពេញកីឡាករ (Athlete Full Name Field)', desc: "Label for athlete name inputs in rosters and self-registration." },
+  sport_type: { label: 'វាល: ប្រភេទកីឡា (Sport Category Field)', desc: 'Dropdown or input descriptor for choosing sports.' },
+
+  // Live broadcast / spectator portal elements
+  header_live_broadcasting: { label: 'ផ្សាយផ្ទាល់ពីទីលាន (Live Broadcasting Label)', desc: 'Indicates the page content is feeding live score information.' },
+  header_spectator_deck: { label: 'ផ្ទាំងទស្សនាលទ្ធផល (Spectator Deck Label)', desc: 'Identifier for the spectator views.' },
+  header_portal_khmer: { label: 'មហាជនមើលពិន្ទុផ្ទាល់ (Spectators Portal Title)', desc: 'Title displayed on the main spectators scoring landing page.' },
+  header_portal_subtitle: { label: 'ពន្យល់ផ្ទាំងព័ត៌មាន (Spectators Subtitle Description)', desc: 'Detailed caption explaining live scoreboard functionalities.' },
+  select_sport_filter: { label: 'ជ្រើសរើសប្រភេទកីឡាដើម្បីមើល (Select Sport To Filter Label)', desc: 'Instruction label above the sport filters buttons.' },
+  all_sports_filter: { label: 'វិញ្ញាសាទាំងអស់ (All Sports Button Option)', desc: 'Option button to display all matches regardless of sport type.' },
+
+  // Public Teams section
+  team_rosters_title: { label: 'បញ្ជីឈ្មោះក្រុម និងកីឡាករ (Team Rosters Header)', desc: 'Main title of the public teams tab list.' },
+  spectator_mode_subtitle: { label: 'ស្វែងរក និងមើលព័ត៌មានក្រុម (Rosters Mode Caption)', desc: 'Explains spectator view reads rosters.' },
+  total_athletes_badge: { label: 'ចំនួនកីឡាករចុះឈ្មោះសរុប (Total Registered Badge)', desc: 'Subtext for tracking total enrolled athletes count.' },
+  active_competitors: { label: 'កីឡាករសកម្ម (Active Competitors Metric)', desc: 'Unit measurement text next to athlete counters.' },
+  search_placeholder: { label: 'ស្វែងរកក្រុម ឬកីឡាករ... (Search Input Hint)', desc: 'Text inside the search input box before typing.' },
+  no_teams_found: { label: 'រកមិនឃើញសោះ (No Teams/Athletes Found warning)', desc: 'Fallback message when filtering/searching yields zero matches.' },
+  btn_upload_photo: { label: 'ប៊ូតុង: ផ្ទុកឡើងរូបថត (Upload photo action)', desc: 'Interactive link trigger to send photos.' },
+  btn_share_qr: { label: 'ប៊ូតុង: ចែករំលែក QR (Share QR action)', desc: 'Triggers popups demonstrating live camera upload link.' },
+  team_roster_members: { label: 'បញ្ជីឈ្មោះសមាជិក (Registered Team Members heading)', desc: 'Dividing title indicating the team member blocks.' },
+  empty_roster_msg: { label: 'មិនទាន់មានឈ្មោះសមាជិក (Roster Empty Note)', desc: 'Placeholder displayed on team rosters containing zero athletes.' },
+  scan_photo_upload: { label: 'ចំណងជើងស្កេន (Scan QR code wrapper text)', desc: 'QR Modal top heading instructions.' },
+  scan_photo_inst: { label: 'ការណែនាំថតរូបជាមួយទូរស័ព្ទ (QR Upload guide detail)', desc: 'Detailed descriptions inside the qr scanner popup.' },
+
+  // Enrolment registration form section
+  enrol_title: { label: 'ចុះឈ្មោះកីឡាករ (Athlete Enrollment Heading)', desc: 'Heading for public athlete online enrolment portal.' },
+  enrol_inst_title: { label: 'ណែនាំការចុះឈ្មោះ (Instructions Heading)', desc: 'Heading of the box guiding how athletes should sign up.' },
+  enrol_inst_body: { label: 'ខ្លឹមសារណែនាំចុះឈ្មោះ (Instructions Body guide)', desc: 'Step-by-step guideline details in the box.' },
+  your_fullname: { label: 'វាល: ឈ្មោះពេញរបស់អ្នក (Your Full Name input label)', desc: 'Required name indicator.' },
+  fullname_placeholder: { label: 'គំរូឈ្មោះ (e.g. Sok Piseth placeholder)', desc: 'Sample name shown inside name field.' },
+  select_sport_event: { label: 'វាល: ជ្រើសរើសប្រភេទកីឡា (Select Sport Event dropdown)', desc: 'Dropdown label for selecting sports.' },
+  select_sport_event_placeholder: { label: 'ជ្រើសរើសវិញ្ញាសា (Select Sport initial selection)', desc: 'Prompt shown before choosing an event.' },
+  choose_team: { label: 'វាល: ជ្រើសរើសក្រុមលេង (Choose Team dropdown label)', desc: 'Selecting optional team roster affiliations.' },
+  choose_team_placeholder_no_sport: { label: 'ជ្រើសរើសកីឡាជាមុន (Select sport first instruction)', desc: 'Shown when choose team dropdown is locked.' },
+  choose_team_free_agent: { label: 'មិនទាន់មានក្រុម (Free Agent / No Team description)', desc: 'Option representing zero team assignments.' },
+  profile_photo_url: { label: 'វាល: តំណភ្ជាប់រូបថត (Profile Photo URL option label)', desc: 'Input box for hosting raw image URLs.' },
+  profile_photo_desc: { label: 'ការណែនាំ URLs (Profile photo guidance detail)', desc: 'Tells athletes which sites are suitable for links.' },
+  btn_submit_registration: { label: 'ប៊ូតុង: បញ្ជូនព័ត៌មាន (Complete Registration Button)', desc: 'Submit form action button.' },
+  submitting_registration: { label: 'កំពុងបញ្ចូលទិន្នន័យ (Registration progress indicator)', desc: 'Spinner text shown during synchronization.' },
+  registration_success_title: { label: 'ជោគជ័យ: ចុះឈ្មោះបានជោគជ័យ (Registration complete alert)', desc: 'Bold alert heading upon completion.' },
+  registration_success_desc: { label: 'លទ្ធផលចុះឈ្មោះខ្លី (Registration complete caption)', desc: 'Slightly smaller result caption.' },
+  registration_success_body: { label: 'អបអរសាទរជោគជ័យ (Congratulations registration text)', desc: 'Friendly Khmer and English success notification.' },
+  btn_register_another: { label: 'ប៊ូតុង: ចុះឈ្មោះសមាជិកម្នាក់ទៀត (Register another action)', desc: 'Standard trigger resetting registration views.' },
+  self_enrol_closed: { label: 'ការចុះឈ្មោះត្រូវបានបិទ (Self-enrolment closed flag)', desc: 'Crucial warning when registry is toggled off.' },
+  sport_category: { label: 'ស្លាក៖ វិញ្ញាសាកីឡា (Sport Category label details)', desc: 'Detailed meta labels inside completion cards.' },
+  team_assigned: { label: 'ស្លាក៖ ក្រុមលេង (Assigned Team label details)', desc: 'Affiliated team meta name upon signups.' },
+
+  // Match result section
+  congrats_victory: { label: 'អបអរសាទរម្ចាស់ជ័យជំនះ (Match Winner Banner)', desc: 'Congratulations message displayed above match win details.' },
+  winner_badge: { label: 'ស្លាក: ជ័យជម្នះ (Winner Ribbon text)', desc: 'Text above the winning team roster.' },
+  declared_winner_msg: { label: 'ប្រកាសជ័យលាភី (Declared Winner Message text)', desc: 'Success description after winning a match.' },
+  live_matches_title: { label: 'ការប្រកួតកំពុងលេង (Live Matches Heading)', desc: 'Heading for active match lists.' },
+  finished_matches_title: { label: 'ការប្រកួតដែលបានបញ្ចប់ (Finished Matches Heading)', desc: 'Heading for completed match lists.' },
+  upcoming_matches_title: { label: 'ការប្រកួតនាពេលខាងមុខ (Upcoming Matches Heading)', desc: 'Heading for scheduled future fixtures.' },
+  no_live_matches: { label: 'គ្មានការប្រកួតកំពុងលេង (No Live Matches Alert)', desc: 'Display when current live listings are empty.' },
+  no_finished_matches: { label: 'គ្មានការប្រកួតដែលបានបញ្ចប់ (No Finished Matches Alert)', desc: 'Display when zero completed games exist.' },
+  no_upcoming_matches: { label: 'គ្មានការប្រកួតគ្រោងទុក (No Upcoming Matches Alert)', desc: 'Display when matches have not been configured.' }
+};
 
 interface EventSettingsProps {
   // Original visibility settings props
@@ -46,6 +119,8 @@ interface EventSettingsProps {
   isEnrolmentEnabled: boolean;
   setIsEnrolmentEnabled: (val: boolean) => void;
   organizationSlug?: string;
+  translations?: Record<string, { kh: string; en: string }>;
+  saveTranslations?: (newTrans: Record<string, { kh: string; en: string }>) => Promise<any>;
 }
 
 export default function EventSettings({
@@ -76,6 +151,8 @@ export default function EventSettings({
   isEnrolmentEnabled,
   setIsEnrolmentEnabled,
   organizationSlug,
+  translations,
+  saveTranslations = async () => {},
 }: EventSettingsProps) {
 
   // Filter events dynamically to support administrative data isolation per creator session
@@ -93,7 +170,7 @@ export default function EventSettings({
       if (client) {
         const myAdminEvents = updatedEventsList.filter(e => e.created_by === currentUser?.username);
         for (const ev of myAdminEvents) {
-          const { error } = await client.from('events').upsert({
+          const payload: any = {
             id: ev.id,
             name: ev.name,
             khmer_name: ev.khmerName,
@@ -106,8 +183,22 @@ export default function EventSettings({
             is_enrolment_enabled: ev.is_enrolment_enabled ?? true,
             organization_slug: ev.organization_slug || null,
             enabled_languages: (ev.enabled_languages || ['kh', 'en']).join(',')
-          });
-          if (error) console.error('Failed to sync event upsert:', error.message);
+          };
+          const { error } = await client.from('events').upsert(payload);
+          if (error) {
+            if (error.message?.includes('enabled_languages')) {
+              // Fallback for older database schemas that lack the enabled_languages column
+              const { enabled_languages, ...fallbackPayload } = payload;
+              const { error: secondErr } = await client.from('events').upsert(fallbackPayload);
+              if (secondErr) {
+                console.error('Failed to sync event upsert after retry:', secondErr.message);
+              } else {
+                console.log('Successfully synced event upsert (fallback without enabled_languages column)');
+              }
+            } else {
+              console.error('Failed to sync event upsert:', error.message);
+            }
+          }
         }
       }
     }
@@ -123,7 +214,7 @@ export default function EventSettings({
     }
   };
   // Sidebar states
-  const [activeSubTab, setActiveSubTab] = useState<'events_sports' | 'design' | 'setup_matches' | 'teams_athletes' | 'enrolment'>('events_sports');
+  const [activeSubTab, setActiveSubTab] = useState<'events_sports' | 'design' | 'setup_matches' | 'teams_athletes' | 'enrolment' | 'language'>('events_sports');
 
   // Event Creation Form States
   const [newEventName, setNewEventName] = useState('');
@@ -137,7 +228,8 @@ export default function EventSettings({
   const [newSportName, setNewSportName] = useState('');
   const [newSportKhmerName, setNewSportKhmerName] = useState('');
   const [newSportIcon, setNewSportIcon] = useState('⚽');
-  const [newSportScoringMethod, setNewSportScoringMethod] = useState<'score' | 'measure'>('score');
+  const [newSportScoringMethod, setNewSportScoringMethod] = useState<'score' | 'measure' | 'distance'>('score');
+  const [newSportDistanceUnit, setNewSportDistanceUnit] = useState<'m' | 'km'>('m');
 
   // Copy Link State
   const [copied, setCopied] = useState(false);
@@ -151,6 +243,20 @@ export default function EventSettings({
   const [simTeam, setSimTeam] = useState('none');
   const [simPhotoUrl, setSimPhotoUrl] = useState('');
   const [simSuccess, setSimSuccess] = useState(false);
+
+  // Wordings local translation states 
+  const [localTranslations, setLocalTranslations] = useState<Record<string, { kh: string; en: string }>>(() => {
+    return translations || DEFAULT_TRANSLATIONS;
+  });
+
+  useEffect(() => {
+    if (translations) {
+      setLocalTranslations(translations);
+    }
+  }, [translations]);
+
+  const [isSavingTrans, setIsSavingTrans] = useState(false);
+  const [transSaveSuccess, setTransSaveSuccess] = useState(false);
 
   // Sync selected event target if active ID shifts
   useEffect(() => {
@@ -276,7 +382,8 @@ export default function EventSettings({
           name: newSportName.trim().replace(/\s+/g, ''), // remove internal space for url/routing safety
           khmerName: newSportKhmerName.trim(),
           icon: newSportIcon,
-          scoringMethod: newSportScoringMethod
+          scoringMethod: newSportScoringMethod,
+          ...(newSportScoringMethod === 'distance' ? { distanceUnit: newSportDistanceUnit } : {})
         };
         return {
           ...ev,
@@ -435,6 +542,22 @@ export default function EventSettings({
             </div>
             <ChevronRight className="w-3.5 h-3.5 opacity-50" />
           </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveSubTab('language')}
+            className={`w-full flex items-center justify-between px-4 py-3.5 rounded-xl font-bold text-xs uppercase tracking-wide transition duration-150 ${
+              activeSubTab === 'language'
+                ? 'bg-[#1a1a1a] text-white shadow-md'
+                : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+            }`}
+          >
+            <div className="flex items-center gap-2.5">
+              <Languages className="w-4 h-4" />
+              <span>ការកំណត់ភាសា (Languages)</span>
+            </div>
+            <ChevronRight className="w-3.5 h-3.5 opacity-50" />
+          </button>
         </div>
 
         {/* Right Main Content Panel */}
@@ -507,9 +630,17 @@ export default function EventSettings({
 
                           <div className="flex flex-col items-end gap-1 select-none">
                             <span className={`text-[8.5px] font-black px-2 py-0.5 rounded uppercase tracking-wider leading-none ${
-                              sp.scoringMethod === 'measure' ? 'bg-cyan-50 text-cyan-600 border border-cyan-150' : 'bg-emerald-50 text-emerald-600 border border-emerald-150'
+                              sp.scoringMethod === 'measure' 
+                                ? 'bg-cyan-50 text-cyan-600 border border-cyan-150' 
+                                : sp.scoringMethod === 'distance'
+                                ? 'bg-amber-50 text-amber-600 border border-amber-150'
+                                : 'bg-emerald-50 text-emerald-600 border border-emerald-150'
                             }`}>
-                              {sp.scoringMethod === 'measure' ? '⏱️ Measure' : '⚽ Goals'}
+                              {sp.scoringMethod === 'measure' 
+                                ? '⏱️ Measure' 
+                                : sp.scoringMethod === 'distance'
+                                ? `📏 Dist (${sp.distanceUnit || 'm'})`
+                                : '⚽ Goals'}
                             </span>
                             <button
                               type="button"
@@ -681,14 +812,29 @@ export default function EventSettings({
                         <label className="block text-[10px] uppercase font-black text-gray-400 mb-1">គម្រោងពិន្ទុ Scoring Method:</label>
                         <select
                           value={newSportScoringMethod}
-                          onChange={(e) => setNewSportScoringMethod(e.target.value as 'score' | 'measure')}
+                          onChange={(e) => setNewSportScoringMethod(e.target.value as any)}
                           className="w-full px-3 py-2 bg-gray-50 border border-[#e5e7eb] text-xs font-black text-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition"
                         >
                           <option value="score">⚽ Goals Counter (ដូច soccer)</option>
                           <option value="measure">⏱️ Timer Stopwatch (វាស់វិនាទីដូចហែលទឹក)</option>
+                          <option value="distance">📏 Distance (m, km) (វាស់ចម្ងាយដូចជារត់ លោត...)</option>
                         </select>
                       </div>
                     </div>
+
+                    {newSportScoringMethod === 'distance' && (
+                      <div className="bg-amber-50/40 border border-amber-100 p-3.5 rounded-2xl animate-fade-in">
+                        <label className="block text-[10px] uppercase font-black text-amber-800 mb-1">ឯកតាចម្ងាយ Distance Unit:</label>
+                        <select
+                          value={newSportDistanceUnit}
+                          onChange={(e) => setNewSportDistanceUnit(e.target.value as 'm' | 'km')}
+                          className="w-full px-3 py-2 bg-white border border-amber-200 text-xs font-black text-slate-800 rounded-xl focus:ring-2 focus:ring-amber-500 outline-none transition"
+                        >
+                          <option value="m">Meters (m) - សម្រាប់លោតចម្ងាយ ហែលទឹក ឬរត់ចម្ងាយខ្លី</option>
+                          <option value="km">Kilometers (km) - សម្រាប់រត់ម៉ារ៉ាតុង ឬជិះកង់</option>
+                        </select>
+                      </div>
+                    )}
 
                     <button
                       type="submit"
@@ -858,7 +1004,7 @@ export default function EventSettings({
 
                 <div className="p-6">
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    {/* Theme 1: DHL Classic */}
+                    {/* Theme 1: Sporty Classic */}
                     <button
                       type="button"
                       onClick={() => {
@@ -883,7 +1029,7 @@ export default function EventSettings({
                         <span className="w-6 h-6 rounded-md bg-[#D40511] border border-gray-200"></span>
                         <span className="w-6 h-6 rounded-md bg-[#FFCC00] border border-gray-200"></span>
                       </div>
-                      <h4 className="text-xs font-bold text-gray-800 uppercase">DHL Classic</h4>
+                      <h4 className="text-xs font-bold text-gray-800 uppercase">Sporty Classic</h4>
                       <p className="text-[10px] text-gray-500 mt-1 font-medium">ពណ៌ក្រហម និងលឿងបែបស្ព័រលំនាំដើម</p>
                     </button>
 
@@ -1008,111 +1154,6 @@ export default function EventSettings({
                     >
                       {isEnrolmentEnabled ? (
                         <ToggleRight className="w-14 h-10 text-emerald-600" />
-                      ) : (
-                        <ToggleLeft className="w-14 h-10 text-gray-300" />
-                      )}
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Language Switcher & Selector Configuration Card */}
-              <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
-                <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-gray-50/50 select-none">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2.5 bg-blue-50 text-blue-600 rounded-2xl border border-blue-105">
-                      <Languages className="w-5 h-5 animate-pulse" />
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-black text-gray-800 uppercase tracking-wide">
-                        ការកំណត់ភាសាផ្ទាំងព័ត៌មាន (Dashboard Language Settings)
-                      </h3>
-                      <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wide">
-                        Enable or disable language switcher options (ភាសារខ្មែរ & English)
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="p-6 space-y-6">
-                  {/* Khmer toggle */}
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-gray-50/50 p-4 rounded-2xl border border-gray-100">
-                    <div className="space-y-1 max-w-md">
-                      <h4 className="text-xs font-black text-gray-800 uppercase">
-                        ភាសារខ្មែរ (Khmer Language Option)
-                      </h4>
-                      <p className="text-[11px] text-gray-500 font-medium leading-relaxed">
-                        អនុញ្ញាតឱ្យអ្នកទស្សនា (spectators) ជ្រើសរើសមើលផ្ទាំងព័ត៌មានជា <strong className="text-blue-600 font-bold">ភាសាខ្មែរ</strong>។
-                      </p>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const activeEv = events.find(e => e.id === activeEventId);
-                        const currentLangs = activeEv?.enabled_languages || ['kh', 'en'];
-                        let nextLangs: string[];
-                        if (currentLangs.includes('kh')) {
-                          if (currentLangs.length <= 1) return;
-                          nextLangs = currentLangs.filter(l => l !== 'kh');
-                        } else {
-                          nextLangs = [...currentLangs, 'kh'];
-                        }
-                        const updated = events.map(ev => {
-                          if (ev.id === activeEventId) {
-                            return { ...ev, enabled_languages: nextLangs };
-                          }
-                          return ev;
-                        });
-                        setEvents(updated);
-                        syncEventsToSupabase(updated);
-                      }}
-                      className="focus:outline-none flex items-center select-none cursor-pointer transition active:scale-95 duration-150 animate-fade-in"
-                    >
-                      {(events.find(e => e.id === activeEventId)?.enabled_languages || ['kh', 'en']).includes('kh') ? (
-                        <ToggleRight className="w-14 h-10 text-blue-600" />
-                      ) : (
-                        <ToggleLeft className="w-14 h-10 text-gray-300" />
-                      )}
-                    </button>
-                  </div>
-
-                  {/* English toggle */}
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-gray-50/50 p-4 rounded-2xl border border-gray-100">
-                    <div className="space-y-1 max-w-md">
-                      <h4 className="text-xs font-black text-gray-800 uppercase">
-                        English Language (English Language Option)
-                      </h4>
-                      <p className="text-[11px] text-gray-500 font-medium leading-relaxed">
-                        Allow spectators to toggle and view the tournament web dashboard in <strong className="text-indigo-600 font-bold">English language</strong> mode.
-                      </p>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const activeEv = events.find(e => e.id === activeEventId);
-                        const currentLangs = activeEv?.enabled_languages || ['kh', 'en'];
-                        let nextLangs: string[];
-                        if (currentLangs.includes('en')) {
-                          if (currentLangs.length <= 1) return;
-                          nextLangs = currentLangs.filter(l => l !== 'en');
-                        } else {
-                          nextLangs = [...currentLangs, 'en'];
-                        }
-                        const updated = events.map(ev => {
-                          if (ev.id === activeEventId) {
-                            return { ...ev, enabled_languages: nextLangs };
-                          }
-                          return ev;
-                        });
-                        setEvents(updated);
-                        syncEventsToSupabase(updated);
-                      }}
-                      className="focus:outline-none flex items-center select-none cursor-pointer transition active:scale-95 duration-150 animate-fade-in"
-                    >
-                      {(events.find(e => e.id === activeEventId)?.enabled_languages || ['kh', 'en']).includes('en') ? (
-                        <ToggleRight className="w-14 h-10 text-indigo-600" />
                       ) : (
                         <ToggleLeft className="w-14 h-10 text-gray-300" />
                       )}
@@ -1513,6 +1554,245 @@ export default function EventSettings({
                         </button>
                       </div>
                     </form>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 6: CUSTOM WORDING AND LANGUAGE SETTINGS */}
+          {activeSubTab === 'language' && (
+            <div className="space-y-6 animate-fade-in">
+              
+              {/* Card 1: Language Switcher Option (Moved here from design session as requested) */}
+              <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+                <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-gray-50/50 select-none">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 bg-blue-50 text-blue-600 rounded-2xl border border-blue-100">
+                      <Languages className="w-5 h-5 animate-pulse" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-black text-gray-800 uppercase tracking-wide">
+                        ការកំណត់ភាសាផ្ទាំងព័ត៌មាន (Dashboard Language Settings)
+                      </h3>
+                      <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wide">
+                        Enable or disable language switcher options (ភាសារខ្មែរ & English)
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-6 space-y-6">
+                  {/* Khmer toggle */}
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-gray-50/50 p-4 rounded-2xl border border-gray-100">
+                    <div className="space-y-1 max-w-md">
+                      <h4 className="text-xs font-black text-gray-800 uppercase">
+                        ភាសារខ្មែរ (Khmer Language Option)
+                      </h4>
+                      <p className="text-[11px] text-gray-500 font-medium leading-relaxed">
+                        អនុញ្ញាតឱ្យអ្នកទស្សនា (spectators) ជ្រើសរើសមើលផ្ទាំងព័ត៌មានជា <strong className="text-blue-600 font-bold">ភាសាខ្មែរ</strong>។
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const activeEv = events.find(e => e.id === activeEventId);
+                        const currentLangs = activeEv?.enabled_languages || ['kh', 'en'];
+                        let nextLangs: string[];
+                        if (currentLangs.includes('kh')) {
+                          if (currentLangs.length <= 1) return;
+                          nextLangs = currentLangs.filter(l => l !== 'kh');
+                        } else {
+                          nextLangs = [...currentLangs, 'kh'];
+                        }
+                        const updated = events.map(ev => {
+                          if (ev.id === activeEventId) {
+                            return { ...ev, enabled_languages: nextLangs };
+                          }
+                          return ev;
+                        });
+                        setEvents(updated);
+                        syncEventsToSupabase(updated);
+                      }}
+                      className="focus:outline-none flex items-center select-none cursor-pointer transition active:scale-95 duration-150"
+                    >
+                      {(events.find(e => e.id === activeEventId)?.enabled_languages || ['kh', 'en']).includes('kh') ? (
+                        <ToggleRight className="w-14 h-10 text-blue-600" />
+                      ) : (
+                        <ToggleLeft className="w-14 h-10 text-gray-300" />
+                      )}
+                    </button>
+                  </div>
+
+                  {/* English toggle */}
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-gray-50/50 p-4 rounded-2xl border border-gray-100">
+                    <div className="space-y-1 max-w-md">
+                      <h4 className="text-xs font-black text-gray-800 uppercase">
+                        English Language (English Language Option)
+                      </h4>
+                      <p className="text-[11px] text-gray-500 font-medium leading-relaxed">
+                        Allow spectators to toggle and view the tournament web dashboard in <strong className="text-indigo-600 font-bold">English language</strong> mode.
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const activeEv = events.find(e => e.id === activeEventId);
+                        const currentLangs = activeEv?.enabled_languages || ['kh', 'en'];
+                        let nextLangs: string[];
+                        if (currentLangs.includes('en')) {
+                          if (currentLangs.length <= 1) return;
+                          nextLangs = currentLangs.filter(l => l !== 'en');
+                        } else {
+                          nextLangs = [...currentLangs, 'en'];
+                        }
+                        const updated = events.map(ev => {
+                          if (ev.id === activeEventId) {
+                            return { ...ev, enabled_languages: nextLangs };
+                          }
+                          return ev;
+                        });
+                        setEvents(updated);
+                        syncEventsToSupabase(updated);
+                      }}
+                      className="focus:outline-none flex items-center select-none cursor-pointer transition active:scale-95 duration-150"
+                    >
+                      {(events.find(e => e.id === activeEventId)?.enabled_languages || ['kh', 'en']).includes('en') ? (
+                        <ToggleRight className="w-14 h-10 text-indigo-600" />
+                      ) : (
+                        <ToggleLeft className="w-14 h-10 text-gray-300" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Card 2: Custom Wordings Localization customization */}
+              <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+                <div className="p-6 border-b border-gray-100 bg-gray-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-4 select-none">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 bg-yellow-50 text-yellow-600 rounded-2xl border border-yellow-105">
+                      <Settings2 className="w-5 h-5 animate-spin-slow" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-black text-gray-800 uppercase tracking-wide">
+                        កែប្រែពាក្យពេចន៍ទូទៅ (Custom Wording Localization)
+                      </h3>
+                      <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wide">
+                        Translate or override wording for all menus, forms, and status indicators in the app
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (confirm('តើអ្នកពិតជាចង់កំណត់ពាក្យពេចន៍ទាំងអស់ត្រឡប់ទៅជាលំនាំដើមវិញមែនទេ? Reset translations to default?')) {
+                          setLocalTranslations(DEFAULT_TRANSLATIONS);
+                        }
+                      }}
+                      className="bg-gray-100 text-gray-750 hover:text-black font-black text-[10px] px-3.5 py-1.5 rounded-lg border hover:bg-gray-200 transition uppercase tracking-wider cursor-pointer"
+                    >
+                      Reset Defaults
+                    </button>
+                  </div>
+                </div>
+
+                <div className="p-6 space-y-6">
+                  <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2 no-scrollbar">
+                    {Object.keys(DEFAULT_TRANSLATIONS).map((key) => {
+                      const desc = KEY_DESCRIPTIONS[key] || { label: key, desc: 'Wording translation key' };
+                      return (
+                        <div key={key} className="p-4 bg-gray-50/80 rounded-2xl border border-gray-150 space-y-3 shadow-sm hover:border-gray-200 transition">
+                          <div className="flex justify-between items-start gap-2">
+                            <div className="space-y-1">
+                              <span className="text-[10px] font-black text-blue-750 bg-blue-50 border border-blue-100 py-0.5 px-2 rounded-md uppercase tracking-wider">
+                                {desc.label}
+                              </span>
+                              <p className="text-[10px] text-gray-400 font-extrabold tracking-wide uppercase mt-1">
+                                {desc.desc} (Key: <code className="font-mono bg-gray-200/60 py-0.5 px-1 rounded text-red-600 lowercase">{key}</code>)
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div className="space-y-1">
+                              <label className="text-[9px] font-black text-gray-400 uppercase tracking-wider">Khmer Translation (ខ្មែរ)</label>
+                              <input
+                                type="text"
+                                value={localTranslations[key]?.kh || ''}
+                                onChange={(e) => {
+                                  const updated = {
+                                    ...localTranslations,
+                                    [key]: {
+                                      kh: e.target.value,
+                                      en: localTranslations[key]?.en || ''
+                                    }
+                                  };
+                                  setLocalTranslations(updated);
+                                }}
+                                className="w-full bg-white border border-gray-150 rounded-xl px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500 text-xs font-bold text-gray-800"
+                              />
+                            </div>
+
+                            <div className="space-y-1">
+                              <label className="text-[9px] font-black text-gray-400 uppercase tracking-wider">English Translation (EN)</label>
+                              <input
+                                type="text"
+                                value={localTranslations[key]?.en || ''}
+                                onChange={(e) => {
+                                  const updated = {
+                                    ...localTranslations,
+                                    [key]: {
+                                      kh: localTranslations[key]?.kh || '',
+                                      en: e.target.value
+                                    }
+                                  };
+                                  setLocalTranslations(updated);
+                                }}
+                                className="w-full bg-white border border-gray-150 rounded-xl px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500 text-xs font-semibold text-gray-800"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <div className="pt-4 border-t border-gray-150 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                    {transSaveSuccess ? (
+                      <span className="text-[11px] text-emerald-600 font-extrabold flex items-center gap-1.5 animate-bounce">
+                        <Check className="w-4 h-4 text-emerald-500 shrink-0" />
+                        រក្សាទុកពាក្យពេចន៍ដោយជូច័យ! Translations successfully saved and applied.
+                      </span>
+                    ) : (
+                      <span className="text-[10px] text-gray-400 font-black uppercase tracking-wide">
+                        Review changes and click save to apply database synchronization
+                      </span>
+                    )}
+
+                    <button
+                      type="button"
+                      disabled={isSavingTrans}
+                      onClick={async () => {
+                        setIsSavingTrans(true);
+                        try {
+                          await saveTranslations(localTranslations);
+                          setTransSaveSuccess(true);
+                          setTimeout(() => setTransSaveSuccess(false), 3000);
+                        } catch (err) {
+                          alert('រក្សាទុកមានបញ្ហា Saving translations error.');
+                        } finally {
+                          setIsSavingTrans(false);
+                        }
+                      }}
+                      className="bg-[#1a1a1a] hover:bg-black text-white px-5 py-2.5 rounded-xl font-bold uppercase tracking-wider transition active:scale-95 text-xs select-none disabled:opacity-50 cursor-pointer"
+                    >
+                      {isSavingTrans ? 'Saving...' : 'រក្សាទុកពាក្យពេចន៍ (Save Wordings)'}
+                    </button>
                   </div>
                 </div>
               </div>

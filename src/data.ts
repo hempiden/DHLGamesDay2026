@@ -2,14 +2,14 @@ import { Match, TeamStanding, SportConfig, SportType, Participant } from './type
 
 export const INITIAL_PARTICIPANTS: Participant[] = [
   // Soccer Teams
-  { id: 'team-1', name: 'DHL Express Warriors', sport_type: 'Soccer', is_team: true, team_id: null },
-  { id: 'team-2', name: 'DHL Supply Chain United', sport_type: 'Soccer', is_team: true, team_id: null },
+  { id: 'team-1', name: 'Express Warriors', sport_type: 'Soccer', is_team: true, team_id: null },
+  { id: 'team-2', name: 'Supply Chain United', sport_type: 'Soccer', is_team: true, team_id: null },
   // Volleyball Teams
-  { id: 'team-3', name: 'DHL Global Forwarding Titans', sport_type: 'Volleyball', is_team: true, team_id: null },
-  { id: 'team-4', name: 'DHL eCommerce Flyers', sport_type: 'Volleyball', is_team: true, team_id: null },
+  { id: 'team-3', name: 'Global Forwarding Titans', sport_type: 'Volleyball', is_team: true, team_id: null },
+  { id: 'team-4', name: 'eCommerce Flyers', sport_type: 'Volleyball', is_team: true, team_id: null },
   // Pingpong Teams
-  { id: 'team-5', name: 'DHL IT Solutions CyberKnights', sport_type: 'Pingpong', is_team: true, team_id: null },
-  { id: 'team-6', name: 'DHL Aviation Chargers', sport_type: 'Pingpong', is_team: true, team_id: null },
+  { id: 'team-5', name: 'IT Solutions CyberKnights', sport_type: 'Pingpong', is_team: true, team_id: null },
+  { id: 'team-6', name: 'Aviation Chargers', sport_type: 'Pingpong', is_team: true, team_id: null },
 
   // Soccer Players (Assigned)
   { id: 'player-1', name: 'Vichet Ly', sport_type: 'Soccer', is_team: false, team_id: 'team-1' },
@@ -71,12 +71,12 @@ export const SPORT_CONFIGS: Record<SportType, SportConfig> = {
 };
 
 export const DEFAULT_TEAMS = [
-  'DHL Express Warriors',
-  'DHL Supply Chain United',
-  'DHL Global Forwarding Titans',
-  'DHL eCommerce Flyers',
-  'DHL IT Solutions CyberKnights',
-  'DHL Aviation Chargers',
+  'Express Warriors',
+  'Supply Chain United',
+  'Global Forwarding Titans',
+  'eCommerce Flyers',
+  'IT Solutions CyberKnights',
+  'Aviation Chargers',
 ];
 
 export const INITIAL_MATCHES: Match[] = [
@@ -84,8 +84,8 @@ export const INITIAL_MATCHES: Match[] = [
     id: 'match-1',
     sport_name: 'Soccer',
     match_label: 'វគ្គជម្រុះតាមពូល (Group Stage)',
-    team_a: 'DHL Express Warriors',
-    team_b: 'DHL Supply Chain United',
+    team_a: 'Express Warriors',
+    team_b: 'Supply Chain United',
     score_a: 2,
     score_b: 1,
     status: 'Live',
@@ -96,8 +96,8 @@ export const INITIAL_MATCHES: Match[] = [
     id: 'match-2',
     sport_name: 'Volleyball',
     match_label: 'វគ្គមុនផ្តាច់ព្រ័ត្រ (Semifinal)',
-    team_a: 'DHL Global Forwarding Titans',
-    team_b: 'DHL eCommerce Flyers',
+    team_a: 'Global Forwarding Titans',
+    team_b: 'eCommerce Flyers',
     score_a: 15,
     score_b: 15,
     status: 'Live',
@@ -108,8 +108,8 @@ export const INITIAL_MATCHES: Match[] = [
     id: 'match-3',
     sport_name: 'Pingpong',
     match_label: 'វគ្គផ្តាច់ព្រ័ត្រ (Grand Final)',
-    team_a: 'DHL IT Solutions CyberKnights',
-    team_b: 'DHL Aviation Chargers',
+    team_a: 'IT Solutions CyberKnights',
+    team_b: 'Aviation Chargers',
     score_a: 11,
     score_b: 9,
     status: 'Finished',
@@ -120,8 +120,8 @@ export const INITIAL_MATCHES: Match[] = [
     id: 'match-4',
     sport_name: 'Badminton',
     match_label: 'វគ្គជម្រុះជុំទី១ (Round 1)',
-    team_a: 'DHL Express Warriors',
-    team_b: 'DHL Global Forwarding Titans',
+    team_a: 'Express Warriors',
+    team_b: 'Global Forwarding Titans',
     score_a: 0,
     score_b: 0,
     status: 'Upcoming',
@@ -259,7 +259,11 @@ export function getSportConfig(sportName: string): SportConfig {
             name: found.name,
             icon: found.icon || '🏆',
             khmerName: found.khmerName || found.name,
-            color: found.scoringMethod === 'measure' ? 'from-sky-500 to-cyan-500' : 'from-emerald-500 to-teal-600',
+            color: found.scoringMethod === 'measure' 
+              ? 'from-sky-500 to-cyan-500' 
+              : found.scoringMethod === 'distance'
+              ? 'from-amber-500 to-orange-600'
+              : 'from-emerald-500 to-teal-600',
           };
         }
       }
@@ -312,6 +316,70 @@ export function isSportMeasure(sportName: string): boolean {
     console.error('isSportMeasure check error:', err);
   }
   return false;
+}
+
+export function isSportDistance(sportName: string): boolean {
+  if (!sportName) return false;
+  const nameLower = sportName.toLowerCase();
+  if (nameLower === 'running' || nameLower === 'jumping' || nameLower === 'longjump' || nameLower === 'highjump') return true;
+  try {
+    const savedEvents = localStorage.getItem('dhl_events');
+    const activeEventId = localStorage.getItem('dhl_active_event_id');
+    if (savedEvents && activeEventId) {
+      const events = JSON.parse(savedEvents);
+      const activeEvent = events.find((e: any) => e.id === activeEventId);
+      if (activeEvent && activeEvent.sports) {
+        const found = activeEvent.sports.find((s: any) => s.name.toLowerCase() === nameLower || s.name === sportName);
+        if (found) {
+          return found.scoringMethod === 'distance';
+        }
+      }
+    }
+  } catch (err) {
+    console.error('isSportDistance check error:', err);
+  }
+  return false;
+}
+
+export function getSportDistanceUnit(sportName: string): 'm' | 'km' {
+  if (!sportName) return 'm';
+  const nameLower = sportName.toLowerCase();
+  // defaults
+  if (nameLower === 'running') return 'km';
+  if (nameLower === 'jumping' || nameLower === 'longjump' || nameLower === 'highjump') return 'm';
+  try {
+    const savedEvents = localStorage.getItem('dhl_events');
+    const activeEventId = localStorage.getItem('dhl_active_event_id');
+    if (savedEvents && activeEventId) {
+      const events = JSON.parse(savedEvents);
+      const activeEvent = events.find((e: any) => e.id === activeEventId);
+      if (activeEvent && activeEvent.sports) {
+        const found = activeEvent.sports.find((s: any) => s.name.toLowerCase() === nameLower || s.name === sportName);
+        if (found) {
+          return found.distanceUnit || 'm';
+        }
+      }
+    }
+  } catch (err) {
+    console.error('getSportDistanceUnit check error:', err);
+  }
+  return 'm';
+}
+
+export function formatDistanceValue(value: number, unit: 'm' | 'km'): string {
+  if (value === undefined || value === null) return "0";
+  if (unit === 'm') {
+    return (value / 100).toFixed(2) + ' m';
+  } else {
+    return (value / 1000).toFixed(2) + ' km';
+  }
+}
+
+export function formatSportScore(value: number, sportName: string): string {
+  if (isSportDistance(sportName)) {
+    return formatDistanceValue(value, getSportDistanceUnit(sportName));
+  }
+  return String(value);
 }
 
 

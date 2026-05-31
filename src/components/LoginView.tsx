@@ -115,7 +115,7 @@ export default function LoginView({ onLoginSuccess, users, onRegisterUser }: Log
         <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/10 rounded-full backdrop-blur-sm border border-white/15 mb-4 animate-pulse">
           <Shield className="w-3.5 h-3.5 text-[#FFCC00] fill-[#FFCC00]/20" />
           <span className="text-[9px] font-black tracking-widest text-[#FFCC00] uppercase">
-            DHL SECURITY CENTRAL
+            PORTAL SECURITY CENTRAL
           </span>
         </div>
 
@@ -285,7 +285,7 @@ export default function LoginView({ onLoginSuccess, users, onRegisterUser }: Log
 
                 <div>
                   <label className="block text-[10px] font-black text-gray-400 tracking-widest uppercase mb-1">
-                    អាសយដ្ឋានអ៊ីមែល (DHL Email)
+                    អាសយដ្ឋានអ៊ីមែល (Company Email)
                   </label>
                   <div className="relative">
                     <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-gray-400">
@@ -295,7 +295,7 @@ export default function LoginView({ onLoginSuccess, users, onRegisterUser }: Log
                       type="email"
                       value={regEmail}
                       onChange={(e) => setRegEmail(e.target.value)}
-                      placeholder="e.g., sovanna.dan@dhl.com"
+                      placeholder="e.g., sovanna.dan@company.com"
                       className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#D40511]/15 focus:border-[#D40511] transition duration-200 placeholder:text-gray-300"
                     />
                   </div>

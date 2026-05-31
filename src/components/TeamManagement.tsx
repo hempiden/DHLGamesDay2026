@@ -878,7 +878,7 @@ export default function TeamManagement({
                 <input
                   type="text"
                   required
-                  placeholder="e.g. DHL Express Warriors"
+                  placeholder="e.g. Logistics Stars"
                   value={newTeamName}
                   onChange={(e) => setNewTeamName(e.target.value)}
                   className="w-full bg-gray-50 border border-gray-300 p-3 rounded-lg font-bold text-sm outline-none focus:ring-2 focus:ring-[#FFCC00]"

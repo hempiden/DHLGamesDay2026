@@ -333,7 +333,7 @@ export default function FacilitatorSwimmerDesk({
 
       {/* Aesthetic Footer */}
       <div className="text-center pt-2 border-t border-cyan-950 text-[9px] text-slate-500 font-extrabold uppercase tracking-widest">
-        <span>EXCELLENCE. SIMPLY DELIVERED • DHL GAMES</span>
+        <span>CONNECT. COMPETE. CELEBRATE. • CORPORATE GAMES</span>
       </div>
 
     </div>

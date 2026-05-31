@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Match, SportType, Participant } from '../types';
-import { DEFAULT_TEAMS, SPORT_CONFIGS, getSportConfig, getActiveSports } from '../data';
+import { DEFAULT_TEAMS, SPORT_CONFIGS, getSportConfig, getActiveSports, isSportDistance, formatSportScore } from '../data';
 import { Plus, Undo, Trash2, RefreshCw, AlertTriangle } from 'lucide-react';
 
 interface AdminPanelProps {
@@ -385,7 +385,7 @@ export default function AdminPanel({
                     <input
                       type="text"
                       required
-                      placeholder={playMode === 'single' ? 'ឧទាហរណ៍៖ សុខ ដារ៉ា (Sok Dara)' : 'ឧទាហរណ៍៖ DHL Global Office'}
+                      placeholder={playMode === 'single' ? 'ឧទាហរណ៍៖ សុខ ដារ៉ា (Sok Dara)' : 'ឧទាហរណ៍៖ ក្រុមការិយាល័យធំ (e.g., Main Office)'}
                       value={teamA}
                       onChange={(e) => setTeamA(e.target.value)}
                       className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:border-[#FFCC00] focus:ring-1 focus:ring-[#FFCC00] outline-none placeholder:text-gray-300 font-medium"
@@ -427,7 +427,7 @@ export default function AdminPanel({
                     <input
                       type="text"
                       required
-                      placeholder={playMode === 'single' ? 'ឧទាហរណ៍៖ គង់ ចាន់ត្រា (Kong Chantra)' : 'ឧទាហរណ៍៖ DHL Custom Express'}
+                      placeholder={playMode === 'single' ? 'ឧទាហរណ៍៖ គង់ ចាន់ត្រា (Kong Chantra)' : 'ឧទាហរណ៍៖ ក្រុមភស្តុភារកម្ម (e.g., Logistics Warriors)'}
                       value={teamB}
                       onChange={(e) => setTeamB(e.target.value)}
                       className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:border-[#FFCC00] focus:ring-1 focus:ring-[#FFCC00] outline-none placeholder:text-gray-305 font-medium"
@@ -634,9 +634,9 @@ export default function AdminPanel({
                         </div>
                       ) : (
                         <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-gray-100 text-gray-900 rounded-lg font-mono font-black select-all">
-                          <span>{m.score_a}</span>
+                          <span>{formatSportScore(m.score_a, m.sport_name)}</span>
                           <span>:</span>
-                          <span>{m.score_b}</span>
+                          <span>{formatSportScore(m.score_b, m.sport_name)}</span>
                         </div>
                       )}
                     </td>

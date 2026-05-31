@@ -14,7 +14,7 @@ import SwimmingTimer from './components/SwimmingTimer';
 import FacilitatorSwimmerDesk from './components/FacilitatorSwimmerDesk';
 import EventSettings from './components/EventSettings';
 import SelfRegistrationForm from './components/SelfRegistrationForm';
-import { Match, SportType, Participant, AppUser, EventInfo, Sport, OrganizationInfo } from './types';
+import { Match, SportType, Participant, AppUser, EventInfo, Sport, OrganizationInfo, DEFAULT_TRANSLATIONS } from './types';
 import { INITIAL_MATCHES, INITIAL_PARTICIPANTS } from './data';
 import { getSupabaseClient, testSupabaseConnection } from './supabase';
 import { Laptop, Wifi, WifiOff, RefreshCw, Layers, ShieldAlert, Heart, Calendar } from 'lucide-react';
@@ -54,11 +54,11 @@ export default function App() {
     }
     return [
       {
-        id: 'dhl-games-2026',
-        name: 'DHL Games Day 2026',
-        khmerName: 'ទិវាហ្គេម DHL ២០២៦',
+        id: 'company-games-2026',
+        name: 'Corporate Games 2026',
+        khmerName: 'ទិវាប្រកួតកីឡាក្រុមហ៊ុន ២០២៦',
         date: '2026-05-31',
-        description: 'The official sports event of DHL Games Day 2026.',
+        description: 'The official sports event of Corporate Games 2026.',
         sports: [
           { name: 'Soccer', khmerName: 'បាល់ទាត់', icon: '⚽', scoringMethod: 'score' },
           { name: 'Volleyball', khmerName: 'បាល់ទះ', icon: '🏐', scoringMethod: 'score' },
@@ -94,7 +94,7 @@ export default function App() {
       const saved = localStorage.getItem('dhl_active_event_id');
       if (saved) return saved;
     }
-    return 'dhl-games-2026';
+    return 'company-games-2026';
   });
 
   // Derived properties from active event configuration
@@ -107,15 +107,15 @@ export default function App() {
 
   const [organization, setOrganization] = useState<OrganizationInfo>(() => {
     let baseOrg: OrganizationInfo = {
-      name: 'DHL Express Cambodia',
-      logoUrl: 'https://logos-world.net/wp-content/uploads/2020/08/DHL-Logo.png',
-      slug: 'dhl-games',
-      tagline: 'Excellence. Simply delivered.',
-      contactEmail: 'kh.info@dhl.com',
-      contactPhone: '+855 23 999 444',
-      website: 'https://www.dhl.com',
+      name: 'Corporate Arena',
+      logoUrl: 'https://images.unsplash.com/photo-1517649763962-0c623066013b?q=80&w=200&auto=format&fit=crop',
+      slug: 'company-games',
+      tagline: 'Connecting Teams, Creating Champions.',
+      contactEmail: 'games@company.com',
+      contactPhone: '+855 23 123 456',
+      website: 'https://www.company.com',
       address: 'Phnom Penh, Cambodia',
-      footerMotto: 'Excellence. Simply delivered.',
+      footerMotto: 'Connecting Teams, Creating Champions.',
     };
 
     if (typeof window !== 'undefined') {
@@ -309,6 +309,41 @@ export default function App() {
     localStorage.setItem('dhl_language', lang);
   };
 
+  const [translations, setTranslations] = useState<Record<string, { kh: string; en: string }>>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('dhl_custom_translations');
+      if (saved) {
+        try {
+          return JSON.parse(saved);
+        } catch (e) {
+          // ignore
+        }
+      }
+    }
+    return DEFAULT_TRANSLATIONS;
+  });
+
+  const saveTranslations = async (newTrans: Record<string, { kh: string; en: string }>) => {
+    setTranslations(newTrans);
+    const transStr = JSON.stringify(newTrans);
+    localStorage.setItem('dhl_custom_translations', transStr);
+
+    if (isSupabaseEnabled && supabaseConnected && supabaseUrl && supabaseAnonKey) {
+      const client = getSupabaseClient(supabaseUrl, supabaseAnonKey);
+      if (client) {
+        try {
+          await client.from('event_settings').upsert({
+            key: 'wording_translations',
+            value: transStr,
+            updated_at: new Date().toISOString()
+          }, { onConflict: 'key' });
+        } catch (err) {
+          console.error('Failed to sync translations to database:', err);
+        }
+      }
+    }
+  };
+
   // App authentication states
   const [currentUser, setCurrentUser] = useState<AppUser | null>(() => {
     const saved = localStorage.getItem('dhl_games_day_current_user');
@@ -333,7 +368,7 @@ export default function App() {
           parsed.unshift({
             id: 'super_admin_hempiden',
             username: 'hempiden',
-            email: 'piden.hem@dhl.com',
+            email: 'hempiden@gmail.com',
             name: 'Piden Hem',
             role: 'super_admin',
             status: 'approved',
@@ -351,7 +386,7 @@ export default function App() {
       {
         id: 'super_admin_hempiden',
         username: 'hempiden',
-        email: 'piden.hem@dhl.com',
+        email: 'hempiden@gmail.com',
         name: 'Piden Hem',
         role: 'super_admin',
         status: 'approved',
@@ -702,21 +737,41 @@ export default function App() {
             if (orgResult && orgResult.data && active) {
               const d = orgResult.data;
               const remoteOrg: OrganizationInfo = {
-                name: d.name || 'DHL Express Cambodia',
-                logoUrl: d.logo_url || 'https://logos-world.net/wp-content/uploads/2020/08/DHL-Logo.png',
-                slug: d.slug || 'dhl-games',
-                tagline: d.tagline || 'Excellence. Simply delivered.',
-                contactEmail: d.contact_email || 'kh.info@dhl.com',
-                contactPhone: d.contact_phone || '+855 23 999 444',
-                website: d.website || 'https://www.dhl.com',
+                name: d.name || 'Corporate Arena',
+                logoUrl: d.logo_url || 'https://images.unsplash.com/photo-1517649763962-0c623066013b?q=80&w=200&auto=format&fit=crop',
+                slug: d.slug || 'company-games',
+                tagline: d.tagline || 'Connecting Teams, Creating Champions.',
+                contactEmail: d.contact_email || 'games@company.com',
+                contactPhone: d.contact_phone || '+855 23 123 456',
+                website: d.website || 'https://www.company.com',
                 address: d.address || 'Phnom Penh, Cambodia',
-                footerMotto: d.footer_motto || 'Excellence. Simply delivered.',
+                footerMotto: d.footer_motto || 'Connecting Teams, Creating Champions.',
               };
               setOrganization(remoteOrg);
               localStorage.setItem('dhl_organization_settings', JSON.stringify(remoteOrg));
             }
           } catch (errOrg) {
             console.warn('Silent note: organization_settings table could not be fetched or does not exist yet.', errOrg);
+          }
+
+          // Fetch remote custom translations from event_settings
+          try {
+            const transResult = await client
+              .from('event_settings')
+              .select('*')
+              .eq('key', 'wording_translations')
+              .maybeSingle();
+
+            if (transResult && transResult.data && active) {
+              const val = transResult.data.value;
+              if (val) {
+                const parsedTrans = JSON.parse(val);
+                setTranslations(parsedTrans);
+                localStorage.setItem('dhl_custom_translations', val);
+              }
+            }
+          } catch (errTrans) {
+            console.warn('Silent note: event_settings could not be fetched or does not exist yet for translations.', errTrans);
           }
 
           // Fetch remote events table
@@ -777,16 +832,29 @@ export default function App() {
                 organization_slug: ev.organization_slug || organization.slug || 'dhl-games',
                 enabled_languages: (ev.enabled_languages || ['kh', 'en']).join(',')
               }));
+              
               const emptySyncPromise = client.from('events').insert(localClean) as any;
               
               emptySyncPromise.then(({ error }: any) => {
                 if (error) {
-                  const isFetchErr = error.message?.toLowerCase().includes('fetch') || error.message?.toLowerCase().includes('typeerror') || error.message?.toLowerCase().includes('network');
-                  if (isFetchErr) {
-                    setSupabaseConnected(false);
-                    console.warn('Failed to sync empty remote events offline:', error.message);
+                  if (error.message?.includes('enabled_languages')) {
+                    // Downgrade payload and try again for backward compatibility
+                    const degradedLocalClean = localClean.map(({ enabled_languages, ...rest }) => rest);
+                    client.from('events').insert(degradedLocalClean).then(({ error: retryError }: any) => {
+                      if (retryError) {
+                        console.error('Failed to sync empty remote events after retry:', retryError.message);
+                      } else {
+                        console.log('Successfully synced remote events (fallback without enabled_languages column)');
+                      }
+                    });
                   } else {
-                    console.error('Failed to sync empty remote events:', error.message);
+                    const isFetchErr = error.message?.toLowerCase().includes('fetch') || error.message?.toLowerCase().includes('typeerror') || error.message?.toLowerCase().includes('network');
+                    if (isFetchErr) {
+                      setSupabaseConnected(false);
+                      console.warn('Failed to sync empty remote events offline:', error.message);
+                    } else {
+                      console.error('Failed to sync empty remote events:', error.message);
+                    }
                   }
                 }
               }).catch((err: any) => {
@@ -958,7 +1026,7 @@ export default function App() {
               const hempidenPreset: AppUser = {
                 id: 'super_admin_hempiden',
                 username: 'hempiden',
-                email: 'piden.hem@dhl.com',
+                email: 'hempiden@gmail.com',
                 name: 'Piden Hem',
                 role: 'super_admin',
                 status: 'approved',
@@ -1485,7 +1553,7 @@ export default function App() {
   return (
     <div className="min-h-screen flex flex-col bg-gray-50 pb-20 select-none">
       
-      {/* DHL Branded Header Navigation */}
+      {/* Corporate Branded Header Navigation */}
       <Header
         activeTab={activeTab}
         setActiveTab={setActiveTab}
@@ -1501,6 +1569,7 @@ export default function App() {
         organization={organization}
         currentLanguage={currentLanguage}
         onChangeLanguage={changeLanguage}
+        translations={translations}
       />
 
       {/* Synchronizing indicator banner */}
@@ -1529,6 +1598,7 @@ export default function App() {
                 matches={filteredMatches} 
                 participants={filteredParticipants} 
                 currentLanguage={currentLanguage}
+                translations={translations}
               />
             )}
 
@@ -1541,6 +1611,7 @@ export default function App() {
                 isSupabaseEnabled={isSupabaseEnabled}
                 matches={filteredMatches}
                 currentLanguage={currentLanguage}
+                translations={translations}
               />
             )}
 
@@ -1626,6 +1697,8 @@ export default function App() {
                 activeEventId={activeEventId}
                 setActiveEventId={setActiveEventId}
                 organizationSlug={organization?.slug}
+                translations={translations}
+                saveTranslations={saveTranslations}
               />
             )}
 
@@ -1638,6 +1711,7 @@ export default function App() {
                 participants={filteredParticipants}
                 addParticipant={addParticipant}
                 currentLanguage={currentLanguage}
+                translations={translations}
               />
             )}
 
@@ -1742,13 +1816,13 @@ export default function App() {
               alt="Org" 
               className="h-3 max-w-full object-contain filter hover:brightness-95 hover:contrast-110 duration-200 shrink-0"
               onError={(e) => {
-                (e.target as HTMLImageElement).src = 'https://logos-world.net/wp-content/uploads/2020/08/DHL-Logo.png';
+                (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1517649763962-0c623066013b?q=80&w=200&auto=format&fit=crop';
               }} 
             />
           ) : (
             <span className="text-[#FFCC00] font-extrabold pr-1">★</span>
           )}
-          <span>{organization.footerMotto || organization.tagline || 'Excellence. Simply delivered.'}</span>
+          <span>{organization.footerMotto || organization.tagline || 'Connecting Teams, Creating Champions.'}</span>
           <span className="text-red-500 animate-pulse pl-0.5 font-sans">❤️</span>
         </div>
       </footer>

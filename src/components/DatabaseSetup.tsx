@@ -155,7 +155,7 @@ export default function DatabaseSetup({
   return (
     <div className="space-y-6 max-w-3xl mx-auto animate-fade-in">
       
-      {/* Header card with DHL branding styling */}
+      {/* Header card with custom branding styling */}
       <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h2 className="font-dhl-title text-2xl text-[#D40511] italic tracking-tight uppercase">
@@ -408,8 +408,12 @@ create table if not exists public.events (
   show_public_teams boolean default false,
   is_enrolment_enabled boolean default true,
   organization_slug text,
+  enabled_languages text default 'kh,en',
   created_at timestamp with time zone default timezone('utc'::text, now())
 );
+
+-- Ensure enabled_languages column exists for upgrading existing databases
+alter table public.events add column if not exists enabled_languages text default 'kh,en';
 
 -- 2. Create Matches Table (with Isolation)
 create table if not exists public.matches (
@@ -481,15 +485,15 @@ create table if not exists public.organization_settings (
 insert into public.organization_settings (id, name, logo_url, slug, tagline, contact_email, contact_phone, website, address, footer_motto)
 values (
   'current',
-  'DHL Express Cambodia',
-  'https://logos-world.net/wp-content/uploads/2020/08/DHL-Logo.png',
-  'dhl-games',
-  'Excellence. Simply delivered.',
-  'kh.info@dhl.com',
-  '+855 23 999 444',
-  'https://www.dhl.com',
+  'Corporate Arena',
+  'https://images.unsplash.com/photo-1517649763962-0c623066013b?auto=format&fit=crop&q=80&w=400',
+  'corporate-games',
+  'Connect. Compete. Celebrate.',
+  'info@corporatearena.com',
+  '+855 23 111 222',
+  'https://www.corporatearena.com',
   'Phnom Penh, Cambodia',
-  'Excellence. Simply delivered.'
+  'Unity in Diversity • Peak Performance'
 ) on conflict (id) do nothing;
 
 -- 8. Enable Public Access policies for quick testing
@@ -564,8 +568,12 @@ create table if not exists public.events (
   show_public_teams boolean default false,
   is_enrolment_enabled boolean default true,
   organization_slug text,
+  enabled_languages text default 'kh,en',
   created_at timestamp with time zone default timezone('utc'::text, now())
 );
+
+-- Ensure enabled_languages column exists for upgrading existing databases
+alter table public.events add column if not exists enabled_languages text default 'kh,en';
 
 -- 2. Create Matches Table (with Isolation)
 create table if not exists public.matches (
@@ -637,15 +645,15 @@ create table if not exists public.organization_settings (
 insert into public.organization_settings (id, name, logo_url, slug, tagline, contact_email, contact_phone, website, address, footer_motto)
 values (
   'current',
-  'DHL Express Cambodia',
-  'https://logos-world.net/wp-content/uploads/2020/08/DHL-Logo.png',
-  'dhl-games',
-  'Excellence. Simply delivered.',
-  'kh.info@dhl.com',
-  '+855 23 999 444',
-  'https://www.dhl.com',
+  'Corporate Arena',
+  'https://images.unsplash.com/photo-1517649763962-0c623066013b?auto=format&fit=crop&q=80&w=400',
+  'corporate-games',
+  'Connect. Compete. Celebrate.',
+  'info@corporatearena.com',
+  '+855 23 111 222',
+  'https://www.corporatearena.com',
   'Phnom Penh, Cambodia',
-  'Excellence. Simply delivered.'
+  'Unity in Diversity • Peak Performance'
 ) on conflict (id) do nothing;
 
 -- 8. Enable Public Access policies for all tables

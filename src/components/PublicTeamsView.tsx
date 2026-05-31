@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Users, Search, HelpCircle, Trophy, User, ArrowRight, QrCode, X, Copy, ExternalLink } from 'lucide-react';
-import { Participant, SportType, Match } from '../types';
+import { Participant, SportType, Match, getTranslatedText } from '../types';
 import { SPORT_CONFIGS } from '../data';
 
 interface PublicTeamsViewProps {
@@ -10,6 +10,7 @@ interface PublicTeamsViewProps {
   isSupabaseEnabled?: boolean;
   matches?: Match[];
   currentLanguage?: 'kh' | 'en';
+  translations?: Record<string, { kh: string; en: string }>;
 }
 
 export default function PublicTeamsView({
@@ -19,7 +20,12 @@ export default function PublicTeamsView({
   isSupabaseEnabled,
   matches = [],
   currentLanguage = 'kh',
+  translations,
 }: PublicTeamsViewProps) {
+  const t = (key: string, defaultKh: string, defaultEn: string): string => {
+    return getTranslatedText(key, defaultKh, defaultEn, currentLanguage, translations);
+  };
+
   const [selectedSport, setSelectedSport] = useState<SportType | 'All'>('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedQRPlayer, setSelectedQRPlayer] = useState<Participant | null>(null);
@@ -108,13 +114,13 @@ export default function PublicTeamsView({
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
         <div>
           <span className="px-2.5 py-1 rounded-full bg-[#FFCC00]/20 text-[#D40511] font-black text-[10px] uppercase tracking-wider">
-            ទិដ្ឋភាពទូទៅសម្រាប់មហាជន (Spectator Arena)
+            {t('header_spectator_deck', 'ផ្ទាំងទស្សនាលទ្ធផល', 'SPECTATOR DECK')}
           </span>
-          <h2 className="font-dhl-title text-2xl text-[#D40511] italic tracking-tight mt-1">
-            បញ្ជីឈ្មោះក្រុម និងកីឡាករ (TEAM ROSTERS & ATHLETES)
+          <h2 className="font-dhl-title text-2xl text-[#D40511] italic tracking-tight mt-1 uppercase">
+            {t('team_rosters_title', 'បញ្ជីឈ្មោះក្រុម និងកីឡាករ', 'TEAM ROSTERS & ATHLETES')}
           </h2>
           <p className="text-gray-400 text-[11px] font-bold uppercase tracking-wider mt-0.5">
-            ស្វែងរក និងមើលព័ត៌មានក្រុម កីឡាករនៃវិញ្ញាសានីមួយៗ (Read-Only Spectator Mode)
+            {t('spectator_mode_subtitle', 'ស្វែងរក និងមើលព័ត៌មានក្រុម កីឡាករនៃវិញ្ញាសានីមួយៗ', 'Explore and view assigned rosters and active athletes.')}
           </p>
         </div>
         
@@ -122,9 +128,11 @@ export default function PublicTeamsView({
         <div className="flex items-center gap-3 bg-gray-50 border border-gray-100 px-4 py-2.5 rounded-2xl shadow-inner">
           <Users className="w-5 h-5 text-[#D40511]" />
           <div className="text-left leading-none">
-            <span className="text-xs text-gray-400 font-bold block uppercase">Total Athletes registered</span>
+            <span className="text-xs text-gray-400 font-bold block uppercase">
+              {t('total_athletes_badge', 'ចំនួនកីឡាករចុះឈ្មោះសរុប', 'Total Athletes Registered')}
+            </span>
             <span className="text-sm font-black text-gray-800">
-              {participants.filter(p => !p.is_team).length} Active Competitors
+              {participants.filter(p => !p.is_team).length} {t('active_competitors', 'កីឡាករសកម្ម', 'Active Competitors')}
             </span>
           </div>
         </div>
@@ -144,7 +152,7 @@ export default function PublicTeamsView({
             }`}
           >
             <span>🏆</span>
-            <span>វិញ្ញាសាទាំងអស់ (All Sports)</span>
+            <span>{t('all_sports_filter', 'វិញ្ញាសាទាំងអស់', 'All Sports')}</span>
             <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-bold ${
               selectedSport === 'All' ? 'bg-gray-950 text-[#FFCC00]' : 'bg-gray-100 text-gray-400'
             }`}>
@@ -167,7 +175,7 @@ export default function PublicTeamsView({
                 }`}
               >
                 <span>{config.icon}</span>
-                <span>{config.khmerName} ({sportKey})</span>
+                <span>{currentLanguage === 'kh' ? config.khmerName : sportKey}</span>
                 <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-bold ${
                   isSelected ? 'bg-gray-950 text-[#FFCC00]' : 'bg-gray-100 text-gray-400'
                 }`}>
@@ -185,7 +193,7 @@ export default function PublicTeamsView({
           </div>
           <input
             type="text"
-            placeholder="ស្វែងរកក្រុម ឬឈ្មោះកីឡាករ... (Search...)"
+            placeholder={t('search_placeholder', 'ស្វែងរកក្រុម ឬកីឡាករ...', 'Search teams or athletes...')}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full bg-white border border-gray-200 pl-10 pr-4 py-3 rounded-2xl font-bold text-xs text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#FFCC00] focus:border-transparent transition-all shadow-sm"
@@ -198,7 +206,9 @@ export default function PublicTeamsView({
       {filteredTeams.length === 0 ? (
         <div className="bg-white p-12 text-center rounded-3xl border border-gray-100 shadow-sm flex flex-col items-center justify-center">
           <HelpCircle className="w-12 h-12 text-gray-300 mb-3" />
-          <h3 className="font-extrabold text-sm text-gray-700 uppercase">រកមិនឃើញក្រុមដែលត្រូវគ្នាទេ</h3>
+          <h3 className="font-extrabold text-sm text-gray-700 uppercase">
+            {t('no_teams_found', 'រកមិនឃើញក្រុមដែលត្រូវគ្នាទេ', 'No matching teams or athletes found')}
+          </h3>
           <p className="text-xs text-gray-400 mt-1 max-w-sm leading-relaxed">
             No matching team rosters found. Try revising your team search keyword or choosing different division filters.
           </p>
@@ -255,10 +265,10 @@ export default function PublicTeamsView({
                   <div className="space-y-3">
                     <div className="flex justify-between items-center pb-2 border-b border-gray-100">
                       <span className="text-[10px] font-black uppercase tracking-wider text-gray-400">
-                        បញ្ជីឈ្មោះសមាជិក (Team Athletes)
+                        {t('team_roster_members', 'បញ្ជីឈ្មោះសមាជិក', 'Team Rosters')}
                       </span>
                       <span className="px-1.5 py-0.5 bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-600 text-[10px] font-black tracking-tighter">
-                        {members.length} Players
+                        {members.length} {t('active_competitors', 'កីឡាករ', 'Players')}
                       </span>
                     </div>
 
@@ -266,7 +276,9 @@ export default function PublicTeamsView({
                     <div className="space-y-1.5 max-h-[178px] overflow-y-auto no-scrollbar pr-1">
                       {members.length === 0 ? (
                         <div className="py-6 text-center text-gray-400">
-                          <p className="text-[10px] font-bold uppercase tracking-wider">មិនទាន់មានសមាជិក</p>
+                          <p className="text-[10px] font-bold uppercase tracking-wider">
+                            {t('empty_roster_msg', 'មិនទាន់មានសមាជិក', 'Roster Empty')}
+                          </p>
                           <p className="text-[9px] text-gray-400 leading-tight">No participants registered under this squad yet.</p>
                         </div>
                       ) : (
@@ -343,10 +355,10 @@ export default function PublicTeamsView({
 
             <div>
               <span className="px-2.5 py-1 rounded-full bg-[#D40511]/10 text-[#D40511] font-black text-[9px] uppercase tracking-wider">
-                ហ្វូតូកាប៊ីន (FACE SHOT PORTAL)
+                {t('header_spectator_deck', 'ហ្វូតូកាប៊ីន', 'FACE SHOT PORTAL')}
               </span>
               <h3 className="font-dhl-title text-lg text-gray-900 italic mt-1.5 leading-tight uppercase">
-                ស្កែនដើម្បីបញ្ចូលរូបថត
+                {t('scan_photo_upload', 'ស្កែនដើម្បីបញ្ចូលរូបថត', 'Scan QR to upload photo')}
               </h3>
               <p className="text-gray-400 text-[9px] font-bold uppercase mt-0.5">
                 Scan to upload profile photo for:
@@ -368,12 +380,8 @@ export default function PublicTeamsView({
             </div>
 
             <div className="space-y-3">
-              <p className="text-[11px] text-gray-600 leading-normal max-w-xs mx-auto font-bold">
-                សូមស្កែន QR កូដនេះជាមួយទូរស័ព្ទរបស់អ្នក ដើម្បីថតរូប ឬបញ្ចូលរូបថតផ្ទាល់ខ្លួន ដោយមិនបាច់ត្រូវការ Login ឡើយ។
-                <br />
-                <span className="text-[9.5px] text-gray-400 font-medium inline-block mt-1">
-                  (Scan with smartphone camera to open secure player photo uploader.)
-                </span>
+              <p className="text-[11px] text-gray-600 leading-normal max-w-xs mx-auto font-bold font-sans">
+                {t('scan_photo_inst', 'សូមស្កែន QR កូដនេះជាមួយទូរស័ព្ទរបស់អ្នក ដើម្បីថតរូប ឬបញ្ចូលរូបថតផ្ទាល់ខ្លួន ដោយមិនបាច់ត្រូវការ Login ឡើយ។', 'Please scan this QR code with your mobile smartphone camera to instantly snap or upload your athlete profile photo—no password or account needed!')}
               </p>
 
               {/* Copy Link Button / Direct Go to */}
