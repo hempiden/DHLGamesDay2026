@@ -13,13 +13,14 @@ import AnalyticsDashboard from './components/AnalyticsDashboard';
 import SwimmingTimer from './components/SwimmingTimer';
 import FacilitatorSwimmerDesk from './components/FacilitatorSwimmerDesk';
 import EventSettings from './components/EventSettings';
-import { Match, SportType, Participant, AppUser } from './types';
+import SelfRegistrationForm from './components/SelfRegistrationForm';
+import { Match, SportType, Participant, AppUser, EventInfo, Sport } from './types';
 import { INITIAL_MATCHES, INITIAL_PARTICIPANTS } from './data';
 import { getSupabaseClient, testSupabaseConnection } from './supabase';
 import { Laptop, Wifi, WifiOff, RefreshCw, Layers, ShieldAlert, Heart, Calendar } from 'lucide-react';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'leaderboard' | 'public_teams' | 'dashboard' | 'scoring' | 'admin' | 'teams' | 'database' | 'users' | 'login' | 'settings'>(() => {
+  const [activeTab, setActiveTab] = useState<'leaderboard' | 'public_teams' | 'dashboard' | 'scoring' | 'admin' | 'teams' | 'database' | 'users' | 'login' | 'settings' | 'enrolment'>(() => {
     if (typeof window !== 'undefined') {
       const p = new URLSearchParams(window.location.search);
       const tab = p.get('tab');
@@ -33,17 +34,119 @@ export default function App() {
       if (tab === 'users') return 'users';
       if (tab === 'login') return 'login';
       if (tab === 'settings') return 'settings';
+      if (tab === 'enrolment') return 'enrolment';
     }
     return 'leaderboard';
   });
   
-  const [showPublicTeamsInHeader, setShowPublicTeamsInHeader] = useState<boolean>(() => {
-    const saved = localStorage.getItem('dhl_games_day_show_public_teams');
-    return saved === 'true'; // Default to false
+  const [events, setEvents] = useState<EventInfo[]>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('dhl_events');
+      if (saved) {
+        try {
+          return JSON.parse(saved);
+        } catch (e) {
+          console.error('Error parsing stored events:', e);
+        }
+      }
+    }
+    return [
+      {
+        id: 'dhl-games-2026',
+        name: 'DHL Games Day 2026',
+        khmerName: 'ទិវាហ្គេម DHL ២០២៦',
+        date: '2026-05-31',
+        description: 'The official sports event of DHL Games Day 2026.',
+        sports: [
+          { name: 'Soccer', khmerName: 'បាល់ទាត់', icon: '⚽', scoringMethod: 'score' },
+          { name: 'Volleyball', khmerName: 'បាល់ទះ', icon: '🏐', scoringMethod: 'score' },
+          { name: 'Pingpong', khmerName: 'វាយកូនឃ្លីលើតុ', icon: '🏓', scoringMethod: 'score' },
+          { name: 'Badminton', khmerName: 'វាយសី', icon: '🏸', scoringMethod: 'score' },
+          { name: 'Swimming', khmerName: 'ហែលទឹក', icon: '🏊', scoringMethod: 'measure' },
+        ],
+        created_by: 'hempiden',
+        show_public_teams: true,
+        is_enrolment_enabled: true
+      }
+    ];
   });
+
+  const [activeEventId, setActiveEventId] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      const p = new URLSearchParams(window.location.search);
+      const urlId = p.get('event_id');
+      if (urlId) {
+        localStorage.setItem('dhl_active_event_id', urlId);
+        return urlId;
+      }
+      const saved = localStorage.getItem('dhl_active_event_id');
+      if (saved) return saved;
+    }
+    return 'dhl-games-2026';
+  });
+
+  // Derived properties from active event configuration
+  const activeEvent = React.useMemo(() => {
+    return events.find(e => e.id === activeEventId) || events[0];
+  }, [events, activeEventId]);
+
+  const showPublicTeamsInHeader = activeEvent?.show_public_teams ?? true;
+  const isEnrolmentEnabled = activeEvent?.is_enrolment_enabled ?? true;
+
+  const updateIsEnrolmentEnabled = async (val: boolean) => {
+    const updatedEvents = events.map(e => {
+      if (e.id === activeEventId) {
+        return { ...e, is_enrolment_enabled: val };
+      }
+      return e;
+    });
+    setEvents(updatedEvents);
+
+    if (isSupabaseEnabled && supabaseConnected) {
+      const client = getSupabaseClient(supabaseUrl, supabaseAnonKey);
+      if (client) {
+        try {
+          await client.from('events').update({ is_enrolment_enabled: val }).eq('id', activeEventId);
+        } catch (err) {
+          console.error('Failed to sync enrolment toggle to database:', err);
+        }
+      }
+    }
+  };
+
+  useEffect(() => {
+    localStorage.setItem('dhl_events', JSON.stringify(events));
+  }, [events]);
+
+  useEffect(() => {
+    localStorage.setItem('dhl_active_event_id', activeEventId);
+    
+    const activeEvent = events.find(e => e.id === activeEventId) || events[0];
+    const theme = activeEvent?.themeColor || 'dhl';
+    const root = document.documentElement;
+    if (theme === 'cosmic') {
+      root.style.setProperty('--primary-brand', '#1E1B4B');
+      root.style.setProperty('--accent-brand', '#06B6D4');
+    } else if (theme === 'forest') {
+      root.style.setProperty('--primary-brand', '#064E3B');
+      root.style.setProperty('--accent-brand', '#10B981');
+    } else {
+      root.style.setProperty('--primary-brand', '#D40511');
+      root.style.setProperty('--accent-brand', '#FFCC00');
+    }
+  }, [activeEventId, events]);
 
   const [matches, setMatches] = useState<Match[]>([]);
   const [participants, setParticipants] = useState<Participant[]>([]);
+
+  // Filter matches and participants to only the active event ID for isolation
+  const filteredMatches = React.useMemo(() => {
+    return matches.filter((m) => m.event_id === activeEventId || !m.event_id || m.event_id === 'dhl-games-2026');
+  }, [matches, activeEventId]);
+
+  const filteredParticipants = React.useMemo(() => {
+    return participants.filter((p) => p.event_id === activeEventId || !p.event_id || p.event_id === 'dhl-games-2026');
+  }, [participants, activeEventId]);
   const [isOnline, setIsOnline] = useState<boolean>(typeof window !== 'undefined' ? window.navigator.onLine : true);
 
   // QR Mobile Facilitator controller state
@@ -393,17 +496,106 @@ export default function App() {
       if (tested) {
         if (!silent) setIsSyncing(true);
         try {
-          // Fetch remote matches
-          const { data, error } = await client
-            .from('matches')
-            .select('*')
-            .order('created_at', { ascending: false });
+          // Fetch remote events table
+          const eventsResult = await client
+            .from('events')
+            .select('*');
 
-          if (error) {
-            console.error('Supabase fetch error:', error.message);
-          } else if (data && data.length > 0 && active) {
-            // Map table records back to our Match TS interface safely
-            const mappedMatches: Match[] = data.map((item: any) => ({
+          if (eventsResult.error) {
+            console.warn('Supabase events fetch notice (Table may not exist yet):', eventsResult.error.message);
+          } else if (eventsResult.data && active) {
+            if (eventsResult.data.length > 0) {
+              const mappedEvents: EventInfo[] = eventsResult.data.map((item: any) => ({
+                id: String(item.id),
+                name: item.name,
+                khmerName: item.khmer_name || item.khmerName || '',
+                date: item.date || '',
+                description: item.description || '',
+                sports: typeof item.sports === 'string' ? JSON.parse(item.sports) : (item.sports || []),
+                themeColor: (item.theme_color || item.themeColor || 'dhl') as any,
+                created_by: item.created_by || 'hempiden',
+                show_public_teams: item.show_public_teams ?? false,
+                is_enrolment_enabled: item.is_enrolment_enabled ?? true
+              }));
+
+              setEvents((prev) => {
+                const combined = [...prev];
+                mappedEvents.forEach((m) => {
+                  const idx = combined.findIndex((c) => c.id === m.id);
+                  if (idx === -1) {
+                    combined.push(m);
+                  } else {
+                    if (JSON.stringify(combined[idx]) !== JSON.stringify(m)) {
+                      combined[idx] = m;
+                    }
+                  }
+                });
+                if (JSON.stringify(prev) !== JSON.stringify(combined)) {
+                  localStorage.setItem('dhl_events', JSON.stringify(combined));
+                  return combined;
+                }
+                return prev;
+              });
+            } else if (eventsResult.data.length === 0 && events.length > 0) {
+              // Auto-seed local events to remote Supabase DB
+              const localClean = events.map((ev) => ({
+                id: ev.id,
+                name: ev.name,
+                khmer_name: ev.khmerName,
+                date: ev.date || null,
+                description: ev.description || null,
+                sports: ev.sports,
+                theme_color: ev.themeColor || 'dhl',
+                created_by: ev.created_by || 'hempiden',
+                show_public_teams: ev.show_public_teams || false,
+                is_enrolment_enabled: ev.is_enrolment_enabled || true
+              }));
+              client.from('events').insert(localClean).then(({ error }) => {
+                if (error) console.error('Failed to sync empty remote events:', error.message);
+              });
+            }
+          }
+
+          // Fetch isolated matches (isolate per admin or active event)
+          let matchesData = null;
+          let matchesError = null;
+
+          if (currentUser) {
+            const matchesRes = await client
+              .from('matches')
+              .select('*')
+              .eq('created_by', currentUser.username)
+              .order('created_at', { ascending: false });
+
+            if (matchesRes.error && (matchesRes.error.message.includes('column') || matchesRes.error.message.includes('attribute'))) {
+              const fallbackRes = await client.from('matches').select('*').order('created_at', { ascending: false });
+              matchesData = fallbackRes.data;
+              matchesError = fallbackRes.error;
+            } else {
+              matchesData = matchesRes.data;
+              matchesError = matchesRes.error;
+            }
+          } else {
+            const matchesRes = await client
+              .from('matches')
+              .select('*')
+              .eq('event_id', activeEventId)
+              .order('created_at', { ascending: false });
+
+            if (matchesRes.error && (matchesRes.error.message.includes('column') || matchesRes.error.message.includes('attribute'))) {
+              const fallbackRes = await client.from('matches').select('*').order('created_at', { ascending: false });
+              matchesData = fallbackRes.data;
+              matchesError = fallbackRes.error;
+            } else {
+              matchesData = matchesRes.data;
+              matchesError = matchesRes.error;
+            }
+          }
+
+          if (matchesError) {
+            console.error('Supabase fetch error:', matchesError.message);
+          } else if (matchesData && active) {
+            const mappedMatches: Match[] = matchesData.map((item: any) => ({
               id: String(item.id),
               sport_name: item.sport_name as SportType,
               match_label: item.match_label || 'Regular Match',
@@ -416,6 +608,8 @@ export default function App() {
               updated_at: item.updated_at || new Date().toISOString(),
               scheduled_date: item.scheduled_date || undefined,
               scheduled_time: item.scheduled_time || undefined,
+              event_id: item.event_id || undefined,
+              created_by: item.created_by || undefined
             }));
             
             setMatches((prev) => {
@@ -427,16 +621,46 @@ export default function App() {
             });
           }
 
-          // Fetch remote participants table
-          const pResult = await client
-            .from('participants')
-            .select('*')
-            .order('name');
+          // Fetch isolated participants table (isolate per admin or active event)
+          let pData = null;
+          let pError = null;
+
+          if (currentUser) {
+            const pRes = await client
+              .from('participants')
+              .select('*')
+              .eq('created_by', currentUser.username)
+              .order('name');
+
+            if (pRes.error && (pRes.error.message.includes('column') || pRes.error.message.includes('attribute'))) {
+              const fallbackRes = await client.from('participants').select('*').order('name');
+              pData = fallbackRes.data;
+              pError = fallbackRes.error;
+            } else {
+              pData = pRes.data;
+              pError = pRes.error;
+            }
+          } else {
+            const pRes = await client
+              .from('participants')
+              .select('*')
+              .eq('event_id', activeEventId)
+              .order('name');
+
+            if (pRes.error && (pRes.error.message.includes('column') || pRes.error.message.includes('attribute'))) {
+              const fallbackRes = await client.from('participants').select('*').order('name');
+              pData = fallbackRes.data;
+              pError = fallbackRes.error;
+            } else {
+              pData = pRes.data;
+              pError = pRes.error;
+            }
+          }
           
-          if (pResult.error) {
-            console.error('Supabase participants fetch error:', pResult.error.message);
-          } else if (pResult.data && pResult.data.length > 0 && active) {
-            const mappedParticipants: Participant[] = pResult.data.map((item: any) => ({
+          if (pError) {
+            console.error('Supabase participants fetch error:', pError.message);
+          } else if (pData && active) {
+            const mappedParticipants: Participant[] = pData.map((item: any) => ({
               id: String(item.id),
               name: item.name,
               sport_type: item.sport_type as SportType,
@@ -445,6 +669,8 @@ export default function App() {
               photo_url: item.photo_url || null,
               created_at: item.created_at,
               updated_at: item.updated_at,
+              event_id: item.event_id || undefined,
+              created_by: item.created_by || undefined
             }));
             setParticipants((prev) => {
               if (JSON.stringify(prev) !== JSON.stringify(mappedParticipants)) {
@@ -462,7 +688,6 @@ export default function App() {
             .order('created_at', { ascending: false });
 
           if (usersResult.error) {
-            // Safe fallback if table doesn't exist yet, we will just keep local list
             console.warn('Supabase admin_users fetch notice (Table may not exist yet):', usersResult.error.message);
           } else if (usersResult.data && active) {
             const mappedUsers: AppUser[] = usersResult.data.map((item: any) => ({
@@ -476,7 +701,6 @@ export default function App() {
               created_at: item.created_at
             }));
 
-            // Always ensure the Super Admin preset 'hempiden' exists in our list
             const adminPresetIdx = mappedUsers.findIndex((p) => p.username === 'hempiden');
             if (adminPresetIdx === -1) {
               const hempidenPreset: AppUser = {
@@ -490,7 +714,6 @@ export default function App() {
                 created_at: new Date().toISOString()
               };
               mappedUsers.unshift(hempidenPreset);
-              // Proactively write preset back to Supabase if table exists
               client.from('admin_users').insert({
                 id: hempidenPreset.id,
                 username: hempidenPreset.username,
@@ -514,27 +737,7 @@ export default function App() {
             });
           }
 
-          // Fetch remote event_settings table
-          const settingsResult = await client
-            .from('event_settings')
-            .select('*');
 
-          if (settingsResult.error) {
-            // Safe fallback if table doesn't exist yet
-            console.warn('Supabase event_settings fetch notice (Table may not exist yet):', settingsResult.error.message);
-          } else if (settingsResult.data && active) {
-            const publicTeamsVal = settingsResult.data.find((s: any) => s.key === 'show_public_teams');
-            if (publicTeamsVal) {
-              const isVal = publicTeamsVal.value === 'true';
-              setShowPublicTeamsInHeader((prev) => {
-                if (prev !== isVal) {
-                  localStorage.setItem('dhl_games_day_show_public_teams', String(isVal));
-                  return isVal;
-                }
-                return prev;
-              });
-            }
-          }
         } catch (err) {
           console.error('Database Sync Issue:', err);
         } finally {
@@ -547,7 +750,6 @@ export default function App() {
 
     syncAndFetch(false);
 
-    // Dynamic database polling loop
     const pollInterval = setInterval(() => {
       syncAndFetch(true);
     }, 2500);
@@ -556,7 +758,7 @@ export default function App() {
       active = false;
       clearInterval(pollInterval);
     };
-  }, [isSupabaseEnabled, supabaseUrl, supabaseAnonKey, isOnline]);
+  }, [isSupabaseEnabled, supabaseUrl, supabaseAnonKey, isOnline, currentUser, activeEventId]);
 
   // Save matches change locally
   const saveLocalMatches = (updated: Match[]) => {
@@ -565,16 +767,22 @@ export default function App() {
   };
 
   const updateShowPublicTeamsInHeader = async (val: boolean) => {
-    setShowPublicTeamsInHeader(val);
-    localStorage.setItem('dhl_games_day_show_public_teams', String(val));
+    const updatedEvents = events.map(e => {
+      if (e.id === activeEventId) {
+        return { ...e, show_public_teams: val };
+      }
+      return e;
+    });
+    setEvents(updatedEvents);
 
     if (isSupabaseEnabled && supabaseConnected) {
       const client = getSupabaseClient(supabaseUrl, supabaseAnonKey);
       if (client) {
         try {
           await client
-            .from('event_settings')
-            .upsert({ key: 'show_public_teams', value: String(val) });
+            .from('events')
+            .update({ show_public_teams: val })
+            .eq('id', activeEventId);
         } catch (err) {
           console.error('Failed to sync settings to Supabase settings:', err);
         }
@@ -998,6 +1206,10 @@ export default function App() {
         currentUser={currentUser}
         onLogout={handleLogout}
         showPublicTeamsInHeader={showPublicTeamsInHeader}
+        isEnrolmentEnabled={isEnrolmentEnabled}
+        events={events}
+        activeEventId={activeEventId}
+        setActiveEventId={setActiveEventId}
       />
 
       {/* Synchronizing indicator banner */}
@@ -1014,7 +1226,7 @@ export default function App() {
         {uploadPhotoPlayerId ? (
           <PublicAthletePhotoUpload
             playerId={uploadPhotoPlayerId}
-            participants={participants}
+            participants={filteredParticipants}
             updateParticipantPhoto={updateParticipantPhoto}
             onBack={handleClearUploadParam}
           />
@@ -1023,27 +1235,27 @@ export default function App() {
             {/* TAB 1: PRESENTATION VIEW / LIVE LEADERBOARD & SPECTATORS */}
             {activeTab === 'leaderboard' && (
               <LeaderboardView 
-                matches={matches} 
-                participants={participants} 
+                matches={filteredMatches} 
+                participants={filteredParticipants} 
               />
             )}
 
             {/* NEW TAB: PUBLIC TEAMS & MEMBERS VIEW */}
             {activeTab === 'public_teams' && (
               <PublicTeamsView
-                participants={participants}
+                participants={filteredParticipants}
                 supabaseUrl={supabaseUrl}
                 supabaseAnonKey={supabaseAnonKey}
                 isSupabaseEnabled={isSupabaseEnabled}
-                matches={matches}
+                matches={filteredMatches}
               />
             )}
 
             {/* NEW TAB: DYNAMIC ANALYTICS DASHBOARD */}
             {activeTab === 'dashboard' && (
               <AnalyticsDashboard
-                matches={matches}
-                participants={participants}
+                matches={filteredMatches}
+                participants={filteredParticipants}
                 setActiveTab={setActiveTab}
               />
             )}
@@ -1051,8 +1263,8 @@ export default function App() {
             {/* TAB 2: ACTIVE SCORING DASHBOARD FOR FIELD SUB-ADMINS */}
             {activeTab === 'scoring' && currentUser && (
               <ScoringPanel
-                matches={matches}
-                participants={participants}
+                matches={filteredMatches}
+                participants={filteredParticipants}
                 updateMatchScore={updateMatchScore}
                 updateMatchFields={updateMatchFields}
                 finishMatch={finishMatch}
@@ -1067,8 +1279,8 @@ export default function App() {
             {/* TAB 3: ADMIN SETUP AND CONTROL CONSOLE */}
             {activeTab === 'admin' && currentUser && (
               <AdminPanel
-                matches={matches}
-                participants={participants}
+                matches={filteredMatches}
+                participants={filteredParticipants}
                 addMatch={addMatch}
                 updateMatchStatus={updateMatchStatus}
                 deleteMatch={deleteMatch}
@@ -1079,7 +1291,7 @@ export default function App() {
             {/* TAB 4: TEAM MANAGEMENT AND ATHLETE ROSTER */}
             {activeTab === 'teams' && currentUser && (
               <TeamManagement
-                participants={participants}
+                participants={filteredParticipants}
                 isOnline={isOnline}
                 supabaseConnected={supabaseConnected}
                 addParticipant={addParticipant}
@@ -1096,8 +1308,45 @@ export default function App() {
               <EventSettings
                 showPublicTeamsInHeader={showPublicTeamsInHeader}
                 onUpdateShowPublicTeamsInHeader={updateShowPublicTeamsInHeader}
+                isEnrolmentEnabled={isEnrolmentEnabled}
+                setIsEnrolmentEnabled={updateIsEnrolmentEnabled}
                 isSupabaseEnabled={isSupabaseEnabled}
                 supabaseConnected={supabaseConnected}
+                supabaseUrl={supabaseUrl}
+                supabaseAnonKey={supabaseAnonKey}
+                currentUser={currentUser}
+                matches={filteredMatches}
+                participants={filteredParticipants}
+                addMatch={addMatch}
+                updateMatchStatus={updateMatchStatus}
+                deleteMatch={deleteMatch}
+                resetToDefault={resetToDefault}
+                isOnline={isOnline}
+                addParticipant={addParticipant}
+                updateParticipantName={updateParticipantName}
+                updateParticipantPhoto={updateParticipantPhoto}
+                assignPlayerToTeam={assignPlayerToTeam}
+                deleteParticipant={deleteParticipant}
+                resetParticipantsToDefault={resetParticipantsToDefault}
+                events={events}
+                setEvents={setEvents}
+                activeEventId={activeEventId}
+                setActiveEventId={setActiveEventId}
+              />
+            )}
+
+            {/* TAB FOR PUBLIC ATHLETE SELF-REGISTRATION PORTAL */}
+            {activeTab === 'enrolment' && (
+              <SelfRegistrationForm
+                isEnrolmentEnabled={isEnrolmentEnabled}
+                activeEventId={activeEventId}
+                events={events}
+                participants={filteredParticipants}
+                addParticipant={addParticipant}
+                matches={filteredMatches}
+                supabaseUrl={supabaseUrl}
+                supabaseAnonKey={supabaseAnonKey}
+                isSupabaseEnabled={isSupabaseEnabled}
               />
             )}
 

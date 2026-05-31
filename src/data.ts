@@ -240,3 +240,79 @@ export function calculateStandings(matches: Match[], sport: SportType): TeamStan
     })
     .slice(0, 10); // Top 10
 }
+
+export function getSportConfig(sportName: string): SportConfig {
+  if (SPORT_CONFIGS[sportName as SportType]) {
+    return SPORT_CONFIGS[sportName as SportType];
+  }
+
+  try {
+    const savedEvents = localStorage.getItem('dhl_events');
+    const activeEventId = localStorage.getItem('dhl_active_event_id');
+    if (savedEvents && activeEventId) {
+      const events = JSON.parse(savedEvents);
+      const activeEvent = events.find((e: any) => e.id === activeEventId);
+      if (activeEvent && activeEvent.sports) {
+        const found = activeEvent.sports.find((s: any) => s.name.toLowerCase() === sportName.toLowerCase() || s.name === sportName);
+        if (found) {
+          return {
+            name: found.name,
+            icon: found.icon || '🏆',
+            khmerName: found.khmerName || found.name,
+            color: found.scoringMethod === 'measure' ? 'from-sky-500 to-cyan-500' : 'from-emerald-500 to-teal-600',
+          };
+        }
+      }
+    }
+  } catch (err) {
+    console.error('getSportConfig parsing issue:', err);
+  }
+
+  return {
+    name: sportName,
+    icon: '🏆',
+    khmerName: sportName,
+    color: 'from-gray-500 to-slate-600',
+  };
+}
+
+export function getActiveSports(): string[] {
+  try {
+    const savedEvents = localStorage.getItem('dhl_events');
+    const activeEventId = localStorage.getItem('dhl_active_event_id');
+    if (savedEvents && activeEventId) {
+      const events = JSON.parse(savedEvents);
+      const activeEvent = events.find((e: any) => e.id === activeEventId);
+      if (activeEvent && activeEvent.sports && activeEvent.sports.length > 0) {
+        return activeEvent.sports.map((s: any) => s.name);
+      }
+    }
+  } catch (err) {
+    console.error('getActiveSports error:', err);
+  }
+  return ['Soccer', 'Volleyball', 'Pingpong', 'Badminton', 'Swimming'];
+}
+
+export function isSportMeasure(sportName: string): boolean {
+  if (sportName.toLowerCase() === 'swimming') return true;
+  try {
+    const savedEvents = localStorage.getItem('dhl_events');
+    const activeEventId = localStorage.getItem('dhl_active_event_id');
+    if (savedEvents && activeEventId) {
+      const events = JSON.parse(savedEvents);
+      const activeEvent = events.find((e: any) => e.id === activeEventId);
+      if (activeEvent && activeEvent.sports) {
+        const found = activeEvent.sports.find((s: any) => s.name.toLowerCase() === sportName.toLowerCase() || s.name === sportName);
+        if (found) {
+          return found.scoringMethod === 'measure';
+        }
+      }
+    }
+  } catch (err) {
+    console.error('isSportMeasure check error:', err);
+  }
+  return false;
+}
+
+
+

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Match, SportType, Participant, AppUser } from '../types';
-import { SPORT_CONFIGS } from '../data';
+import { SPORT_CONFIGS, getSportConfig, getActiveSports, isSportMeasure } from '../data';
 import { Play, Check, Trophy, Trash2, ArrowRight, ShieldCheck, AlertCircle, Plus, Minus } from 'lucide-react';
 import SwimmingTimer from './SwimmingTimer';
 
@@ -36,7 +36,7 @@ export default function ScoringPanel({
   // Buffer input states for performance and real-time typing
   const [scoresBuffer, setScoresBuffer] = useState<Record<string, { a: number; b: number }>>({});
 
-  const filterSports: (SportType | 'All')[] = ['All', 'Soccer', 'Volleyball', 'Pingpong', 'Badminton', 'Swimming'];
+  const filterSports = ['All', ...getActiveSports()];
 
   const filteredMatches = matches.filter((m) => {
     const isLive = m.status === 'Live';
@@ -99,7 +99,7 @@ export default function ScoringPanel({
       {/* Sport Filtering Segmented Control */}
       <div className="w-full bg-white rounded-2xl p-2.5 shadow-sm border border-gray-100 flex items-center gap-2 overflow-x-auto scroll-smooth no-scrollbar">
         {filterSports.map((sport) => {
-          const config = sport !== 'All' ? SPORT_CONFIGS[sport] : null;
+          const config = sport !== 'All' ? getSportConfig(sport) : null;
           const isActive = selectedSport === sport;
           return (
             <button
@@ -126,9 +126,10 @@ export default function ScoringPanel({
       </div>
 
       {/* Main Container of Active / Live Matches */}
-      {selectedSport === 'Swimming' ? (
+      {isSportMeasure(selectedSport) ? (
         <div className="col-span-full">
           <SwimmingTimer
+            sportName={selectedSport}
             matches={matches}
             participants={participants}
             updateMatchFields={updateMatchFields}
@@ -156,7 +157,8 @@ export default function ScoringPanel({
             </div>
           ) : (
             filteredMatches.map((m) => {
-              if (m.sport_name === 'Swimming') {
+              if (isSportMeasure(m.sport_name)) {
+                const mConfig = getSportConfig(m.sport_name);
                 return (
                   <div
                     key={m.id}
@@ -164,8 +166,8 @@ export default function ScoringPanel({
                   >
                     <div className="px-5 py-4 bg-slate-900 border-b border-slate-800 flex justify-between items-center">
                       <div className="flex items-center gap-2 text-cyan-400">
-                        <span className="text-lg">🏊‍♂️</span>
-                        <span className="font-dhl-title text-xs leading-none">SWIMMING TIMER STYLE</span>
+                        <span className="text-lg">{mConfig?.icon || '⏱️'}</span>
+                        <span className="font-dhl-title text-xs leading-none">{(m.sport_name || '').toUpperCase()} TIMER STYLE</span>
                       </div>
                       <span className="text-[10px] font-extrabold text-[#1a1a1a] bg-cyan-400 px-2.5 py-1 rounded-md uppercase tracking-wide">
                         {m.match_label}
@@ -178,16 +180,16 @@ export default function ScoringPanel({
                           {m.match_label || 'Heat Match'}
                         </h4>
                         <p className="text-[11.5px] text-gray-400 leading-relaxed font-bold">
-                          គម្រោងហែលទឹកមិនប្រើប្រាស់ពិន្ទុ២ក្រុមធម្មតាទេ។ សូមប្រើប្រាស់ឧបករណ៍វាស់ម៉ោង និង Lane Stop ក្នុងផ្ទាំងវាស់ម៉ោង Swimming Timer!
+                          គម្រោង {mConfig?.khmerName || m.sport_name} មិនប្រើប្រាស់ពិន្ទុ២ក្រុមធម្មតាទេ។ សូមប្រើប្រាស់ឧបករណ៍វាស់ម៉ោង និង Lane Stop ក្នុងផ្ទាំងវាស់ម៉ោង {mConfig?.khmerName || m.sport_name} Timer!
                         </p>
                       </div>
 
                       <button
                         type="button"
-                        onClick={() => setSelectedSport('Swimming')}
+                        onClick={() => setSelectedSport(m.sport_name)}
                         className="w-full py-3.5 bg-cyan-500 hover:bg-cyan-600 text-slate-950 text-xs font-black uppercase rounded-2xl transition-all duration-150 flex items-center justify-center gap-1.5 cursor-pointer shadow-lg shadow-cyan-500/10 active:scale-95"
                       >
-                        <span>បើកផ្ទាំងវាស់ម៉ោង (Open Swim Timer)</span>
+                        <span>បើកផ្ទាំងវាស់ម៉ោង (Open {m.sport_name} Timer)</span>
                         <ArrowRight className="w-4 h-4 text-slate-950" />
                       </button>
                     </div>
@@ -195,7 +197,7 @@ export default function ScoringPanel({
                 );
               }
 
-              const config = SPORT_CONFIGS[m.sport_name];
+              const config = getSportConfig(m.sport_name);
               const isSaving = savingId === m.id;
               const currentA = getScore(m.id, 'a', m.score_a);
               const currentB = getScore(m.id, 'b', m.score_b);

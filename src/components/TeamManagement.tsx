@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { User, Users, Plus, Trash2, Edit2, ShieldAlert, Check, HelpCircle, UserPlus, ArrowLeftRight, Camera, Image, Shuffle, Sparkles, RefreshCw } from 'lucide-react';
 import { Participant, SportType } from '../types';
-import { SPORT_CONFIGS } from '../data';
+import { SPORT_CONFIGS, getSportConfig, getActiveSports } from '../data';
 import AthleteUpload from './AthleteUpload';
 
 interface TeamManagementProps {
@@ -29,16 +29,16 @@ export default function TeamManagement({
 }: TeamManagementProps) {
   const [activeSubTab, setActiveSubTab] = useState<'structure' | 'athletes'>('structure');
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
-  const [selectedSport, setSelectedSport] = useState<SportType>('Soccer');
+  const [selectedSport, setSelectedSport] = useState<SportType>(() => getActiveSports()[0] || 'Soccer');
   
   // Forms states
   const [showCreateTeamModal, setShowCreateTeamModal] = useState(false);
   const [newTeamName, setNewTeamName] = useState('');
-  const [newTeamSport, setNewTeamSport] = useState<SportType>('Soccer');
+  const [newTeamSport, setNewTeamSport] = useState<SportType>(() => getActiveSports()[0] || 'Soccer');
   
   const [showCreatePlayerModal, setShowCreatePlayerModal] = useState(false);
   const [newPlayerName, setNewPlayerName] = useState('');
-  const [newPlayerSport, setNewPlayerSport] = useState<SportType>('Soccer');
+  const [newPlayerSport, setNewPlayerSport] = useState<SportType>(() => getActiveSports()[0] || 'Soccer');
   const [newPlayerTeamId, setNewPlayerTeamId] = useState<string>('');
 
   const [editTeamNameValue, setEditTeamNameValue] = useState('');
@@ -97,7 +97,7 @@ export default function TeamManagement({
     setTeamupAthletes(prepared);
 
     // Default team name pattern
-    setTargetTeamNamePattern(`កងសហគមន៍ ${SPORT_CONFIGS[selectedSport]?.khmerName || selectedSport}`);
+    setTargetTeamNamePattern(`កងសហគមន៍ ${getSportConfig(selectedSport)?.khmerName || selectedSport}`);
     
     // Guess target team size based on sport division
     let defaultSize = 3;
@@ -461,8 +461,8 @@ export default function TeamManagement({
 
       {/* Sport selection filters */}
       <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar scroll-smooth">
-        {(Object.keys(SPORT_CONFIGS) as SportType[]).map((sportKey) => {
-          const config = SPORT_CONFIGS[sportKey];
+        {(getActiveSports() as SportType[]).map((sportKey) => {
+          const config = getSportConfig(sportKey);
           const isSelected = selectedSport === sportKey;
           const count = participants.filter(p => p.is_team && p.sport_type === sportKey).length;
           return (
@@ -540,7 +540,7 @@ export default function TeamManagement({
                           />
                         ) : (
                           <span className="text-xl filter saturate-100 select-none">
-                            {SPORT_CONFIGS[t.sport_type]?.icon || '🛡️'}
+                            {getSportConfig(t.sport_type)?.icon || '🛡️'}
                           </span>
                         )}
                       </div>
@@ -603,7 +603,7 @@ export default function TeamManagement({
                     />
                   ) : (
                     <div className="absolute inset-0 bg-gradient-to-br from-gray-900 to-gray-800 flex flex-col items-center justify-center p-4 text-center">
-                      <span className="text-3xl opacity-60 mb-1">{SPORT_CONFIGS[selectedTeam.sport_type]?.icon}</span>
+                      <span className="text-3xl opacity-60 mb-1">{getSportConfig(selectedTeam.sport_type)?.icon}</span>
                       <p className="text-[11px] font-black uppercase text-gray-500 tracking-wider">No Team Theme Photo</p>
                       <p className="text-[9px] text-gray-600 max-w-xs mt-0.5 font-bold uppercase">Upload a visual identity banner for {selectedTeam.name}</p>
                     </div>
@@ -894,9 +894,9 @@ export default function TeamManagement({
                   onChange={(e) => setNewTeamSport(e.target.value as SportType)}
                   className="w-full bg-gray-50 border border-gray-300 p-3 rounded-lg font-bold text-xs"
                 >
-                  {(Object.keys(SPORT_CONFIGS) as SportType[]).map((sportKey) => (
+                  {(getActiveSports() as SportType[]).map((sportKey) => (
                     <option key={sportKey} value={sportKey}>
-                      {SPORT_CONFIGS[sportKey].icon} {sportKey} ({SPORT_CONFIGS[sportKey].khmerName})
+                      {getSportConfig(sportKey).icon} {sportKey} ({getSportConfig(sportKey).khmerName})
                     </option>
                   ))}
                 </select>
@@ -968,9 +968,9 @@ export default function TeamManagement({
                   }}
                   className="w-full bg-gray-50 border border-gray-300 p-3 rounded-lg font-bold text-xs"
                 >
-                  {(Object.keys(SPORT_CONFIGS) as SportType[]).map((sportKey) => (
+                  {(getActiveSports() as SportType[]).map((sportKey) => (
                     <option key={sportKey} value={sportKey}>
-                      {SPORT_CONFIGS[sportKey].icon} {sportKey} ({SPORT_CONFIGS[sportKey].khmerName})
+                      {getSportConfig(sportKey).icon} {sportKey} ({getSportConfig(sportKey).khmerName})
                     </option>
                   ))}
                 </select>

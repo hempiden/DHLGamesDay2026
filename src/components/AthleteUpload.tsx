@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { User, UserPlus, Upload, Trash2, Users, Check, AlertCircle, RefreshCw, FileText, Briefcase, Camera, Image } from 'lucide-react';
 import { Participant, SportType } from '../types';
-import { SPORT_CONFIGS } from '../data';
+import { SPORT_CONFIGS, getSportConfig, getActiveSports } from '../data';
 
 interface AthleteUploadProps {
   participants: Participant[];
@@ -305,7 +305,7 @@ export default function AthleteUpload({
                     ប្រភេទវិញ្ញាសា (Select Sport Divisions - Multiple allowed)
                   </label>
                   <div className="grid grid-cols-2 gap-2">
-                    {(Object.keys(SPORT_CONFIGS) as SportType[]).map((sportKey) => {
+                    {(getActiveSports() as SportType[]).map((sportKey) => {
                       const isChecked = singleSports.includes(sportKey);
                       return (
                         <label
@@ -429,7 +429,7 @@ export default function AthleteUpload({
             >
               All sports
             </button>
-            {(Object.keys(SPORT_CONFIGS) as SportType[]).map((sKey) => (
+            {(getActiveSports() as SportType[]).map((sKey) => (
               <button
                 key={sKey}
                 onClick={() => setSportFilter(sKey)}
@@ -439,7 +439,7 @@ export default function AthleteUpload({
                     : 'bg-white text-gray-500 border-gray-200'
                 }`}
               >
-                {SPORT_CONFIGS[sKey].icon} {sKey}
+                {getSportConfig(sKey).icon || '🏆'} {sKey}
               </button>
             ))}
 
@@ -557,7 +557,7 @@ export default function AthleteUpload({
                         {/* Sports select checkboxes */}
                         <td className="p-4">
                           <div className="flex flex-wrap gap-1.5 py-1">
-                            {(Object.keys(SPORT_CONFIGS) as SportType[]).map((sportKey) => {
+                            {(getActiveSports() as SportType[]).map((sportKey) => {
                               const isActive = group.activeSports.includes(sportKey);
                               return (
                                 <button
@@ -593,7 +593,7 @@ export default function AthleteUpload({
                                   }`}>
                                     {isActive && <Check className="w-2.5 h-2.5 stroke-[4px]" />}
                                   </div>
-                                  <span>{SPORT_CONFIGS[sportKey].icon} {sportKey}</span>
+                                  <span>{getSportConfig(sportKey).icon || '🏆'} {sportKey}</span>
                                 </button>
                               );
                             })}
@@ -611,7 +611,7 @@ export default function AthleteUpload({
                                 return (
                                   <div key={rec.id} className="flex items-center gap-1.5 p-1 bg-slate-50/60 rounded-lg border border-gray-150 text-[10.5px]">
                                     <span className="font-extrabold text-gray-500 w-16 shrink-0 truncate uppercase tracking-tighter" title={rec.sport_type}>
-                                      {SPORT_CONFIGS[rec.sport_type]?.icon} {rec.sport_type}:
+                                      {getSportConfig(rec.sport_type)?.icon || '🏆'} {rec.sport_type}:
                                     </span>
                                     <select
                                       value={rec.team_id || ''}

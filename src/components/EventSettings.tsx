@@ -1,11 +1,50 @@
-import React, { useState, useEffect } from 'react';
-import { ToggleLeft, ToggleRight, QrCode, Copy, Check, ExternalLink, Settings2, Sliders, ShieldCheck } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { 
+  ToggleLeft, ToggleRight, QrCode, Copy, Check, ExternalLink, Settings2, Sliders, 
+  ShieldCheck, Trophy, Layers, Users, Calendar, Plus, Trash2, Edit, CheckCircle, 
+  Clock, Award, HelpCircle, Activity, LayoutGrid, Settings, KeyRound, Play, ChevronRight, AlertTriangle
+} from 'lucide-react';
+import { Match, Participant, AppUser, EventInfo, Sport, SportType } from '../types';
+import { getSupabaseClient } from '../supabase';
+import AdminPanel from './AdminPanel';
+import TeamManagement from './TeamManagement';
 
 interface EventSettingsProps {
+  // Original visibility settings props
   showPublicTeamsInHeader: boolean;
   onUpdateShowPublicTeamsInHeader: (val: boolean) => Promise<void>;
   isSupabaseEnabled: boolean;
   supabaseConnected: boolean;
+  supabaseUrl?: string;
+  supabaseAnonKey?: string;
+
+  // Active user session
+  currentUser: AppUser | null;
+
+  // Embedded AdminPanel props
+  matches: Match[];
+  participants: Participant[];
+  addMatch: (match: Omit<Match, 'id' | 'created_at' | 'updated_at'>) => void;
+  updateMatchStatus: (id: string, status: 'Upcoming' | 'Live' | 'Finished') => void;
+  deleteMatch: (id: string) => void;
+  resetToDefault: () => void;
+
+  // Embedded TeamManagement props
+  isOnline: boolean;
+  addParticipant: (name: string, sport_type: SportType, is_team: boolean, team_id: string | null, photo_url?: string) => Promise<any>;
+  updateParticipantName: (id: string, name: string) => Promise<boolean>;
+  updateParticipantPhoto: (id: string, photoUrl: string | null) => Promise<boolean>;
+  assignPlayerToTeam: (playerId: string, teamId: string | null) => Promise<boolean>;
+  deleteParticipant: (id: string) => Promise<boolean>;
+  resetParticipantsToDefault: () => void;
+
+  // Dynamic Event settings props
+  events: EventInfo[];
+  setEvents: (events: EventInfo[]) => void;
+  activeEventId: string;
+  setActiveEventId: (id: string) => void;
+  isEnrolmentEnabled: boolean;
+  setIsEnrolmentEnabled: (val: boolean) => void;
 }
 
 export default function EventSettings({
@@ -13,13 +52,110 @@ export default function EventSettings({
   onUpdateShowPublicTeamsInHeader,
   isSupabaseEnabled,
   supabaseConnected,
+  supabaseUrl,
+  supabaseAnonKey,
+  currentUser,
+  matches,
+  participants,
+  addMatch,
+  updateMatchStatus,
+  deleteMatch,
+  resetToDefault,
+  isOnline,
+  addParticipant,
+  updateParticipantName,
+  updateParticipantPhoto,
+  assignPlayerToTeam,
+  deleteParticipant,
+  resetParticipantsToDefault,
+  events,
+  setEvents,
+  activeEventId,
+  setActiveEventId,
+  isEnrolmentEnabled,
+  setIsEnrolmentEnabled,
 }: EventSettingsProps) {
-  const [copied, setCopied] = useState(false);
-  const [isUpdating, setIsUpdating] = useState(false);
 
-  // Derive dynamic shareable path for Public Teams page
+  // Filter events dynamically to support administrative data isolation per creator session
+  const filteredAdminEvents = useMemo(() => {
+    if (!currentUser) return [];
+    if (currentUser.role === 'super_admin' && currentUser.username === 'hempiden') {
+      return events;
+    }
+    return events.filter(e => e.created_by === currentUser.username);
+  }, [events, currentUser]);
+
+  const syncEventsToSupabase = async (updatedEventsList: EventInfo[]) => {
+    if (isSupabaseEnabled && supabaseConnected && supabaseUrl && supabaseAnonKey) {
+      const client = getSupabaseClient(supabaseUrl, supabaseAnonKey);
+      if (client) {
+        const myAdminEvents = updatedEventsList.filter(e => e.created_by === currentUser?.username);
+        for (const ev of myAdminEvents) {
+          const { error } = await client.from('events').upsert({
+            id: ev.id,
+            name: ev.name,
+            khmer_name: ev.khmerName,
+            date: ev.date || null,
+            description: ev.description || null,
+            sports: ev.sports,
+            theme_color: ev.themeColor || 'dhl',
+            created_by: ev.created_by || currentUser?.username || 'hempiden',
+            show_public_teams: ev.show_public_teams ?? false,
+            is_enrolment_enabled: ev.is_enrolment_enabled ?? true
+          });
+          if (error) console.error('Failed to sync event upsert:', error.message);
+        }
+      }
+    }
+  };
+
+  const deleteEventFromSupabase = async (eventId: string) => {
+    if (isSupabaseEnabled && supabaseConnected && supabaseUrl && supabaseAnonKey) {
+      const client = getSupabaseClient(supabaseUrl, supabaseAnonKey);
+      if (client) {
+        const { error } = await client.from('events').delete().eq('id', eventId);
+        if (error) console.error('Failed to remote delete event:', error.message);
+      }
+    }
+  };
+  // Sidebar states
+  const [activeSubTab, setActiveSubTab] = useState<'events_sports' | 'design' | 'setup_matches' | 'teams_athletes' | 'enrolment'>('events_sports');
+
+  // Event Creation Form States
+  const [newEventName, setNewEventName] = useState('');
+  const [newEventKhmerName, setNewEventKhmerName] = useState('');
+  const [newEventDate, setNewEventDate] = useState('');
+  const [newEventDesc, setNewEventDesc] = useState('');
+  const [populateDefaultSports, setPopulateDefaultSports] = useState(true);
+
+  // Custom Sport Form States
+  const [selectedEventIdForSport, setSelectedEventIdForSport] = useState(activeEventId);
+  const [newSportName, setNewSportName] = useState('');
+  const [newSportKhmerName, setNewSportKhmerName] = useState('');
+  const [newSportIcon, setNewSportIcon] = useState('⚽');
+  const [newSportScoringMethod, setNewSportScoringMethod] = useState<'score' | 'measure'>('score');
+
+  // Copy Link State
+  const [copied, setCopied] = useState(false);
+  const [copiedEnrol, setCopiedEnrol] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [toggleVal, setToggleVal] = useState(showPublicTeamsInHeader);
+
+  // Enrolment Simulator Form State
+  const [simName, setSimName] = useState('');
+  const [simSport, setSimSport] = useState('');
+  const [simTeam, setSimTeam] = useState('none');
+  const [simPhotoUrl, setSimPhotoUrl] = useState('');
+  const [simSuccess, setSimSuccess] = useState(false);
+
+  // Sync selected event target if active ID shifts
+  useEffect(() => {
+    setSelectedEventIdForSport(activeEventId);
+  }, [activeEventId]);
+
   const origin = typeof window !== 'undefined' ? window.location.origin : 'https://dhlgamesday2026.web.app';
   const shareableUrl = `${origin}/?tab=public_teams`;
+  const shareableEnrolUrl = `${origin}/?tab=enrolment`;
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(shareableUrl);
@@ -27,9 +163,12 @@ export default function EventSettings({
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const [toggleVal, setToggleVal] = useState(showPublicTeamsInHeader);
+  const handleCopyEnrolLink = () => {
+    navigator.clipboard.writeText(shareableEnrolUrl);
+    setCopiedEnrol(true);
+    setTimeout(() => setCopiedEnrol(false), 2000);
+  };
 
-  // Sync state if prop changes from external sync
   useEffect(() => {
     setToggleVal(showPublicTeamsInHeader);
   }, [showPublicTeamsInHeader]);
@@ -41,224 +180,1236 @@ export default function EventSettings({
     try {
       await onUpdateShowPublicTeamsInHeader(newVal);
     } catch (err) {
-      console.error('Failed to update header settings:', err);
-      // Rollback on failure
+      console.error('Failed to update visibility settings:', err);
+      // Rollback
       setToggleVal(!newVal);
     } finally {
       setIsUpdating(false);
     }
   };
 
+  // 1. Create New Event
+  const handleCreateEvent = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newEventName.trim() || !newEventKhmerName.trim()) {
+      alert('សូមបញ្ចូលឈ្មោះព្រឹត្តិការណ៍ទាំង អង់គ្លេស និង ខ្មែរ! (Please input both English and Khmer names.)');
+      return;
+    }
+
+    const initialSports: Sport[] = populateDefaultSports ? [
+      { name: 'Soccer', khmerName: 'បាល់ទាត់', icon: '⚽', scoringMethod: 'score' },
+      { name: 'Volleyball', khmerName: 'បាល់ទះ', icon: '🏐', scoringMethod: 'score' },
+      { name: 'Pingpong', khmerName: 'វាយកូនឃ្លីលើតុ', icon: '🏓', scoringMethod: 'score' },
+      { name: 'Badminton', khmerName: 'វាយសី', icon: '🏸', scoringMethod: 'score' },
+      { name: 'Swimming', khmerName: 'ហែលទឹក', icon: '🏊', scoringMethod: 'measure' },
+    ] : [];
+
+    const brandNew: EventInfo = {
+      id: 'event-' + Date.now(),
+      name: newEventName.trim(),
+      khmerName: newEventKhmerName.trim(),
+      date: newEventDate || new Date().toISOString().split('T')[0],
+      description: newEventDesc.trim(),
+      sports: initialSports,
+      created_by: currentUser?.username || 'hempiden',
+      show_public_teams: true,
+      is_enrolment_enabled: true
+    };
+
+    const updated = [...events, brandNew];
+    setEvents(updated);
+    syncEventsToSupabase(updated);
+    
+    // Auto-select as active
+    setActiveEventId(brandNew.id);
+
+    // Reset Form
+    setNewEventName('');
+    setNewEventKhmerName('');
+    setNewEventDate('');
+    setNewEventDesc('');
+    alert('បង្កើតព្រឹត្តិការណ៍ថ្មីបានជោគជ័យ! New event created and selected as active.');
+  };
+
+  // 2. Delete Event
+  const handleDeleteEvent = (id: string) => {
+    if (id === activeEventId) {
+      alert('មិនអាចលុបព្រឹត្តិការណ៍ដែលកំពុងដំណើរការបានទេ! (Cannot delete the active event. Please switch to another first.)');
+      return;
+    }
+    if (events.length <= 1) {
+      alert('ត្រូវតែមានព្រឹត្តិការណ៍យ៉ាងហោចណាស់១ជានិច្ច! (Must keep at least one event.)');
+      return;
+    }
+    if (!confirm('តើអ្នកពិតជាចង់លុបព្រឹត្តិការណ៍នេះមែនទេ? (Are you sure you want to delete this event?)')) {
+      return;
+    }
+
+    const filtered = events.filter(e => e.id !== id);
+    setEvents(filtered);
+    deleteEventFromSupabase(id);
+  };
+
+  // 3. Add Custom Sport to selected Event
+  const handleAddSport = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newSportName.trim() || !newSportKhmerName.trim()) {
+      alert('សូមបំពេញឈ្មោះប្រភេទកីឡា! (Please fill both sport names.)');
+      return;
+    }
+
+    const modifiedEvents = events.map(ev => {
+      if (ev.id === selectedEventIdForSport) {
+        // Prevent duplicate sport name
+        const exists = ev.sports.some(s => s.name.toLowerCase() === newSportName.trim().toLowerCase());
+        if (exists) {
+          alert('ឈ្មោះកីឡានេះមានរួចហើយនៅក្នុងព្រឹត្តិការណ៍នេះ! (This sport name already exists in this event.)');
+          return ev;
+        }
+
+        const newSport: Sport = {
+          name: newSportName.trim().replace(/\s+/g, ''), // remove internal space for url/routing safety
+          khmerName: newSportKhmerName.trim(),
+          icon: newSportIcon,
+          scoringMethod: newSportScoringMethod
+        };
+        return {
+          ...ev,
+          sports: [...ev.sports, newSport]
+        };
+      }
+      return ev;
+    });
+
+    setEvents(modifiedEvents);
+    syncEventsToSupabase(modifiedEvents);
+    // Reset Form
+    setNewSportName('');
+    setNewSportKhmerName('');
+    setNewSportIcon('⚽');
+    alert('បន្ថែមប្រភេទកីឡាថ្មីបានជោគជ័យ! New sport added to event.');
+  };
+
+  // 4. Delete Sport from selected Event
+  const handleDeleteSport = (eventId: string, sportName: string) => {
+    if (!confirm(`តើអ្នកពិតជាចង់លុបប្រភេទកីឡា "${sportName}" នេះមែនទេ? (Are you sure you want to delete this sport?)`)) {
+      return;
+    }
+
+    const modifiedEvents = events.map(ev => {
+      if (ev.id === eventId) {
+        return {
+          ...ev,
+          sports: ev.sports.filter(s => s.name !== sportName)
+        };
+      }
+      return ev;
+    });
+
+    setEvents(modifiedEvents);
+    syncEventsToSupabase(modifiedEvents);
+  };
+
+  const currentActiveEventObj = events.find(e => e.id === activeEventId) || events[0];
+
   return (
-    <div className="space-y-8 max-w-7xl mx-auto">
+    <div className="w-full flex flex-col gap-6 select-all">
       
-      {/* Centered Settings Container */}
-      <div className="max-w-3xl mx-auto space-y-6">
-        
-        {/* Banner Title */}
-        <div className="bg-gradient-to-r from-red-700 to-red-600 rounded-3xl p-6 text-white shadow-xl relative overflow-hidden">
-          <div className="absolute right-0 bottom-0 transform translate-x-12 translate-y-8 opacity-10">
-            <Settings2 className="w-64 h-64" />
-          </div>
-          <div className="relative z-10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div className="space-y-1">
-              <span className="bg-yellow-400 text-red-900 text-[9px] font-black tracking-wider uppercase px-2.5 py-1 rounded-full border border-yellow-300">
-                Event Setting Suite
-              </span>
-              <h2 className="text-xl sm:text-2xl font-black uppercase tracking-tight mt-1.5">
-                ការកំណត់ការប្រកួត (Event Manager)
-              </h2>
-              <p className="text-xs text-red-100 font-medium max-w-lg">
-                គ្រប់គ្រងភាពមើលឃើញនៃមុខងារផ្សេងៗ និងទីតាំងទំព័រសាធារណៈដើម្បីភាពងាយស្រួលរបស់អ្នកទស្សនា។
-                Manage view visibility and share direct action page links or custom QR spectator passes.
-              </p>
-            </div>
-          </div>
+      {/* Top Banner with dynamic active event indicator */}
+      <div className="bg-[#D40511] text-white p-5 rounded-3xl shadow-md border-b-4 border-[#FFCC00] relative overflow-hidden flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="relative z-10">
+          <p className="text-[9px] font-black tracking-widest bg-yellow-400 text-red-950 px-2.5 py-1 rounded-md uppercase w-fit select-none font-mono">
+            ADMINISTRATOR SUITE
+          </p>
+          <h2 className="text-xl sm:text-2xl font-black uppercase tracking-tight mt-1.5 flex items-center gap-2">
+            <Settings className="w-6 sm:w-7 sm:h-7 animate-spin-slow text-yellow-400" />
+            <span>ការកំណត់ប្រព័ន្ធប្រកួត (Tournament Dashboard)</span>
+          </h2>
+          <p className="text-xs text-red-100 max-w-xl mt-1.5 leading-relaxed font-semibold">
+            ព្រឹត្តិការណ៍សកម្ម៖ <strong className="text-yellow-300 underline underline-offset-4">{currentActiveEventObj?.khmerName} ({currentActiveEventObj?.name})</strong>
+          </p>
         </div>
 
-        {/* Setting Card 1 */}
-        <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 bg-red-50 text-red-600 rounded-2xl border border-red-100">
-                <Sliders className="w-5 h-5" />
+        {/* Sync Badges */}
+        <div className="flex select-none gap-2 shrink-0 h-fit">
+          <div className="bg-white/10 px-3.5 py-2 rounded-xl border border-white/15 text-left font-bold min-w-[120px]">
+            <span className="text-[8px] text-red-200 block uppercase font-extrabold tracking-wider">DATABASE STORAGE</span>
+            <span className="text-xs text-white uppercase block mt-0.5">{isSupabaseEnabled ? 'SUPABASE' : 'BROWSER LOCAL'}</span>
+          </div>
+          <div className="bg-white/10 px-3.5 py-2 rounded-xl border border-white/15 text-left font-bold min-w-[120px]">
+            <span className="text-[8px] text-red-200 block uppercase font-extrabold tracking-wider">EVENTS AMOUNT</span>
+            <span className="text-xs text-yellow-300 block mt-0.5 font-mono">{events.length} EVENTS REC</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        
+        {/* Left Sidebar Menu */}
+        <div className="lg:col-span-3 bg-white p-4.5 rounded-[24px] border border-gray-150 shadow-sm space-y-2 select-none shrink-0 w-full">
+          <p className="text-[9.5px] text-gray-400 uppercase font-extrabold tracking-wider px-3 mb-2.5">
+            ម៉ឺនុយចាត់ការ (Admin Operations)
+          </p>
+
+          <button
+            type="button"
+            onClick={() => setActiveSubTab('events_sports')}
+            className={`w-full flex items-center justify-between px-4 py-3.5 rounded-xl font-bold text-xs uppercase tracking-wide transition-all duration-150 ${
+              activeSubTab === 'events_sports'
+                ? 'bg-[#1a1a1a] text-white shadow-md'
+                : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+            }`}
+          >
+            <div className="flex items-center gap-2.5">
+              <Trophy className="w-4 h-4" />
+              <span>ព្រឹត្តិការណ៍ & ប្រភេទកីឡា</span>
+            </div>
+            <ChevronRight className="w-3.5 h-3.5 opacity-50" />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveSubTab('setup_matches')}
+            className={`w-full flex items-center justify-between px-4 py-3.5 rounded-xl font-bold text-xs uppercase tracking-wide transition-all duration-150 ${
+              activeSubTab === 'setup_matches'
+                ? 'bg-[#1a1a1a] text-white shadow-md'
+                : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+            }`}
+          >
+            <div className="flex items-center gap-2.5">
+              <Settings2 className="w-4 h-4" />
+              <span>រៀបចំការប្រកួត (Setup matches)</span>
+            </div>
+            <ChevronRight className="w-3.5 h-3.5 opacity-50" />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveSubTab('teams_athletes')}
+            className={`w-full flex items-center justify-between px-4 py-3.5 rounded-xl font-bold text-xs uppercase tracking-wide transition-all duration-150 ${
+              activeSubTab === 'teams_athletes'
+                ? 'bg-[#1a1a1a] text-white shadow-md'
+                : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+            }`}
+          >
+            <div className="flex items-center gap-2.5">
+              <Users className="w-4 h-4" />
+              <span>ក្រុម & កីឡាករ (Teams / rosters)</span>
+            </div>
+            <ChevronRight className="w-3.5 h-3.5 opacity-50" />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveSubTab('design')}
+            className={`w-full flex items-center justify-between px-4 py-3.5 rounded-xl font-bold text-xs uppercase tracking-wide transition duration-150 ${
+              activeSubTab === 'design'
+                ? 'bg-dhl-red text-white shadow-md'
+                : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+            }`}
+          >
+            <div className="flex items-center gap-2.5">
+              <Sliders className="w-4 h-4" />
+              <span>ការរចនា និងការចែកចាយ (Design)</span>
+            </div>
+            <ChevronRight className="w-3.5 h-3.5 opacity-50" />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveSubTab('enrolment')}
+            className={`w-full flex items-center justify-between px-4 py-3.5 rounded-xl font-bold text-xs uppercase tracking-wide transition duration-150 ${
+              activeSubTab === 'enrolment'
+                ? 'bg-dhl-red text-white shadow-md'
+                : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+            }`}
+          >
+            <div className="flex items-center gap-2.5">
+              <Award className="w-4 h-4" />
+              <span>ទម្រង់ចុះឈ្មោះ (Enrolment Form)</span>
+            </div>
+            <ChevronRight className="w-3.5 h-3.5 opacity-50" />
+          </button>
+        </div>
+
+        {/* Right Main Content Panel */}
+        <div className="lg:col-span-9 space-y-6 w-full">
+
+          {/* TAB 1: EVENTS AND SPORTS ARCHITECT */}
+          {activeSubTab === 'events_sports' && (
+            <div className="space-y-6">
+              
+              {/* Card 1: Active Event Info & Switcher */}
+              <div className="bg-white rounded-3xl border border-gray-150 p-6 shadow-sm space-y-6">
+                <div className="border-b border-gray-100 pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 bg-yellow-50 text-yellow-600 rounded-2xl border border-yellow-100">
+                      <Trophy className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-black text-gray-800 uppercase tracking-wide">
+                        ជ្រើសរើស និង ដំណើរការព្រឹត្តិការណ៍ (Set Active Event)
+                      </h3>
+                      <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wide">
+                        Choose which tournament is live across dashboards
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Dropdown switch active event */}
+                  <div className="flex items-center gap-2 select-none shrink-0">
+                    <label className="text-[10px] font-black text-gray-400 uppercase">Tournament:</label>
+                    <select
+                      value={activeEventId}
+                      onChange={(e) => setActiveEventId(e.target.value)}
+                      className="px-3.5 py-2 bg-yellow-50 hover:bg-yellow-100 text-slate-900 border border-[#FFCC00] text-xs font-black rounded-xl focus:ring-2 focus:ring-[#FFCC00] outline-none transition duration-150"
+                    >
+                      {filteredAdminEvents.map(ev => (
+                        <option key={ev.id} value={ev.id}>
+                          {ev.khmerName} ({ev.name})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Sub: Active event sports visualization checklist */}
+                <div className="bg-gray-50/60 rounded-2xl border border-gray-100 p-5 space-y-4">
+                  <div className="flex items-center justify-between select-none">
+                    <h4 className="text-xs font-black text-gray-700 uppercase tracking-wide">
+                      បញ្ជីកីឡាក្នុងព្រឹត្តិការណ៍សកម្ម ({currentActiveEventObj?.sports?.length || 0} Sports in Active Event)
+                    </h4>
+                    <span className="text-[8px] bg-red-100 text-red-700 font-black px-2.5 py-0.5 rounded-full uppercase">
+                      Active Configuration
+                    </span>
+                  </div>
+
+                  {currentActiveEventObj?.sports?.length === 0 ? (
+                    <p className="text-xs text-gray-400 italic py-4 text-center">
+                      មិនទាន់មានប្រភេទកីឡាឡើយក្នុងព្រឹត្តិការណ៍នេះ។ សូមបញ្ចូលនៅទម្រង់ខាងក្រោម! (No sports inside this event yet. Add one below!)
+                    </p>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                      {currentActiveEventObj?.sports.map((sp) => (
+                        <div key={sp.name} className="bg-white p-3.5 rounded-xl border border-gray-100 flex items-center justify-between shadow-xs">
+                          <div className="flex items-center gap-2.5">
+                            <span className="text-xl bg-gray-50 w-8 h-8 rounded-full flex items-center justify-center border select-none">{sp.icon || '🏆'}</span>
+                            <div className="leading-tight">
+                              <h5 className="text-xs font-black text-gray-800">{sp.khmerName}</h5>
+                              <p className="text-[9.5px] text-gray-400 font-mono mt-0.5">{sp.name}</p>
+                            </div>
+                          </div>
+
+                          <div className="flex flex-col items-end gap-1 select-none">
+                            <span className={`text-[8.5px] font-black px-2 py-0.5 rounded uppercase tracking-wider leading-none ${
+                              sp.scoringMethod === 'measure' ? 'bg-cyan-50 text-cyan-600 border border-cyan-150' : 'bg-emerald-50 text-emerald-600 border border-emerald-150'
+                            }`}>
+                              {sp.scoringMethod === 'measure' ? '⏱️ Measure' : '⚽ Goals'}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteSport(currentActiveEventObj.id, sp.name)}
+                              className="text-[9px] font-bold text-red-500 hover:text-red-700 hover:underline cursor-pointer"
+                              title="Delete sport from event"
+                            >
+                              លុប (Delete)
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
-              <div>
+
+              {/* Grid Form 1: Create New Event Form & Add custom sport */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+                {/* Left: Create Event Form */}
+                <div className="bg-white rounded-3xl border border-gray-150 p-6 shadow-sm space-y-4">
+                  <div className="flex items-center gap-2 pb-2.5 border-b border-gray-100">
+                    <Calendar className="w-4.5 h-4.5 text-red-650" />
+                    <h3 className="text-xs font-black text-gray-800 uppercase tracking-wide">
+                      បង្កើតព្រឹត្តិការណ៍ថ្មី (Create Tournament Event)
+                    </h3>
+                  </div>
+
+                  <form onSubmit={handleCreateEvent} className="space-y-3.5">
+                    <div>
+                      <label className="block text-[10px] uppercase font-black text-gray-400 mb-1">ឈ្មោះអង់គ្លេស English Name:</label>
+                      <input
+                        type="text"
+                        value={newEventName}
+                        onChange={(e) => setNewEventName(e.target.value)}
+                        placeholder="e.g. Summer Games 2026"
+                        className="w-full px-3 py-2 bg-gray-50 border border-gray-200 text-xs text-gray-800 rounded-xl focus:ring-2 focus:ring-red-500 outline-none transition"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] uppercase font-black text-gray-400 mb-1">ឈ្មោះខ្មែរ Khmer Name:</label>
+                      <input
+                        type="text"
+                        value={newEventKhmerName}
+                        onChange={(e) => setNewEventKhmerName(e.target.value)}
+                        placeholder="ឧ. ពានរង្វាន់រដូវក្តៅ ២០២៦"
+                        className="w-full px-3 py-2 bg-gray-50 border border-gray-200 text-xs text-gray-800 rounded-xl focus:ring-2 focus:ring-red-500 outline-none transition"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[10px] uppercase font-black text-gray-400 mb-1">កាលបរិច្ឆេទ Date:</label>
+                        <input
+                          type="date"
+                          value={newEventDate}
+                          onChange={(e) => setNewEventDate(e.target.value)}
+                          className="w-full px-3 py-2 bg-gray-50 border border-gray-200 text-xs text-gray-800 rounded-xl focus:ring-2 focus:ring-red-500 outline-none transition"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] uppercase font-black text-gray-400 mb-1 select-none">Populate:</label>
+                        <div className="flex items-center gap-2 mt-2 h-7 select-none">
+                          <input
+                            type="checkbox"
+                            id="populate-defaults"
+                            checked={populateDefaultSports}
+                            onChange={(e) => setPopulateDefaultSports(e.target.checked)}
+                            className="w-4 h-4 text-red-600 border-gray-300 rounded focus:ring-red-500"
+                          />
+                          <label htmlFor="populate-defaults" className="text-[10px] font-bold text-gray-500 uppercase cursor-pointer">5 Default Sports</label>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] uppercase font-black text-gray-400 mb-1">ពណ៌នា Description:</label>
+                      <textarea
+                        value={newEventDesc}
+                        onChange={(e) => setNewEventDesc(e.target.value)}
+                        placeholder="Tournament summary..."
+                        rows={2}
+                        className="w-full px-3 py-2 bg-gray-50 border border-gray-200 text-xs text-gray-800 rounded-xl focus:ring-2 focus:ring-red-500 outline-none transition resize-none"
+                      />
+                    </div>
+
+                    <button
+                      type="submit"
+                      className="w-full py-2.5 bg-red-600 hover:bg-red-700 text-white text-xs font-black uppercase rounded-xl shadow-md transition duration-150 active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>បង្កើតព្រឹត្តិការណ៍ (Create Event)</span>
+                    </button>
+                  </form>
+                </div>
+
+                {/* Right: Add Custom Sport to selected Event */}
+                <div className="bg-white rounded-3xl border border-gray-150 p-6 shadow-sm space-y-4">
+                  <div className="flex items-center gap-2 pb-2.5 border-b border-gray-100">
+                    <Plus className="w-4.5 h-4.5 text-blue-600" />
+                    <h3 className="text-xs font-black text-gray-800 uppercase tracking-wide">
+                      បន្ថែមប្រភេទកីឡាក្នុងព្រឹត្តិការណ៍ (Create & Add Sport)
+                    </h3>
+                  </div>
+
+                  <form onSubmit={handleAddSport} className="space-y-3.5">
+                    <div>
+                      <label className="block text-[10px] uppercase font-black text-gray-400 mb-1">ជ្រើសរើសព្រឹត្តិការណ៍ Select Target Event:</label>
+                      <select
+                        value={selectedEventIdForSport}
+                        onChange={(e) => setSelectedEventIdForSport(e.target.value)}
+                        className="w-full px-3 py-2 bg-gray-50 border border-gray-200 text-xs text-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition"
+                      >
+                        {filteredAdminEvents.map(ev => (
+                          <option key={ev.id} value={ev.id}>
+                            {ev.khmerName} ({ev.name})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[10px] uppercase font-black text-gray-400 mb-1">ឈ្មោះកីឡា (English):</label>
+                        <input
+                          type="text"
+                          value={newSportName}
+                          onChange={(e) => setNewSportName(e.target.value)}
+                          placeholder="e.g. Basketball, Chess"
+                          className="w-full px-3 py-2 bg-gray-50 border border-gray-200 text-xs text-gray-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] uppercase font-black text-gray-400 mb-1">ឈ្មោះកីឡា (Khmer):</label>
+                        <input
+                          type="text"
+                          value={newSportKhmerName}
+                          onChange={(e) => setNewSportKhmerName(e.target.value)}
+                          placeholder="ឧ. បាល់បោះ, អុក"
+                          className="w-full px-3 py-2 bg-gray-50 border border-gray-200 text-xs text-gray-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[10px] uppercase font-black text-gray-400 mb-1">រូបតំណាង Icon (Emoji):</label>
+                        <select
+                          value={newSportIcon}
+                          onChange={(e) => setNewSportIcon(e.target.value)}
+                          className="w-full px-3 py-2 bg-gray-50 border border-gray-200 text-xs text-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition"
+                        >
+                          <option value="⚽">⚽ Soccer Ball</option>
+                          <option value="🏐">🏐 Volleyball</option>
+                          <option value="🏓">🏓 Ping Pong</option>
+                          <option value="🏸">🏸 Badminton</option>
+                          <option value="🏊">🏊 Swimmer</option>
+                          <option value="🏀">🏀 Basketball</option>
+                          <option value="🏃">🏃 Runner</option>
+                          <option value="♟️">♟️ Chess Piece</option>
+                          <option value="🎳">🎳 Bowling</option>
+                          <option value="🎾">🎾 Tennis</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] uppercase font-black text-gray-400 mb-1">គម្រោងពិន្ទុ Scoring Method:</label>
+                        <select
+                          value={newSportScoringMethod}
+                          onChange={(e) => setNewSportScoringMethod(e.target.value as 'score' | 'measure')}
+                          className="w-full px-3 py-2 bg-gray-50 border border-[#e5e7eb] text-xs font-black text-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition"
+                        >
+                          <option value="score">⚽ Goals Counter (ដូច soccer)</option>
+                          <option value="measure">⏱️ Timer Stopwatch (វាស់វិនាទីដូចហែលទឹក)</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <button
+                      type="submit"
+                      className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-black uppercase rounded-xl shadow-md transition duration-150 active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>បន្ថែមប្រភេទកីឡា (Add Sport)</span>
+                    </button>
+                  </form>
+                </div>
+              </div>
+
+              {/* Event Directory Listing Row */}
+              <div className="bg-white rounded-3xl border border-gray-150 p-6 shadow-sm space-y-4">
+                <div className="flex items-center gap-3 border-b border-gray-150 pb-3">
+                  <LayoutGrid className="w-4.5 h-4.5 text-gray-600" />
+                  <h4 className="text-xs font-black text-gray-850 uppercase tracking-wide">
+                    តារាងព្រឹត្តិការណ៍ទាំងអស់ក្នុងប្រព័ន្ធ (Existing Tournaments Directory)
+                  </h4>
+                </div>
+
+                <div className="overflow-x-auto w-full no-scrollbar">
+                  <table className="w-full text-xs text-left text-gray-500 border-collapse">
+                    <thead className="text-[10px] font-black text-gray-400 uppercase bg-gray-50 select-none">
+                      <tr>
+                        <th className="px-4 py-3 rounded-l-lg">Khmer / English Name</th>
+                        <th className="px-4 py-3">Scheduled Date</th>
+                        <th className="px-4 py-3">Roster of Sports</th>
+                        <th className="px-4 py-3 text-center">Status</th>
+                        <th className="px-4 py-3 text-right rounded-r-lg">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {filteredAdminEvents.map((ev) => {
+                        const isActive = ev.id === activeEventId;
+                        return (
+                          <tr key={ev.id} className={`hover:bg-gray-50/50 ${isActive ? 'bg-yellow-50-important' : ''}`}>
+                            <td className="px-4 py-3.5 font-bold">
+                              <p className="text-gray-800 text-xs sm:text-[12.5px]">{ev.khmerName}</p>
+                              <p className="text-[10px] text-gray-400 font-mono font-medium">{ev.name}</p>
+                            </td>
+                            <td className="px-4 py-3.5 font-mono text-gray-500">
+                              {ev.date || 'No Date'}
+                            </td>
+                            <td className="px-4 py-3.5">
+                              <div className="flex flex-wrap gap-1 w-xs">
+                                {ev.sports?.map(s => (
+                                  <span key={s.name} className="px-2 py-0.5 bg-gray-100 hover:bg-gray-200 border text-gray-600 text-[9.5px] rounded-md font-bold" title={s.khmerName}>
+                                    {s.icon} {s.name}
+                                  </span>
+                                ))}
+                              </div>
+                            </td>
+                            <td className="px-4 py-3.5 text-center select-none">
+                              {isActive ? (
+                                <span className="bg-yellow-100 text-yellow-800 border border-yellow-200 text-[8.5px] font-extrabold uppercase px-2.5 py-1 rounded-full">
+                                  ● ACTIVE MATCH LIVE
+                                </span>
+                              ) : (
+                                <span className="bg-gray-100 text-gray-400 border text-[8.5px] font-extrabold uppercase px-2.5 py-1 rounded-full">
+                                  Standby
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3.5 text-right select-none">
+                              <div className="flex gap-2 justify-end">
+                                {!isActive && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setActiveEventId(ev.id)}
+                                    className="px-2.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-xs text-white font-black rounded-lg cursor-pointer transition shadow-xs"
+                                  >
+                                    Activate
+                                  </button>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteEvent(ev.id)}
+                                  className="p-1.5 bg-red-50 hover:bg-red-150 border border-red-250 text-[#D40511] rounded-lg cursor-pointer transition h-fit inline-flex align-middle"
+                                  disabled={isActive}
+                                  title="Delete Tourney"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 2: EMBEDDED SETUP MATCHED VIEW */}
+          {activeSubTab === 'setup_matches' && (
+            <div className="bg-white rounded-3xl border border-gray-150 p-6 shadow-sm">
+              <div className="border-b border-gray-100 pb-3 mb-6 select-none">
                 <h3 className="text-sm font-black text-gray-800 uppercase tracking-wide">
-                  ការបង្ហាញម៉ឺនុយហ្គេម (Header Navigation Menu)
+                  រៀបចំការប្រកួត និង កាលវិភាគ (Match Fixture Setup Console)
                 </h3>
                 <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wide">
-                  Toggle what spectators see on top header panel
-                </p>
-              </div>
-            </div>
-            
-            {/* Sync status */}
-            {isSupabaseEnabled && (
-              <span className={`text-[8px] font-black px-2 py-0.5 rounded uppercase ${
-                supabaseConnected ? 'bg-emerald-50 text-emerald-600 border border-emerald-150' : 'bg-red-50 text-red-500 border border-red-100'
-              }`}>
-                {supabaseConnected ? 'Remote Sync Enabled' : 'Local Only Sync'}
-              </span>
-            )}
-          </div>
-
-          <div className="p-6 space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-gray-50/50 p-4 rounded-2xl border border-gray-100">
-              <div className="space-y-1 max-w-md">
-                <h4 className="text-xs font-black text-gray-800 uppercase">
-                  ទំព័របញ្ជីឈ្មោះក្រុមសាធារណៈ (Public Teams Page)
-                </h4>
-                <p className="text-[11px] text-gray-500 font-medium leading-relaxed">
-                  អនុញ្ញាតឱ្យបង្ហាញ ឬលាក់ប៊ូតុង <strong className="text-red-600 font-bold">"បញ្ជីឈ្មោះក្រុម (Public Teams)"</strong> ចេញពី Header menu សម្រាប់ spectators ទូទៅ។
-                  Toggle whether the "Public Teams" button is placed directly in the navigation header bar.
+                  Created matches here will populate the public live board and sub-admin scorer panel
                 </p>
               </div>
 
-              {/* IOS Styled Toggle Switch */}
-              <button
-                type="button"
-                onClick={handleToggle}
-                disabled={isUpdating}
-                className="focus:outline-none flex items-center select-none cursor-pointer transition active:scale-95 duration-150"
-              >
-                {toggleVal ? (
-                  <ToggleRight className="w-14 h-10 text-[#D40511] font-light" />
-                ) : (
-                  <ToggleLeft className="w-14 h-10 text-gray-300 font-light" />
-                )}
-              </button>
+              <AdminPanel
+                matches={matches}
+                participants={participants}
+                addMatch={addMatch}
+                updateMatchStatus={updateMatchStatus}
+                deleteMatch={deleteMatch}
+                resetToDefault={resetToDefault}
+              />
             </div>
+          )}
 
-            <div className="space-y-3 pt-2 text-xs border-t border-gray-50 mt-4">
-              <div className="bg-amber-50 rounded-2xl p-4 border border-amber-100 text-[11px] text-amber-800 space-y-1.5 font-medium leading-relaxed">
-                <p className="font-bold">
-                  ⚠️ ចំណាំ (Note for Admins):
-                </p>
-                <p>
-                  ទោះបីជាលាក់ប៊ូតុងនេះចេញពី Header menu ក៏ដោយ ក៏លោកអ្នក ឬអ្នកទស្សនានៅតែអាចចូលទំព័រនេះដោយផ្ទាល់បានដែរ តាមរយៈរយៈការស្កែន QR Code ឬចុចលើតំណភ្ជាប់ (Link) ខាងក្រោមនេះ។
-                </p>
-                <p className="text-amber-700 italic">
-                  Even when hidden, spectators can still view live squads and rosters if they scan the QR card or use the direct link you distribute.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* QR & Share distribution container */}
-        <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-6 space-y-6">
-          <div className="flex items-center gap-3 border-b border-gray-100 pb-3">
-            <div className="p-2.5 bg-yellow-50 text-yellow-600 rounded-2xl border border-yellow-105">
-              <QrCode className="w-5 h-5" />
-            </div>
-            <div>
-              <h3 className="text-sm font-black text-gray-800 uppercase tracking-wide">
-                តំណភ្ជាប់ និង QR Code សម្រាប់ចែករំលែក (Direct Page Distribution)
-              </h3>
-              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wide">
-                Distribute direct spectator link to search teams and upload athlete profile photos
-              </p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
-            {/* Left side: descriptions & copy link */}
-            <div className="space-y-5 text-xs">
-              <div className="space-y-2">
-                <h4 className="text-xs font-black text-gray-800 uppercase">
-                  តំណភ្ជាប់ផ្ទាល់ទៅកាន់ទំព័រ (Specator Direct Link)
-                </h4>
-                <p className="text-[11px] text-gray-500 font-medium leading-relaxed">
-                  ចម្លងតំណភ្ជាប់នេះ រួចផ្ញើតាម Telegram, ផុសលើ Social Media ឬប្រើប្រាស់ដើម្បីបង្កើតប្រព័ន្ធផ្សព្វផ្សាយរបស់លោកអ្នក៖
-                  Copy and send this direct URL to athletes or groups so they can check profiles and upload photos easily.
+          {/* TAB 3: EMBEDDED TEAMS & ATHLETES ROUTINE */}
+          {activeSubTab === 'teams_athletes' && (
+            <div className="bg-white rounded-3xl border border-gray-150 p-6 shadow-sm">
+              <div className="border-b border-gray-100 pb-3 mb-6 select-none">
+                <h3 className="text-sm font-black text-gray-800 uppercase tracking-wide">
+                  គ្រប់គ្រងក្រុម និង បញ្ជីឈ្មោះកីឡាករ (Teams & Athletes Registry)
+                </h3>
+                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wide">
+                  Assign registered employees to teams and upload athlete profiles
                 </p>
               </div>
 
-              {/* Direct link URL display container */}
-              <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-xl border border-gray-150 font-mono text-[10px] text-gray-600 break-all select-all relative group shadow-inner">
-                <span className="flex-1 truncate pr-8">{shareableUrl}</span>
-                <button
-                  type="button"
-                  onClick={handleCopyLink}
-                  className="absolute right-2 p-1.5 bg-white hover:bg-gray-100 border border-gray-200 text-gray-500 hover:text-[#D40511] rounded-lg transition-all cursor-pointer shadow-xs active:scale-90"
-                  title="Copy link"
-                >
-                  {copied ? (
-                    <Check className="w-3.5 h-3.5 text-emerald-500" />
-                  ) : (
-                    <Copy className="w-3.5 h-3.5" />
-                  )}
-                </button>
-              </div>
-
-              {/* Additional trigger buttons */}
-              <div className="flex flex-wrap gap-2.5">
-                <button
-                  type="button"
-                  onClick={handleCopyLink}
-                  className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-150 cursor-pointer ${
-                    copied
-                      ? 'bg-emerald-50 text-emerald-600 border border-emerald-200'
-                      : 'bg-[#FFCC00] text-gray-900 hover:bg-[#ffe054] border border-[#e5b800]'
-                  }`}
-                >
-                  {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                  <span>{copied ? 'ចម្លងរួចរាល់! Copied' : 'ចម្លងតំណភ្ជាប់ (Copy URL)'}</span>
-                </button>
-
-                <a
-                  href={shareableUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1.5 px-4 py-2 bg-gray-100 hover:bg-gray-200 border border-gray-200 text-gray-700 hover:text-gray-900 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-150"
-                >
-                  <ExternalLink className="w-4 h-4" />
-                  <span>បើកមើលផ្ទាល់ (Open Page)</span>
-                </a>
-              </div>
+              <TeamManagement
+                participants={participants}
+                isOnline={isOnline}
+                supabaseConnected={supabaseConnected}
+                addParticipant={addParticipant}
+                updateParticipantName={updateParticipantName}
+                updateParticipantPhoto={updateParticipantPhoto}
+                assignPlayerToTeam={assignPlayerToTeam}
+                deleteParticipant={deleteParticipant}
+                resetParticipantsToDefault={resetParticipantsToDefault}
+              />
             </div>
+          )}
 
-            {/* Right side: QR Code layout */}
-            <div className="flex flex-col items-center justify-center bg-gray-50 p-5 rounded-3xl border border-gray-150 relative space-y-3 shadow-inner">
+          {/* TAB 4: DESIGN & VISIBILITY & SPECATOR DISTRIBUTION */}
+          {activeSubTab === 'design' && (
+            <div className="space-y-6">
               
-              {/* QR Code Container styled like a pass card */}
-              <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-200 flex flex-col items-center">
-                <img
-                  src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(shareableUrl)}`}
-                  alt="Public Teams Direct QR Code"
-                  className="w-40 h-40 object-contain select-none pointer-events-none"
-                />
-                <div className="mt-2 text-center">
-                  <p className="text-[10px] font-black font-dhl-title text-[#D40511] uppercase tracking-wide">
-                    DHL GAMES DAY 2026
-                  </p>
-                  <p className="text-[7.5px] text-gray-400 font-bold uppercase tracking-wider">
-                    Spectator Roster Scan Pass
-                  </p>
+              {/* Preset Theme Selection */}
+              <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+                <div className="p-6 border-b border-gray-100 bg-gray-50/50 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 bg-yellow-50 text-yellow-600 rounded-2xl border border-yellow-100">
+                      <LayoutGrid className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-black text-gray-800 uppercase tracking-wide">
+                        ពណ៌រចនាប័ទ្មរបស់ព្រឹត្តិការណ៍ (Event Premium Themes)
+                      </h3>
+                      <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wide">
+                        Choose one of 3 eye-catching themes to paint your tournament view
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-6">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {/* Theme 1: DHL Classic */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const updated = events.map(ev => {
+                          if (ev.id === activeEventId) {
+                            return { ...ev, themeColor: 'dhl' as const };
+                          }
+                          return ev;
+                        });
+                        setEvents(updated);
+                      }}
+                      className={`relative p-4 rounded-2xl border text-left transition duration-200 cursor-pointer ${
+                        (events.find(e => e.id === activeEventId)?.themeColor || 'dhl') === 'dhl'
+                          ? 'border-red-650 bg-red-50/20 shadow-sm ring-2 ring-red-600'
+                          : 'border-gray-200 bg-white hover:border-gray-300'
+                      }`}
+                    >
+                      <div className="absolute top-3 right-3 w-5 h-5 rounded-full bg-red-600 flex items-center justify-center text-white text-[10px] font-black">
+                        {(events.find(e => e.id === activeEventId)?.themeColor || 'dhl') === 'dhl' && '✓'}
+                      </div>
+                      <div className="flex gap-1.5 mb-3">
+                        <span className="w-6 h-6 rounded-md bg-[#D40511] border border-gray-200"></span>
+                        <span className="w-6 h-6 rounded-md bg-[#FFCC00] border border-gray-200"></span>
+                      </div>
+                      <h4 className="text-xs font-bold text-gray-800 uppercase">DHL Classic</h4>
+                      <p className="text-[10px] text-gray-500 mt-1 font-medium">ពណ៌ក្រហម និងលឿងបែបស្ព័រលំនាំដើម</p>
+                    </button>
+
+                    {/* Theme 2: Cosmic Midnight */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const updated = events.map(ev => {
+                          if (ev.id === activeEventId) {
+                            return { ...ev, themeColor: 'cosmic' as const };
+                          }
+                          return ev;
+                        });
+                        setEvents(updated);
+                      }}
+                      className={`relative p-4 rounded-2xl border text-left transition duration-200 cursor-pointer ${
+                        events.find(e => e.id === activeEventId)?.themeColor === 'cosmic'
+                          ? 'border-indigo-600 bg-indigo-50/20 shadow-sm ring-2 ring-indigo-650'
+                          : 'border-gray-200 bg-white hover:border-gray-300'
+                      }`}
+                    >
+                      <div className="absolute top-3 right-3 w-5 h-5 rounded-full bg-indigo-800 flex items-center justify-center text-white text-[10px] font-black">
+                        {events.find(e => e.id === activeEventId)?.themeColor === 'cosmic' && '✓'}
+                      </div>
+                      <div className="flex gap-1.5 mb-3">
+                        <span className="w-6 h-6 rounded-md bg-[#1E1B4B] border border-gray-200"></span>
+                        <span className="w-6 h-6 rounded-md bg-cyan-400 border border-gray-200"></span>
+                      </div>
+                      <h4 className="text-xs font-bold text-gray-800 uppercase">Cosmic Midnight</h4>
+                      <p className="text-[10px] text-gray-500 mt-1 font-medium">ពណ៌ខៀវចាស់ និងផ្ទៃមេឃផ្កាយ</p>
+                    </button>
+
+                    {/* Theme 3: Forest Emerald */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const updated = events.map(ev => {
+                          if (ev.id === activeEventId) {
+                            return { ...ev, themeColor: 'forest' as const };
+                          }
+                          return ev;
+                        });
+                        setEvents(updated);
+                      }}
+                      className={`relative p-4 rounded-2xl border text-left transition duration-200 cursor-pointer ${
+                        events.find(e => e.id === activeEventId)?.themeColor === 'forest'
+                          ? 'border-emerald-600 bg-emerald-50/20 shadow-sm ring-2 ring-emerald-650'
+                          : 'border-gray-200 bg-white hover:border-gray-300'
+                      }`}
+                    >
+                      <div className="absolute top-3 right-3 w-5 h-5 rounded-full bg-emerald-700 flex items-center justify-center text-white text-[10px] font-black">
+                        {events.find(e => e.id === activeEventId)?.themeColor === 'forest' && '✓'}
+                      </div>
+                      <div className="flex gap-1.5 mb-3">
+                        <span className="w-6 h-6 rounded-md bg-[#064E3B] border border-gray-200"></span>
+                        <span className="w-6 h-6 rounded-md bg-emerald-500 border border-gray-200"></span>
+                      </div>
+                      <h4 className="text-xs font-bold text-gray-800 uppercase">Forest Emerald</h4>
+                      <p className="text-[10px] text-gray-500 mt-1 font-medium">ពណ៌បៃតងធម្មជាតិស្រស់ស្រាយ</p>
+                    </button>
+                  </div>
                 </div>
               </div>
 
-              {/* Utility actions for QR */}
-              <div className="text-center space-y-1.5">
-                <p className="text-[10px] text-gray-400 font-bold uppercase">
-                  ស្កែនសម្រាប់មើលបញ្ជីក្រុម (Scan for Public Teams)
-                </p>
-                <div className="flex gap-2 justify-center">
-                  <a
-                    href={`https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=${encodeURIComponent(shareableUrl)}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-[9px] font-black text-indigo-600 hover:underline flex items-center gap-1 uppercase"
-                  >
-                    <ExternalLink className="w-3 h-3" /> Get Large QR Code Image
-                  </a>
+              {/* Header visible toggle */}
+              <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+                <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-gray-50/50 select-none">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 bg-red-50 text-red-650 rounded-2xl border border-red-100">
+                      <Sliders className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-black text-gray-800 uppercase tracking-wide">
+                        ការបង្ហាញម៉ឺនុយហ្គេម (Header Navigation Menu)
+                      </h3>
+                      <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wide">
+                        Toggle what spectators see on top header panel
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-6 space-y-6">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-gray-50/50 p-4 rounded-2xl border border-gray-100">
+                    <div className="space-y-1 max-w-md">
+                      <h4 className="text-xs font-black text-gray-800 uppercase">
+                        ទំព័របញ្ជីឈ្មោះក្រុមសាធារណៈ (Public Teams Page)
+                      </h4>
+                      <p className="text-[11px] text-gray-500 font-medium leading-relaxed">
+                        អនុញ្ញាតឱ្យបង្ហាញ ឬលាក់ប៊ូតុង <strong className="text-dhl-red font-bold">"បញ្ជីឈ្មោះក្រុម (Public Teams)"</strong> ចេញពី Header menu សម្រាប់ spectators ទូទៅ។
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={handleToggle}
+                      disabled={isUpdating}
+                      className="focus:outline-none flex items-center select-none cursor-pointer transition active:scale-95 duration-150 animate-fade-in"
+                    >
+                      {toggleVal ? (
+                        <ToggleRight className="w-14 h-10 text-dhl-red" />
+                      ) : (
+                        <ToggleLeft className="w-14 h-10 text-gray-300" />
+                      )}
+                    </button>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-gray-50/50 p-4 rounded-2xl border border-gray-100">
+                    <div className="space-y-1 max-w-md">
+                      <h4 className="text-xs font-black text-gray-800 uppercase">
+                        ទំព័រចុះឈ្មោះកីឡាករដោយខ្លួនឯង (Athlete Self-Enrolment Page)
+                      </h4>
+                      <p className="text-[11px] text-gray-500 font-medium leading-relaxed">
+                        អនុញ្ញាតឱ្យបង្ហាញ ឬលាក់ប៊ូតុង <strong className="text-emerald-700 font-bold">"ចុះឈ្មោះលេងកីឡា (Enrol Athlete)"</strong> ចេញពី Header menu សម្រាប់ spectators ទូទៅ។
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setIsEnrolmentEnabled(!isEnrolmentEnabled)}
+                      className="focus:outline-none flex items-center select-none cursor-pointer transition active:scale-95 duration-150 animate-fade-in"
+                    >
+                      {isEnrolmentEnabled ? (
+                        <ToggleRight className="w-14 h-10 text-emerald-600" />
+                      ) : (
+                        <ToggleLeft className="w-14 h-10 text-gray-300" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* QR & Share distribution */}
+              <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-6 space-y-8">
+                <div className="flex items-center gap-3 border-b border-gray-100 pb-3 select-none">
+                  <div className="p-2.5 bg-yellow-50 text-yellow-600 rounded-2xl border border-yellow-105">
+                    <QrCode className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-black text-gray-800 uppercase tracking-wide">
+                      តំណភ្ជាប់ និង QR Code សម្រាប់ចែករំលែក (Direct Page Distribution Channels)
+                    </h3>
+                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wide">
+                      Distribute spectator page links to search teams or register athletes with ease
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-8">
+                  {/* Channel 1: Public Teams Direct Page */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center p-4 bg-gray-50/50 rounded-2xl border border-gray-150">
+                    <div className="space-y-4 text-xs">
+                      <div className="space-y-1">
+                        <span className="text-[10px] bg-red-50 text-dhl-red font-black px-2 py-0.5 rounded-md uppercase tracking-wider border border-red-100">Public Teams Overview</span>
+                        <h4 className="text-sm font-black text-gray-800 uppercase mt-1">
+                          តំណភ្ជាប់ទៅកាន់បញ្ជីឈ្មោះក្រុមសាធារណៈ
+                        </h4>
+                        <p className="text-[11px] text-gray-500 font-medium leading-relaxed">
+                          ចម្លងតំណភ្ជាប់នេះផ្ញើជូន spectators ដើម្បីស្វែងរកឈ្មោះកីឡាករ និងក្រុមលេង៖
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-2 p-3 bg-white rounded-xl border border-gray-150 font-mono text-[10px] text-gray-600 break-all select-all relative group shadow-sm">
+                        <span className="flex-1 truncate pr-8">{shareableUrl}</span>
+                        <button
+                          type="button"
+                          onClick={handleCopyLink}
+                          className="absolute right-2 p-1.5 bg-white hover:bg-gray-100 border border-gray-200 text-gray-500 hover:text-dhl-red rounded-lg transition-all cursor-pointer shadow-xs active:scale-95"
+                        >
+                          {copied ? (
+                            <Check className="w-3.5 h-3.5 text-emerald-500" />
+                          ) : (
+                            <Copy className="w-3.5 h-3.5" />
+                          )}
+                        </button>
+                      </div>
+
+                      <div className="flex flex-wrap gap-2 text-xs select-none">
+                        <button
+                          type="button"
+                          onClick={handleCopyLink}
+                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition duration-150 cursor-pointer ${
+                            copied
+                              ? 'bg-emerald-50 text-emerald-600 border border-emerald-200'
+                              : 'bg-dhl-yellow text-gray-900 hover:brightness-105 border border-amber-400'
+                          }`}
+                        >
+                          {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5 font-black" />}
+                          <span>{copied ? 'ចម្លងរួចរាល់! Copied' : 'ចម្លងតំណភ្ជាប់ (Copy URL)'}</span>
+                        </button>
+
+                        <a
+                          href={shareableUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-gray-100 border border-gray-200 text-gray-700 hover:text-gray-900 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-150"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                          <span>បើកមើលផ្ទាល់ (Open Page)</span>
+                        </a>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col items-center justify-center bg-white p-4 rounded-3xl border border-gray-150 relative space-y-2 shadow-sm selection-none">
+                      <div className="p-2 bg-white rounded-2xl flex flex-col items-center">
+                        <img
+                          src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(shareableUrl)}`}
+                          alt="Public Teams Direct QR Code"
+                          className="w-32 h-32 object-contain select-none pointer-events-none"
+                        />
+                        <div className="mt-1.5 text-center select-none">
+                          <p className="text-[9px] font-black font-dhl-title text-dhl-red uppercase tracking-wide">
+                            PUBLIC TEAMS ROADMAP
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Channel 2: Athlete Self-Enrolment Direct Page */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center p-4 bg-gray-50/50 rounded-2xl border border-gray-150">
+                    <div className="space-y-4 text-xs">
+                      <div className="space-y-1">
+                        <span className="text-[10px] bg-emerald-50 text-emerald-700 font-black px-2 py-0.5 rounded-md uppercase tracking-wider border border-emerald-100">Athlete Self-Enrolment</span>
+                        <h4 className="text-sm font-black text-gray-800 uppercase mt-1">
+                          តំណភ្ជាប់ចុះឈ្មោះកីឡាករដោយខ្លួនឯង
+                        </h4>
+                        <p className="text-[11px] text-gray-500 font-medium leading-relaxed">
+                          ចម្លងតំណភ្ជាប់នេះផ្ញើជូនបុគ្គលិក ដើម្បីឱ្យពួកគេចុះឈ្មោះចូលរួមលេងដោយខ្លួនឯង៖
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-2 p-3 bg-white rounded-xl border border-gray-150 font-mono text-[10px] text-gray-600 break-all select-all relative group shadow-sm">
+                        <span className="flex-1 truncate pr-8">{shareableEnrolUrl}</span>
+                        <button
+                          type="button"
+                          onClick={handleCopyEnrolLink}
+                          className="absolute right-2 p-1.5 bg-white hover:bg-gray-100 border border-gray-200 text-gray-500 hover:text-emerald-600 rounded-lg transition-all cursor-pointer shadow-xs active:scale-95"
+                        >
+                          {copiedEnrol ? (
+                            <Check className="w-3.5 h-3.5 text-emerald-500" />
+                          ) : (
+                            <Copy className="w-3.5 h-3.5" />
+                          )}
+                        </button>
+                      </div>
+
+                      <div className="flex flex-wrap gap-2 text-xs select-none">
+                        <button
+                          type="button"
+                          onClick={handleCopyEnrolLink}
+                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition duration-150 cursor-pointer ${
+                            copiedEnrol
+                              ? 'bg-emerald-50 text-emerald-600 border border-emerald-250 font-black'
+                              : 'bg-emerald-600 text-white hover:bg-emerald-700 border border-emerald-500'
+                          }`}
+                        >
+                          {copiedEnrol ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5 font-black" />}
+                          <span>{copiedEnrol ? 'ចម្លងរួចរាល់! Copied' : 'ចម្លងតំណភ្ជាប់ (Copy URL)'}</span>
+                        </button>
+
+                        <a
+                          href={shareableEnrolUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-gray-100 border border-gray-200 text-gray-700 hover:text-gray-900 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-150"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                          <span>បើកមើលផ្ទាល់ (Open Page)</span>
+                        </a>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col items-center justify-center bg-white p-4 rounded-3xl border border-gray-150 relative space-y-2 shadow-sm selection-none">
+                      <div className="p-2 bg-white rounded-2xl flex flex-col items-center">
+                        <img
+                          src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(shareableEnrolUrl)}`}
+                          alt="Athlete Enrolment Direct QR Code"
+                          className="w-32 h-32 object-contain select-none pointer-events-none"
+                        />
+                        <div className="mt-1.5 text-center select-none">
+                          <p className="text-[9px] font-black font-dhl-title text-emerald-600 uppercase tracking-wide">
+                            ATHLETE REGISTRATION
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        </div>
+          )}
 
+          {/* TAB 5: PUBLIC ATHLETE ENROLMENT FORM CONFIGURATOR */}
+          {activeSubTab === 'enrolment' && (
+            <div className="space-y-6">
+              <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+                <div className="p-6 border-b border-gray-100 bg-gray-50/50 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 bg-emerald-50 text-emerald-600 rounded-2xl border border-emerald-100">
+                      <Users className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-black text-gray-800 uppercase tracking-wide">
+                        ចុះឈ្មោះកីឡាករដោយខ្លួនឯង (Athlete Self-Enrolment Configuration)
+                      </h3>
+                      <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wide">
+                        Provide a dedicated registration portal for employees to register themselves
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-6 space-y-6 text-xs">
+                  {/* Status configuration */}
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-gray-50 p-4 rounded-2xl border border-gray-150 shadow-inner">
+                    <div className="space-y-1">
+                      <h4 className="text-xs font-black text-gray-800 uppercase">
+                        បើកដំណើរការទម្រង់ចុះឈ្មោះជាសាធារណៈ (Enable Registration Portal)
+                      </h4>
+                      <p className="text-[10px] text-gray-500 font-bold tracking-wide leading-relaxed">
+                        If enabled, anyone can visit the link or scan the QR Code below to choose their sport, enter name, upload a photo and self-register!
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setIsEnrolmentEnabled(!isEnrolmentEnabled)}
+                      className="focus:outline-none flex items-center select-none cursor-pointer transition active:scale-95 duration-100"
+                    >
+                      {isEnrolmentEnabled ? (
+                        <ToggleRight className="w-14 h-10 text-emerald-600" />
+                      ) : (
+                        <ToggleLeft className="w-14 h-10 text-gray-300" />
+                      )}
+                    </button>
+                  </div>
+
+                  {/* Public Link Direct Sharing */}
+                  <div className="bg-white rounded-2xl border border-gray-150 p-5 space-y-4">
+                    <h4 className="text-xs font-black text-gray-800 uppercase">
+                      តំណភ្ជាប់ផ្ទាល់ទៅកាន់ទម្រង់ចុះឈ្មោះសមាជិក (Enrolment Direct Link & QR)
+                    </h4>
+
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-5 items-center">
+                      <div className="md:col-span-8 space-y-3">
+                        <p className="text-[11px] text-gray-500 leading-relaxed">
+                          ចែករំលែកតំណភ្ជាប់នេះ ដើម្បីឱ្យសហការីចុះឈ្មោះចូលរួមលេងកីឡាដោយខ្លួនឯង ដោយមិនបាច់បុកបញ្ចូល (Bulk Upload) ពី Admin ឡើយ៖
+                        </p>
+
+                        <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-xl border border-gray-150 font-mono text-[10px] text-gray-600 break-all select-all relative">
+                          <span className="flex-1 truncate pr-8">{`${origin}/?tab=enrolment`}</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              navigator.clipboard.writeText(`${origin}/?tab=enrolment`);
+                              alert('Copied registration link! ចម្លងតំណភ្ជាប់ចុះឈ្មោះកីឡាកររួចរាល់។');
+                            }}
+                            className="absolute right-2 p-1.5 bg-white hover:bg-gray-100 border border-gray-200 text-gray-500 rounded-lg transition-all active:scale-95"
+                          >
+                            <Copy className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              navigator.clipboard.writeText(`${origin}/?tab=enrolment`);
+                              alert('Copied registration link! ចម្លងតំណភ្ជាប់ចុះឈ្មោះកីឡាកររួចរាល់។');
+                            }}
+                            className="bg-emerald-600 text-white font-bold text-[10px] px-3.5 py-2 rounded-xl uppercase tracking-wider hover:bg-emerald-700 active:scale-95 transition"
+                          >
+                            Copy Link
+                          </button>
+                          <a
+                            href={`${origin}/?tab=enrolment`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="bg-gray-100 text-gray-700 font-bold text-[10px] px-3.5 py-2 border rounded-xl uppercase tracking-wider hover:bg-gray-200 transition"
+                          >
+                            Open Portal Tab
+                          </a>
+                        </div>
+                      </div>
+
+                      <div className="md:col-span-4 flex justify-center">
+                        <div className="bg-gray-50 p-3 rounded-2xl border border-gray-200 shadow-inner flex flex-col items-center">
+                          <img
+                            src={`https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(`${origin}/?tab=enrolment`)}`}
+                            alt="Athlete Registration QR Code"
+                            className="w-28 h-28 object-contain"
+                          />
+                          <span className="text-[8px] font-bold text-gray-400 mt-1">SCAN TO REGISTER</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Form Live Simulator */}
+                  <div className="bg-gray-50 rounded-2xl border border-gray-150 p-5 space-y-4">
+                    <div className="flex items-center gap-2 border-b border-gray-200 pb-2">
+                      <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></div>
+                      <h4 className="text-xs font-black text-gray-800 uppercase">
+                        សាកល្បងចុះឈ្មោះ (Interactive Form Simulator)
+                      </h4>
+                    </div>
+
+                    <p className="text-[11px] text-gray-500 leading-relaxed">
+                      នេះជាផ្ទាំងសាកល្បង ដែលដំណើរការដូចទៅនឹងទម្រង់ចុះឈ្មោះពិតប្រាកដ។ អ្នកអាចសាកល្បងចុះឈ្មោះសមាជិក រួចពិនិត្យមើលលទ្ធផលក្នុងបញ្ជីឈ្មោះភ្លាមៗ៖
+                    </p>
+
+                    <form
+                      onSubmit={async (e) => {
+                        e.preventDefault();
+                        if (!simName.trim()) {
+                          alert('សូមបញ្ចូលឈ្មោះកីឡាករ! Please enter athlete name.');
+                          return;
+                        }
+                        if (!simSport) {
+                          alert('សូមជ្រើសរើសប្រភេទកីឡា! Please select sport.');
+                          return;
+                        }
+
+                        const targetTeam = simTeam === 'none' ? null : simTeam;
+                        const res = await addParticipant(simName.trim(), simSport, false, targetTeam, simPhotoUrl.trim() || undefined);
+                        if (res) {
+                          setSimSuccess(true);
+                          setSimName('');
+                          setSimPhotoUrl('');
+                          setSimTeam('none');
+                          setTimeout(() => setSimSuccess(false), 4000);
+                        } else {
+                          alert('ការចុះឈ្មោះមានបញ្ហា Error completing registration.');
+                        }
+                      }}
+                      className="bg-white p-5 rounded-2xl border border-gray-200 space-y-4"
+                    >
+                      {simSuccess && (
+                        <div className="p-3 bg-emerald-50 border border-emerald-150 rounded-xl text-emerald-700 font-bold text-[11px] flex items-center gap-2 animate-bounce">
+                          <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
+                          <span>ការចុះឈ្មោះទទួលបានជោគជ័យ! Enrolled successfully and added to team roster.</span>
+                        </div>
+                      )}
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wide">
+                            ឈ្មោះពេញ (Full Name) <strong className="text-dhl-red">*</strong>
+                          </label>
+                          <input
+                            type="text"
+                            required
+                            placeholder="ឧ. សុខ ម៉ានិត"
+                            value={simName}
+                            onChange={(e) => setSimName(e.target.value)}
+                            className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-medium text-xs"
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wide">
+                            ប្រភេទកីឡា (Select Sport) <strong className="text-dhl-red">*</strong>
+                          </label>
+                          <select
+                            required
+                            value={simSport}
+                            onChange={(e) => setSimSport(e.target.value)}
+                            className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-medium text-xs transition-colors"
+                          >
+                            <option value="">-- ជ្រើសរើសប្រភេទកីឡា --</option>
+                            {(events.find(e => e.id === activeEventId)?.sports || []).map((sp) => (
+                              <option key={sp.name} value={sp.name}>
+                                {sp.icon} {sp.khmerName} ({sp.name})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wide">
+                            រូបថត Profile Link (Photo URL - Optional)
+                          </label>
+                          <input
+                            type="url"
+                            placeholder="https://example.com/photo.jpg"
+                            value={simPhotoUrl}
+                            onChange={(e) => setSimPhotoUrl(e.target.value)}
+                            className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono text-xs"
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wide">
+                            ជ្រើសរើសក្រុមលេង (Select Team - Optional)
+                          </label>
+                          <select
+                            value={simTeam}
+                            onChange={(e) => setSimTeam(e.target.value)}
+                            className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-medium text-xs"
+                          >
+                            <option value="none">មិនទាន់មានក្រុម (Assign team later / None)</option>
+                            {participants
+                              .filter(p => p.is_team && (!simSport || p.sport_type === simSport))
+                              .map(team => (
+                                <option key={team.id} value={team.id}>
+                                  {team.name} ({team.sport_type})
+                                </option>
+                              ))}
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="flex justify-end pt-2">
+                        <button
+                          type="submit"
+                          className="bg-emerald-600 text-white px-5 py-2.5 rounded-xl font-bold uppercase tracking-wider hover:bg-emerald-700 active:scale-95 transition cursor-pointer"
+                        >
+                          រក្សាទុកកីឡាករ (Add Athlete)
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+        </div>
       </div>
     </div>
   );

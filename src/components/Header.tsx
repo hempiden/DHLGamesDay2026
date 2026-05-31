@@ -1,46 +1,115 @@
 import React, { useState, useEffect } from 'react';
-import { Award, Layers, ToggleLeft, RefreshCw, AlertCircle, Laptop, Settings, Wifi, WifiOff, Users, Upload, Monitor, Database, ShieldAlert, LogOut, KeyRound, BarChart3, Timer } from 'lucide-react';
-import { AppUser } from '../types';
+import { Award, Layers, ToggleLeft, RefreshCw, AlertCircle, Laptop, Settings, Wifi, WifiOff, Users, Upload, Monitor, Database, ShieldAlert, LogOut, KeyRound, BarChart3, Timer, ChevronDown } from 'lucide-react';
+import { AppUser, EventInfo } from '../types';
 
 interface HeaderProps {
-  activeTab: 'leaderboard' | 'public_teams' | 'dashboard' | 'scoring' | 'admin' | 'teams' | 'database' | 'users' | 'login' | 'settings';
-  setActiveTab: (tab: 'leaderboard' | 'public_teams' | 'dashboard' | 'scoring' | 'admin' | 'teams' | 'database' | 'users' | 'login' | 'settings') => void;
+  activeTab: 'leaderboard' | 'public_teams' | 'dashboard' | 'scoring' | 'admin' | 'teams' | 'database' | 'users' | 'login' | 'settings' | 'enrolment';
+  setActiveTab: (tab: 'leaderboard' | 'public_teams' | 'dashboard' | 'scoring' | 'admin' | 'teams' | 'database' | 'users' | 'login' | 'settings' | 'enrolment') => void;
   isOnline: boolean;
   supabaseConnected: boolean;
   currentUser: AppUser | null;
   onLogout: () => void;
   showPublicTeamsInHeader: boolean;
+  isEnrolmentEnabled: boolean;
+  events: EventInfo[];
+  activeEventId: string;
+  setActiveEventId: (id: string) => void;
 }
 
 
-export default function Header({ activeTab, setActiveTab, isOnline, supabaseConnected, currentUser, onLogout, showPublicTeamsInHeader }: HeaderProps) {
+export default function Header({ 
+  activeTab, 
+  setActiveTab, 
+  isOnline, 
+  supabaseConnected, 
+  currentUser, 
+  onLogout, 
+  showPublicTeamsInHeader, 
+  isEnrolmentEnabled,
+  events,
+  activeEventId,
+  setActiveEventId
+}: HeaderProps) {
+  
+  const activeEvent = events.find(e => e.id === activeEventId) || events[0];
+  const theme = activeEvent?.themeColor || 'dhl';
+
+  // Dynamic colors based on active event theme
+  const themeColors = {
+    dhl: {
+      primaryBg: 'bg-[#D40511]',
+      textHex: 'text-[#D40511]',
+      borderHex: 'border-b-4 border-[#FFCC00]',
+      badgeBg: 'bg-[#D40511]',
+      buttonActive: 'bg-[#D40511]',
+    },
+    cosmic: {
+      primaryBg: 'bg-indigo-950',
+      textHex: 'text-indigo-900',
+      borderHex: 'border-b-4 border-cyan-400',
+      badgeBg: 'bg-indigo-950',
+      buttonActive: 'bg-indigo-950',
+    },
+    forest: {
+      primaryBg: 'bg-emerald-950',
+      textHex: 'text-emerald-900',
+      borderHex: 'border-b-4 border-emerald-400',
+      badgeBg: 'bg-emerald-950',
+      buttonActive: 'bg-emerald-950',
+    }
+  };
+
+  const colors = themeColors[theme] || themeColors.dhl;
+  const brandAcronym = activeEvent?.name 
+    ? activeEvent.name.split(' ').map(w => w[0]).join('').substring(0, 3).toUpperCase() 
+    : 'DHL';
+
   return (
-    <header className="sticky top-0 z-50 bg-white border-b-4 border-[#FFCC00] shadow-md transition-all duration-300">
+    <header className={`sticky top-0 z-50 bg-white ${colors.borderHex} shadow-md transition-all duration-300`}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between py-3 md:py-4 gap-4">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between py-3 md:py-4 gap-4">
           
           {/* Brand Logo & Title */}
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between flex-wrap gap-2">
             <div className="flex items-center gap-4">
-              <div className="bg-[#D40511] px-3 py-1.5 rounded-sm transform -skew-x-12 shadow-sm">
+              <div className={`${colors.primaryBg} px-3 py-1.5 rounded-sm transform -skew-x-12 shadow-sm`}>
                 <span className="text-white font-black italic tracking-tighter text-lg leading-none select-none">
-                  DHL
+                  {brandAcronym}
                 </span>
               </div>
               <div className="border-l-2 border-gray-200 pl-3">
-                <h1 className="font-dhl-title text-[#D40511] text-base sm:text-lg tracking-tight leading-none text-nowrap">
-                  GAMES DAY 2026
+                <h1 className="font-bold text-gray-950 text-base sm:text-lg tracking-tight leading-none uppercase">
+                  {activeEvent?.name || 'GAMES DAY 2026'}
                 </h1>
                 <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mt-0.5">
-                  SCORING & TOURNAMENT SUITE
+                  {activeEvent?.khmerName || 'ទិវាហ្គេម DHL ២០២៦'}
                 </p>
               </div>
             </div>
 
-            {/* Mobile Connection Status (visible only on mobile) */}
-            <div className="md:hidden flex items-center gap-1.5 bg-gray-50 border px-2.5 py-1 rounded-full">
-              <span className={`w-2 h-2 rounded-full animate-pulse ${
-                isOnline ? (supabaseConnected ? 'bg-green-500' : 'bg-yellow-500') : 'bg-red-500'
+            {/* Event Selector Dropdown */}
+            <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl text-xs font-bold shadow-sm">
+              <span className="text-gray-400 text-[9px] uppercase tracking-wider font-extrabold">សកម្មភាព / Event:</span>
+              <select
+                value={activeEventId}
+                onChange={(e) => setActiveEventId(e.target.value)}
+                className="bg-transparent text-gray-800 focus:outline-[#FFCC00] cursor-pointer font-black text-xs pr-1"
+              >
+                {(currentUser 
+                  ? events.filter(ev => ev.created_by === currentUser.username)
+                  : events
+                ).map((ev) => (
+                  <option key={ev.id} value={ev.id} className="text-gray-800 font-semibold bg-white">
+                    {ev.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Mobile Connection Status (visible only on mobile/tablet) */}
+            <div className="lg:hidden flex items-center gap-1.5 bg-gray-50 border px-2.5 py-1 rounded-full">
+              <span className={`w-2 h-2 rounded-full ${
+                isOnline ? (supabaseConnected ? 'bg-green-500 animate-pulse' : 'bg-yellow-500') : 'bg-red-500'
               }`}></span>
               <span className="text-[10px] font-bold tracking-wider text-gray-500">
                 {isOnline ? (supabaseConnected ? 'SUPABASE' : 'LOCAL') : 'OFFLINE'}
@@ -49,19 +118,19 @@ export default function Header({ activeTab, setActiveTab, isOnline, supabaseConn
           </div>
 
           {/* Tab Navigation Menu */}
-          <div className="flex items-center overflow-x-auto pb-1 md:pb-0 gap-1.5 no-scrollbar scroll-smooth">
+          <div className="flex items-center overflow-x-auto pb-1 lg:pb-0 gap-1.5 no-scrollbar scroll-smooth">
             <button
-              id="tab-leaderboard"
-              onClick={() => setActiveTab('leaderboard')}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs uppercase cursor-pointer tracking-wide transition-all duration-200 active:scale-95 whitespace-nowrap ${
-                activeTab === 'leaderboard'
-                  ? 'bg-[#D40511] text-white shadow-md shadow-[#D40511]/15'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
-            >
-              <Award className="w-4 h-4" />
-              <span>លទ្ធផល (Live Board)</span>
-            </button>
+               id="tab-leaderboard"
+               onClick={() => setActiveTab('leaderboard')}
+               className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs uppercase cursor-pointer tracking-wide transition-all duration-200 active:scale-95 whitespace-nowrap ${
+                 activeTab === 'leaderboard'
+                   ? `${colors.primaryBg} text-white shadow-md`
+                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+               }`}
+             >
+               <Award className="w-4 h-4" />
+               <span>លទ្ធផល (Live Board)</span>
+             </button>
 
             {showPublicTeamsInHeader && (
               <button
@@ -69,7 +138,7 @@ export default function Header({ activeTab, setActiveTab, isOnline, supabaseConn
                 onClick={() => setActiveTab('public_teams')}
                 className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs uppercase cursor-pointer tracking-wide transition-all duration-200 active:scale-95 whitespace-nowrap ${
                   activeTab === 'public_teams'
-                    ? 'bg-[#D40511] text-white shadow-md shadow-[#D40511]/15'
+                    ? `${colors.primaryBg} text-white shadow-md`
                     : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                 }`}
               >
@@ -78,14 +147,27 @@ export default function Header({ activeTab, setActiveTab, isOnline, supabaseConn
               </button>
             )}
 
-
+            {isEnrolmentEnabled && (
+              <button
+                id="tab-enrolment"
+                onClick={() => setActiveTab('enrolment')}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs uppercase cursor-pointer tracking-wide transition-all duration-200 active:scale-95 whitespace-nowrap ${
+                  activeTab === 'enrolment'
+                    ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/15'
+                    : 'bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100'
+                }`}
+              >
+                <Users className="w-4 h-4" />
+                <span>ចុះឈ្មោះលេងកីឡា (Enrol Athlete)</span>
+              </button>
+            )}
 
             <button
               id="tab-dashboard"
               onClick={() => setActiveTab('dashboard')}
               className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs uppercase cursor-pointer tracking-wide transition-all duration-200 active:scale-95 whitespace-nowrap ${
                 activeTab === 'dashboard'
-                  ? 'bg-[#D40511] text-white shadow-md shadow-[#D40511]/15'
+                  ? `${colors.primaryBg} text-white shadow-md`
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               }`}
             >
@@ -109,32 +191,6 @@ export default function Header({ activeTab, setActiveTab, isOnline, supabaseConn
                 </button>
 
                 <button
-                  id="tab-teams"
-                  onClick={() => setActiveTab('teams')}
-                  className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs uppercase cursor-pointer tracking-wide transition-all duration-200 active:scale-95 whitespace-nowrap ${
-                    activeTab === 'teams'
-                      ? 'bg-blue-600 text-white shadow-md shadow-blue-600/15'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  }`}
-                >
-                  <Users className="w-4 h-4" />
-                  <span>គ្រប់គ្រងក្រុម & កីឡាករ (Teams & Athletes)</span>
-                </button>
-
-                <button
-                  id="tab-admin"
-                  onClick={() => setActiveTab('admin')}
-                  className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs uppercase cursor-pointer tracking-wide transition-all duration-200 active:scale-95 whitespace-nowrap ${
-                    activeTab === 'admin'
-                      ? 'bg-[#1a1a1a] text-white shadow-md shadow-black/15'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  }`}
-                >
-                  <Settings className="w-4 h-4" />
-                  <span>រៀបចំការប្រកួត (Setup Game)</span>
-                </button>
-
-                <button
                   id="tab-settings"
                   onClick={() => setActiveTab('settings')}
                   className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs uppercase cursor-pointer tracking-wide transition-all duration-200 active:scale-95 whitespace-nowrap ${
@@ -151,11 +207,7 @@ export default function Header({ activeTab, setActiveTab, isOnline, supabaseConn
               <button
                 id="tab-login"
                 onClick={() => setActiveTab('login')}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs uppercase cursor-pointer tracking-wide transition-all duration-200 active:scale-95 whitespace-nowrap ${
-                  activeTab === 'login'
-                    ? 'bg-[#D40511] text-white shadow-md shadow-[#D40511]/15'
-                    : 'bg-[#FFCC00] text-gray-900 hover:bg-[#ffe054] shadow-sm'
-                }`}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs uppercase cursor-pointer tracking-wide transition-all duration-200 active:scale-95 whitespace-nowrap bg-[#FFCC00] text-gray-900 hover:bg-[#ffe054] shadow-sm`}
               >
                 <KeyRound className="w-4 h-4" />
                 <span>ចូលគ្រងប្រព័ន្ធ (Admin Sign In)</span>
@@ -164,7 +216,7 @@ export default function Header({ activeTab, setActiveTab, isOnline, supabaseConn
           </div>
 
           {/* Desktop Connection Status & User Profile */}
-          <div className="hidden md:flex items-center gap-4">
+          <div className="hidden lg:flex items-center gap-4">
             
             {/* Show User Badge with Logout */}
             {currentUser && (

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Match, SportType, Participant } from '../types';
-import { DEFAULT_TEAMS, SPORT_CONFIGS } from '../data';
+import { DEFAULT_TEAMS, SPORT_CONFIGS, getSportConfig, getActiveSports } from '../data';
 import { Plus, Undo, Trash2, RefreshCw, AlertTriangle } from 'lucide-react';
 
 interface AdminPanelProps {
@@ -22,7 +22,7 @@ export default function AdminPanel({
 }: AdminPanelProps) {
   
   // Form states
-  const [sport, setSport] = useState<SportType>('Soccer');
+  const [sport, setSport] = useState<SportType>(() => getActiveSports()[0] || 'Soccer');
   const [playMode, setPlayMode] = useState<'team' | 'single'>('team');
   const [teamA, setTeamA] = useState('');
   const [teamB, setTeamB] = useState('');
@@ -202,8 +202,8 @@ export default function AdminPanel({
                 ប្រភេទកីឡា (Sport Category)
               </label>
               <div className="grid grid-cols-5 gap-2">
-                {(Object.keys(SPORT_CONFIGS) as SportType[]).map((name) => {
-                  const conf = SPORT_CONFIGS[name];
+                {(getActiveSports() as SportType[]).map((name) => {
+                  const conf = getSportConfig(name);
                   const selected = sport === name;
                   return (
                     <button
@@ -597,7 +597,7 @@ export default function AdminPanel({
             </thead>
             <tbody className="divide-y divide-gray-100">
               {matches.map((m) => {
-                const config = SPORT_CONFIGS[m.sport_name];
+                const config = getSportConfig(m.sport_name);
                 return (
                   <tr key={m.id} className="hover:bg-gray-50/30 transition">
                     

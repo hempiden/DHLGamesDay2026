@@ -23,6 +23,7 @@ import {
 import { SPORT_CONFIGS } from '../data';
 
 interface SwimmingTimerProps {
+  sportName?: string;
   matches: Match[];
   participants: Participant[];
   updateMatchFields: (id: string, fields: Partial<Match>) => Promise<boolean>;
@@ -44,6 +45,7 @@ interface SwimmingState {
 }
 
 export default function SwimmingTimer({ 
+  sportName = 'Swimming',
   matches, 
   participants, 
   updateMatchFields, 
@@ -54,8 +56,8 @@ export default function SwimmingTimer({
 }: SwimmingTimerProps) {
   // 1. Filter active swimming matches (Upcoming or Live)
   const swimmingMatches = useMemo(() => {
-    return matches.filter(m => m.sport_name === 'Swimming' && m.status !== 'Finished');
-  }, [matches]);
+    return matches.filter(m => m.sport_name === sportName && m.status !== 'Finished');
+  }, [matches, sportName]);
 
   const [selectedMatchId, setSelectedMatchId] = useState<string>('');
 

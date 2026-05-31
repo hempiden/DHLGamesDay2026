@@ -4,8 +4,8 @@
   --font-sans: "Kantumruy Pro", "Inter", system-ui, sans-serif;
   --font-dhl: "Inter", "Kantumruy Pro", system-ui, sans-serif;
   
-  --color-dhl-yellow: #FFCC00;
-  --color-dhl-red: #D40511;
+  --color-dhl-yellow: var(--accent-brand, #FFCC00);
+  --color-dhl-red: var(--primary-brand, #D40511);
   --color-dhl-dark: #1a1a1a;
 }
 

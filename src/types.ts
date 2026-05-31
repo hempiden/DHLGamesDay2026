@@ -1,4 +1,24 @@
-export type SportType = 'Soccer' | 'Volleyball' | 'Pingpong' | 'Badminton' | 'Swimming';
+export type SportType = 'Soccer' | 'Volleyball' | 'Pingpong' | 'Badminton' | 'Swimming' | string;
+
+export interface Sport {
+  name: string;
+  khmerName: string;
+  icon: string;
+  scoringMethod: 'score' | 'measure';
+}
+
+export interface EventInfo {
+  id: string;
+  name: string;
+  khmerName: string;
+  date?: string;
+  description?: string;
+  sports: Sport[];
+  themeColor?: 'dhl' | 'cosmic' | 'forest';
+  created_by?: string;
+  show_public_teams?: boolean;
+  is_enrolment_enabled?: boolean;
+}
 
 export interface Match {
   id: string;
@@ -13,6 +33,8 @@ export interface Match {
   updated_at: string;
   scheduled_date?: string;
   scheduled_time?: string;
+  event_id?: string;
+  created_by?: string;
 }
 
 export interface TeamStanding {
@@ -49,6 +71,8 @@ export interface Participant {
   created_at?: string;
   updated_at?: string;
   photo_url?: string;
+  event_id?: string;
+  created_by?: string;
 }
 
 export interface AppUser {
