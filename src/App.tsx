@@ -8,8 +8,6 @@ import DatabaseSetup from './components/DatabaseSetup';
 import LoginView from './components/LoginView';
 import UsersApprovalPanel from './components/UsersApprovalPanel';
 import PublicTeamsView from './components/PublicTeamsView';
-import ProfileOverlay from './components/ProfileOverlay';
-import ConsoleLockOverlay from './components/ConsoleLockOverlay';
 import PublicAthletePhotoUpload from './components/PublicAthletePhotoUpload';
 import AnalyticsDashboard from './components/AnalyticsDashboard';
 import SwimmingTimer from './components/SwimmingTimer';
@@ -88,12 +86,6 @@ export default function App() {
     return null;
   });
 
-  const [isConsoleLocked, setIsConsoleLocked] = useState<boolean>(() => {
-    return localStorage.getItem('dhl_games_day_console_locked') === 'true';
-  });
-
-  const [showProfileModal, setShowProfileModal] = useState<boolean>(false);
-
   const [users, setUsers] = useState<AppUser[]>(() => {
     const saved = localStorage.getItem('dhl_games_day_users');
     if (saved) {
@@ -139,88 +131,13 @@ export default function App() {
   const handleLoginSuccess = (user: AppUser) => {
     setCurrentUser(user);
     localStorage.setItem('dhl_games_day_current_user', JSON.stringify(user));
-    
-    // Auto unlock console on new success login
-    setIsConsoleLocked(false);
-    localStorage.removeItem('dhl_games_day_console_locked');
-
-    // Sync newly logged in user into offline state cache list if not present
-    setUsers((prev) => {
-      const exists = prev.some((u) => u.id === user.id);
-      if (!exists) {
-        const updated = [user, ...prev];
-        localStorage.setItem('dhl_games_day_users', JSON.stringify(updated));
-        return updated;
-      } else {
-        const updated = prev.map((u) => u.id === user.id ? user : u);
-        localStorage.setItem('dhl_games_day_users', JSON.stringify(updated));
-        return updated;
-      }
-    });
-
     setActiveTab('leaderboard');
   };
 
   const handleLogout = () => {
     setCurrentUser(null);
     localStorage.removeItem('dhl_games_day_current_user');
-    
-    setIsConsoleLocked(false);
-    localStorage.removeItem('dhl_games_day_console_locked');
-    
     setActiveTab('leaderboard');
-  };
-
-  const handleLockConsole = () => {
-    setIsConsoleLocked(true);
-    localStorage.setItem('dhl_games_day_console_locked', 'true');
-  };
-
-  const handleUnlockConsole = (password: string): boolean => {
-    if (currentUser && currentUser.passwordPlain === password) {
-      setIsConsoleLocked(false);
-      localStorage.removeItem('dhl_games_day_console_locked');
-      return true;
-    }
-    return false;
-  };
-
-  const handleUpdatePassword = async (newPasswordPlain: string): Promise<{ success: boolean; error?: string }> => {
-    if (!currentUser) return { success: false, error: 'សំណួរផុតកំណត់ការចូល (No active session)' };
-
-    const updatedUser = { ...currentUser, passwordPlain: newPasswordPlain };
-    
-    // Update local users array
-    const updatedUsersList = users.map(u => u.id === currentUser.id ? updatedUser : u);
-    setUsers(updatedUsersList);
-    localStorage.setItem('dhl_games_day_users', JSON.stringify(updatedUsersList));
-
-    // Update active currentUser
-    setCurrentUser(updatedUser);
-    localStorage.setItem('dhl_games_day_current_user', JSON.stringify(updatedUser));
-
-    // Update remote Supabase if connected
-    if (isSupabaseEnabled && supabaseConnected) {
-      const client = getSupabaseClient(supabaseUrl, supabaseAnonKey);
-      if (client) {
-        try {
-          const { error } = await client
-            .from('admin_users')
-            .update({ password_plain: newPasswordPlain })
-            .eq('id', currentUser.id);
-
-          if (error) {
-            console.error('Failed to sync new password to Supabase:', error.message);
-            return { success: true, error: 'បានរក្សាទុកក្នុងឧបករណ៍ ប៉ុន្តែមិនអាចរួមកម្រងពពក (Saved locally, cloud sync failed: ' + error.message + ')' };
-          }
-        } catch (err: any) {
-          console.error('Database connection exception:', err);
-          return { success: true, error: 'បានរក្សាទុកក្នុងឧបករណ៍ ប៉ុន្តែមានបញ្ហាភ្ជាប់ពពក (Saved locally, database exception)' };
-        }
-      }
-    }
-
-    return { success: true };
   };
 
   const handleRegisterUser = (name: string, username: string, email: string, passwordPlain: string) => {
@@ -1017,8 +934,6 @@ export default function App() {
         supabaseConnected={supabaseConnected}
         currentUser={currentUser}
         onLogout={handleLogout}
-        onOpenProfile={() => setShowProfileModal(true)}
-        onLockConsole={handleLockConsole}
       />
 
       {/* Synchronizing indicator banner */}
@@ -1131,10 +1046,6 @@ export default function App() {
                 onLoginSuccess={handleLoginSuccess}
                 users={users}
                 onRegisterUser={handleRegisterUser}
-                isSupabaseEnabled={isSupabaseEnabled}
-                supabaseConnected={supabaseConnected}
-                supabaseUrl={supabaseUrl}
-                supabaseAnonKey={supabaseAnonKey}
               />
             )}
 
@@ -1197,24 +1108,6 @@ export default function App() {
           <span className="text-red-500 animate-pulse pl-0.5 font-sans">❤️</span>
         </div>
       </footer>
-
-      {/* Profile & Security Modal Overlay */}
-      {showProfileModal && currentUser && (
-        <ProfileOverlay
-          currentUser={currentUser}
-          onClose={() => setShowProfileModal(false)}
-          onUpdatePassword={handleUpdatePassword}
-        />
-      )}
-
-      {/* Screen Security Lock Overlay */}
-      {isConsoleLocked && currentUser && (
-        <ConsoleLockOverlay
-          currentUser={currentUser}
-          onUnlock={handleUnlockConsole}
-          onLogout={handleLogout}
-        />
-      )}
 
     </div>
   );
