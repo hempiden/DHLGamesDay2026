@@ -7,7 +7,7 @@ interface SelfRegistrationFormProps {
   activeEventId: string;
   events: EventInfo[];
   participants: Participant[];
-  addParticipant: (name: string, sport_type: SportType, is_team: boolean, team_id: string | null, photo_url?: string) => Promise<string | null>;
+  addParticipant: (name: string, sport_type: SportType, is_team: boolean, team_id: string | null, photo_url?: string, gender?: string) => Promise<string | null>;
   currentLanguage?: 'kh' | 'en';
   translations?: Record<string, { kh: string; en: string }>;
 }
@@ -26,6 +26,7 @@ export default function SelfRegistrationForm({
   };
 
   const [fullname, setFullname] = useState('');
+  const [gender, setGender] = useState<'Male' | 'Female'>('Male');
   const [selectedSport, setSelectedSport] = useState('');
   const [selectedTeam, setSelectedTeam] = useState('none');
   const [photoUrl, setPhotoUrl] = useState('');
@@ -76,7 +77,8 @@ export default function SelfRegistrationForm({
         selectedSport, 
         false, 
         targetTeam, 
-        photoUrl.trim() || undefined
+        photoUrl.trim() || undefined,
+        gender
       );
 
       if (addedId) {
@@ -229,6 +231,39 @@ export default function SelfRegistrationForm({
                     onChange={(e) => setFullname(e.target.value)}
                     className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-xs font-bold shadow-sm"
                   />
+                </div>
+
+                {/* Gender */}
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wide block">
+                    {currentLanguage === 'kh' ? 'ភេទ (Gender)' : 'Gender'} <strong className="text-red-500">*</strong>
+                  </label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setGender('Male')}
+                      className={`py-2.5 px-4 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                        gender === 'Male'
+                          ? 'bg-blue-50 border-blue-400 text-blue-700 ring-2 ring-blue-100 shadow-sm'
+                          : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
+                      }`}
+                    >
+                      <span className="text-base leading-none">♂️</span>
+                      <span>{currentLanguage === 'kh' ? 'ប្រុស (Male)' : 'Male'}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setGender('Female')}
+                      className={`py-2.5 px-4 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                        gender === 'Female'
+                          ? 'bg-pink-50 border-pink-400 text-pink-700 ring-2 ring-pink-100 shadow-sm'
+                          : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
+                      }`}
+                    >
+                      <span className="text-base leading-none">♀️</span>
+                      <span>{currentLanguage === 'kh' ? 'ស្រី (Female)' : 'Female'}</span>
+                    </button>
+                  </div>
                 </div>
 
                 {/* Sport list */}

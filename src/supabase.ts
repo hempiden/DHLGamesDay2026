@@ -20,7 +20,11 @@ export function getSupabaseClient(url?: string, anonKey?: string): SupabaseClien
 
   try {
     if (!supabaseInstance || finalUrl !== lastUsedUrl || finalKey !== lastUsedKey) {
-      supabaseInstance = createClient(finalUrl, finalKey);
+      supabaseInstance = createClient(finalUrl, finalKey, {
+        auth: {
+          persistSession: false
+        }
+      });
       lastUsedUrl = finalUrl;
       lastUsedKey = finalKey;
     }
@@ -34,7 +38,11 @@ export function getSupabaseClient(url?: string, anonKey?: string): SupabaseClien
 // Check database connection
 export async function testSupabaseConnection(url: string, key: string): Promise<boolean> {
   try {
-    const client = createClient(url, key);
+    const client = createClient(url, key, {
+      auth: {
+        persistSession: false
+      }
+    });
     // Simple query to verify keys
     const { error } = await client.from('matches').select('id').limit(1);
     if (error && error.code !== 'PGRST116' && error.code !== '42P01') {

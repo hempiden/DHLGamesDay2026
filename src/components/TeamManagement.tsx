@@ -8,7 +8,7 @@ interface TeamManagementProps {
   participants: Participant[];
   isOnline: boolean;
   supabaseConnected: boolean;
-  addParticipant: (name: string, sport_type: SportType, is_team: boolean, team_id: string | null, photo_url?: string) => Promise<any>;
+  addParticipant: (name: string, sport_type: SportType, is_team: boolean, team_id: string | null, photo_url?: string, gender?: string) => Promise<any>;
   updateParticipantName: (id: string, name: string) => Promise<boolean>;
   updateParticipantPhoto: (id: string, photoUrl: string | null) => Promise<boolean>;
   assignPlayerToTeam: (playerId: string, teamId: string | null) => Promise<boolean>;
@@ -40,6 +40,7 @@ export default function TeamManagement({
   const [newPlayerName, setNewPlayerName] = useState('');
   const [newPlayerSport, setNewPlayerSport] = useState<SportType>(() => getActiveSports()[0] || 'Soccer');
   const [newPlayerTeamId, setNewPlayerTeamId] = useState<string>('');
+  const [newPlayerGender, setNewPlayerGender] = useState<'Male' | 'Female'>('Male');
 
   const [editTeamNameValue, setEditTeamNameValue] = useState('');
   const [isEditingName, setIsEditingName] = useState(false);
@@ -70,26 +71,30 @@ export default function TeamManagement({
     // Collect all athletes for selected sport
     const sportAthletes = participants.filter(p => !p.is_team && p.sport_type === selectedSport);
     
-    // Guess gender based on name
+    // Use stored gender or guess gender based on name if empty
     const prepared = sportAthletes.map(a => {
       const text = a.name.toLowerCase();
-      let guessedGender: 'Male' | 'Female' = 'Male';
+      let activeGender: 'Male' | 'Female' = 'Male';
       
-      const femaleTriggers = [
-        'sokha', 'pisey', 'nara', 'sovanna', 'vibol', 'roth', 'chan', 'leak', 'sokha',
-        'neary', 'leakhena', 'srey', 'bopha', 'moly', 'rath', 'sreypich', 'pich', 'sophia',
-        'kalyan', 'kolab', 'chenda', 'tevy', 'kunthea', 'sophea', 'theary', 'srei', 'pheap',
-        'chanta', 'chantra', 'maly', 'sothy', 'vanny', 'rom', 'chravy'
-      ];
-      
-      if (femaleTriggers.some(t => text.includes(t))) {
-        guessedGender = 'Female';
+      if (a.gender === 'Male' || a.gender === 'Female') {
+        activeGender = a.gender;
+      } else {
+        const femaleTriggers = [
+          'sokha', 'pisey', 'nara', 'sovanna', 'vibol', 'roth', 'chan', 'leak', 'sokha',
+          'neary', 'leakhena', 'srey', 'bopha', 'moly', 'rath', 'sreypich', 'pich', 'sophia',
+          'kalyan', 'kolab', 'chenda', 'tevy', 'kunthea', 'sophea', 'theary', 'srei', 'pheap',
+          'chanta', 'chantra', 'maly', 'sothy', 'vanny', 'rom', 'chravy'
+        ];
+        
+        if (femaleTriggers.some(t => text.includes(t))) {
+          activeGender = 'Female';
+        }
       }
       
       return {
         id: a.id,
         name: a.name,
-        gender: guessedGender,
+        gender: activeGender,
         selected: true // default to checked
       };
     });
@@ -353,10 +358,11 @@ export default function TeamManagement({
     e.preventDefault();
     if (!newPlayerName.trim()) return;
     const teamIdValue = newPlayerTeamId === 'none' || !newPlayerTeamId ? null : newPlayerTeamId;
-    const success = await addParticipant(newPlayerName.trim(), newPlayerSport, false, teamIdValue);
+    const success = await addParticipant(newPlayerName.trim(), newPlayerSport, false, teamIdValue, undefined, newPlayerGender);
     if (success) {
       setNewPlayerName('');
       setNewPlayerTeamId('');
+      setNewPlayerGender('Male');
       setShowCreatePlayerModal(false);
     }
   };
@@ -953,6 +959,38 @@ export default function TeamManagement({
                   onChange={(e) => setNewPlayerName(e.target.value)}
                   className="w-full bg-gray-50 border border-gray-300 p-3 rounded-lg font-bold text-sm outline-none focus:ring-2 focus:ring-[#FFCC00]"
                 />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-black uppercase text-gray-400 block mb-1">
+                  ភេទ (Gender)
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setNewPlayerGender('Male')}
+                    className={`py-2 px-4 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition cursor-pointer ${
+                      newPlayerGender === 'Male'
+                        ? 'bg-blue-50 border-blue-400 text-blue-700 ring-2 ring-blue-100 shadow-sm'
+                        : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
+                    }`}
+                  >
+                    <span>♂️</span>
+                    <span>ប្រុស (Male)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setNewPlayerGender('Female')}
+                    className={`py-2 px-4 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition cursor-pointer ${
+                      newPlayerGender === 'Female'
+                        ? 'bg-pink-50 border-pink-400 text-pink-700 ring-2 ring-pink-100 shadow-sm'
+                        : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
+                    }`}
+                  >
+                    <span>♀️</span>
+                    <span>ស្រី (Female)</span>
+                  </button>
+                </div>
               </div>
 
               <div>

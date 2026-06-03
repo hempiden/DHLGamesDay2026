@@ -74,6 +74,7 @@ export interface Participant {
   created_at?: string;
   updated_at?: string;
   photo_url?: string;
+  gender?: string;
   event_id?: string;
   created_by?: string;
 }

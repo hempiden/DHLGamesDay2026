@@ -5,7 +5,7 @@ import { SPORT_CONFIGS, getSportConfig, getActiveSports } from '../data';
 
 interface AthleteUploadProps {
   participants: Participant[];
-  addParticipant: (name: string, sport_type: SportType, is_team: boolean, team_id: string | null, photo_url?: string) => Promise<any>;
+  addParticipant: (name: string, sport_type: SportType, is_team: boolean, team_id: string | null, photo_url?: string, gender?: string) => Promise<any>;
   updateParticipantName: (id: string, name: string) => Promise<boolean>;
   updateParticipantPhoto: (id: string, photoUrl: string | null) => Promise<boolean>;
   assignPlayerToTeam: (playerId: string, teamId: string | null) => Promise<boolean>;
@@ -160,13 +160,14 @@ export default function AthleteUpload({
           throw new Error('Each record must contain a valid string "name" attribute.');
         }
         const sType = item.sport_type || 'Soccer';
-        // Validate sport type
-        const validSports: SportType[] = ['Soccer', 'Volleyball', 'Pingpong', 'Badminton', 'Swimming'];
-        if (!validSports.includes(sType)) {
-          throw new Error(`Invalid sport_type "${sType}". Must be one of: Soccer, Volleyball, Pingpong, Badminton, Swimming`);
+        // Validate sport type against active sports
+        const validSports = getActiveSports() as string[];
+        const isStandard = ['Soccer', 'Volleyball', 'Pingpong', 'Badminton', 'Swimming'].includes(sType);
+        if (!validSports.includes(sType) && !isStandard) {
+          throw new Error(`Invalid sport_type "${sType}". Must be one of standard sports or active custom event sports.`);
         }
 
-        await addParticipant(item.name.trim(), sType, false, null, item.photo_url || undefined);
+        await addParticipant(item.name.trim(), sType, false, null, item.photo_url || undefined, item.gender);
         count++;
       }
 

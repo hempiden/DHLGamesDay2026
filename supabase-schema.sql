@@ -83,6 +83,7 @@ CREATE TABLE IF NOT EXISTS public.participants (
     is_team BOOLEAN DEFAULT FALSE NOT NULL,
     team_id TEXT, -- Store raw text or bigints. To allow simple local references, we use TEXT.
     photo_url TEXT,
+    gender TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW()) NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW()) NOT NULL
 );

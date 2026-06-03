@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Header from './components/Header';
 import LeaderboardView from './components/LeaderboardView';
 import ScoringPanel from './components/ScoringPanel';
@@ -21,6 +21,7 @@ import { Laptop, Wifi, WifiOff, RefreshCw, Layers, ShieldAlert, Heart, Calendar 
 import OrganizationSettings from './components/OrganizationSettings';
 
 export default function App() {
+  const hasAttemptedEventsSync = useRef(false);
   const [activeTab, setActiveTab] = useState<'leaderboard' | 'public_teams' | 'dashboard' | 'scoring' | 'admin' | 'teams' | 'database' | 'users' | 'login' | 'settings' | 'enrolment' | 'organization'>(() => {
     if (typeof window !== 'undefined') {
       const p = new URLSearchParams(window.location.search);
@@ -828,8 +829,9 @@ export default function App() {
                 }
                 return prev;
               });
-            } else if (eventsResult.data.length === 0 && events.length > 0) {
-              // Auto-seed local events to remote Supabase DB
+            } else if (eventsResult.data.length === 0 && events.length > 0 && !hasAttemptedEventsSync.current) {
+              // Auto-seed local events to remote Supabase DB once per session/change
+              hasAttemptedEventsSync.current = true;
               const localClean = events.map((ev) => ({
                 id: ev.id,
                 name: ev.name,
@@ -1394,7 +1396,7 @@ export default function App() {
     localStorage.setItem('dhl_games_day_participants', JSON.stringify(updated));
   };
 
-  const addParticipant = async (name: string, sport_type: SportType, is_team: boolean, team_id: string | null, photo_url?: string): Promise<string | null> => {
+  const addParticipant = async (name: string, sport_type: SportType, is_team: boolean, team_id: string | null, photo_url?: string, gender?: string): Promise<string | null> => {
     const newId = `p-${Date.now()}`;
     const newPar: Participant = {
       id: newId,
@@ -1403,6 +1405,7 @@ export default function App() {
       is_team,
       team_id,
       photo_url: photo_url || undefined,
+      gender: gender || undefined,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     };
@@ -1414,13 +1417,29 @@ export default function App() {
       const client = getSupabaseClient(supabaseUrl, supabaseAnonKey);
       if (client) {
         try {
-          const { data, error } = await client.from('participants').insert({
+          const payload: any = {
             name,
             sport_type,
             is_team,
             team_id: team_id && !isNaN(Number(team_id)) ? Number(team_id) : null,
             photo_url: photo_url || null,
-          }).select('id');
+            gender: gender || null,
+          };
+          
+          let result = await client.from('participants').insert(payload).select('id');
+          
+          if (result.error) {
+            const isColumnErr = result.error.message?.toLowerCase().includes('column') || 
+                                result.error.message?.toLowerCase().includes('schema cache') || 
+                                result.error.message?.toLowerCase().includes('attribute') ||
+                                result.error.message?.toLowerCase().includes('not found');
+            if (isColumnErr) {
+              const { gender, ...fallbackPayload } = payload;
+              result = await client.from('participants').insert(fallbackPayload).select('id');
+            }
+          }
+          
+          const { data, error } = result;
           
           if (error) {
             const isFetchErr = error.message?.toLowerCase().includes('fetch') || error.message?.toLowerCase().includes('typeerror') || error.message?.toLowerCase().includes('network');

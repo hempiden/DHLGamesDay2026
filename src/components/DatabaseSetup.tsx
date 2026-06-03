@@ -112,6 +112,7 @@ export default function DatabaseSetup({
           is_team: Boolean(p.is_team),
           team_id: p.team_id && p.team_id !== 'null' ? String(p.team_id) : null,
           photo_url: p.photo_url || null,
+          gender: p.gender || null,
         }));
 
         const { error: partError } = await client.from('participants').insert(partToInsert);
@@ -443,6 +444,7 @@ create table if not exists public.participants (
   is_team boolean not null default false,
   team_id text,
   photo_url text,
+  gender text,
   created_at timestamp with time zone default timezone('utc'::text, now()),
   updated_at timestamp with time zone default timezone('utc'::text, now())
 );
@@ -603,6 +605,7 @@ create table if not exists public.participants (
   is_team boolean not null default false,
   team_id text,
   photo_url text,
+  gender text,
   created_at timestamp with time zone default timezone('utc'::text, now()),
   updated_at timestamp with time zone default timezone('utc'::text, now())
 );
