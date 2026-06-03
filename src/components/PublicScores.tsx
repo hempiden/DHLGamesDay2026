@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Award, Trophy, Zap, Users, AlertCircle, RefreshCw, Star, CheckCircle, Flame, Calendar, Clock, ArrowRight, X, Maximize2 } from 'lucide-react';
 import { Match, Participant, SportType, getTranslatedText } from '../types';
-import { SPORT_CONFIGS, isSportDistance, formatSportScore } from '../data';
+import { SPORT_CONFIGS, isSportDistance, formatSportScore, getSportConfig } from '../data';
 
 interface PublicScoresProps {
   matches: Match[];
@@ -609,7 +609,7 @@ export default function PublicScores({ matches, participants, currentLanguage = 
                       <div className="space-y-1 text-center sm:text-left shrink-0">
                         <div className="flex flex-wrap justify-center sm:justify-start items-center gap-1.5">
                           <span className="px-2 py-0.5 bg-red-50 text-[#D40511] font-black uppercase text-[9px] tracking-wider rounded-md border border-red-100">
-                            {SPORT_CONFIGS[m.sport_name]?.icon} {m.sport_name}
+                            {getSportConfig(m.sport_name)?.icon} {m.sport_name}
                           </span>
                           {(m.scheduled_date || m.scheduled_time) && (
                             <span className="px-2 py-0.5 bg-gray-50 border border-gray-150 text-gray-500 font-extrabold uppercase text-[9px] tracking-wider rounded-md inline-block">
@@ -675,7 +675,7 @@ export default function PublicScores({ matches, participants, currentLanguage = 
                     <div className="flex justify-between items-start">
                       <div className="flex flex-wrap items-center gap-1.5">
                         <span className="px-2.5 py-1 bg-blue-50 border border-blue-100 text-blue-600 rounded-xl font-extrabold text-[9px] uppercase tracking-wide">
-                          {SPORT_CONFIGS[m.sport_name]?.icon} {m.sport_name}
+                          {getSportConfig(m.sport_name)?.icon} {m.sport_name}
                         </span>
                         {(m.scheduled_date || m.scheduled_time) && (
                           <span className="px-2 py-0.5 bg-gray-50 border border-gray-150 text-gray-500 font-extrabold uppercase text-[9px] tracking-wider rounded-md inline-block">
@@ -850,7 +850,7 @@ export default function PublicScores({ matches, participants, currentLanguage = 
                   <div key={m.id} className="p-3.5 bg-gray-50 border border-gray-100 rounded-2xl space-y-2">
                     <div className="flex justify-between items-center">
                       <span className="text-[9.5px] font-black text-[#D40511] uppercase tracking-tight italic">
-                        {SPORT_CONFIGS[m.sport_name]?.icon} {m.sport_name}
+                        {getSportConfig(m.sport_name)?.icon} {m.sport_name}
                       </span>
                       <span className="text-[8.5px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-black uppercase">
                         RESOLVED

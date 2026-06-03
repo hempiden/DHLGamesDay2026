@@ -568,6 +568,12 @@ export default function App() {
 
   // Seeding default template sports event for selected organization if none exist
   useEffect(() => {
+    if (isSupabaseEnabled) {
+      // If Supabase is enabled, we rely entirely on the remote events table. 
+      // We should NOT auto-create a random timestamped event locally and push it,
+      // as that wipes out visibility of existing matches on Supabase.
+      return;
+    }
     const hasOrgEvents = events.some(e => (e.organization_slug || 'dhl-games') === organization.slug);
     if (!hasOrgEvents) {
       const defaultOrgEvent: EventInfo = {
@@ -613,9 +619,15 @@ export default function App() {
           insertPromise.then(({ error }: any) => {
             if (error) {
               const isFetchErr = error.message?.toLowerCase().includes('fetch') || error.message?.toLowerCase().includes('typeerror') || error.message?.toLowerCase().includes('network');
+              const isRLSErr = error.message?.toLowerCase().includes('row-level security') || 
+                               error.message?.toLowerCase().includes('policy') || 
+                               error.message?.toLowerCase().includes('permission') || 
+                               error.message?.toLowerCase().includes('violates');
               if (isFetchErr) {
                 setSupabaseConnected(false);
                 console.warn('Failed to sync auto-seeded org event offline:', error.message);
+              } else if (isRLSErr) {
+                console.warn('Failed to sync auto-seeded org event (RLS/policy constraint):', error.message);
               } else {
                 console.error('Failed to sync auto-seeded org event:', error.message);
               }
@@ -837,16 +849,30 @@ export default function App() {
               
               emptySyncPromise.then(({ error }: any) => {
                 if (error) {
+                  const isRLSErr = error.message?.toLowerCase().includes('row-level security') || 
+                                   error.message?.toLowerCase().includes('policy') || 
+                                   error.message?.toLowerCase().includes('permission') || 
+                                   error.message?.toLowerCase().includes('violates');
                   if (error.message?.includes('enabled_languages')) {
                     // Downgrade payload and try again for backward compatibility
                     const degradedLocalClean = localClean.map(({ enabled_languages, ...rest }) => rest);
                     client.from('events').insert(degradedLocalClean).then(({ error: retryError }: any) => {
                       if (retryError) {
-                        console.error('Failed to sync empty remote events after retry:', retryError.message);
+                        const isRetryRLSErr = retryError.message?.toLowerCase().includes('row-level security') || 
+                                              retryError.message?.toLowerCase().includes('policy') || 
+                                              retryError.message?.toLowerCase().includes('permission') || 
+                                              retryError.message?.toLowerCase().includes('violates');
+                        if (isRetryRLSErr) {
+                          console.warn('Failed to sync empty remote events after retry (RLS/policy constraint):', retryError.message);
+                        } else {
+                          console.error('Failed to sync empty remote events after retry:', retryError.message);
+                        }
                       } else {
                         console.log('Successfully synced remote events (fallback without enabled_languages column)');
                       }
                     });
+                  } else if (isRLSErr) {
+                    console.warn('Failed to sync empty remote events (RLS/policy constraint):', error.message);
                   } else {
                     const isFetchErr = error.message?.toLowerCase().includes('fetch') || error.message?.toLowerCase().includes('typeerror') || error.message?.toLowerCase().includes('network');
                     if (isFetchErr) {
@@ -1076,15 +1102,16 @@ export default function App() {
 
     syncAndFetch(false);
 
+    // Light connection and silent database sync fallback every 60 seconds
     const pollInterval = setInterval(() => {
       syncAndFetch(true);
-    }, 2500);
+    }, 60000);
 
     return () => {
       active = false;
       clearInterval(pollInterval);
     };
-  }, [isSupabaseEnabled, supabaseUrl, supabaseAnonKey, isOnline, currentUser, activeEventId]);
+  }, [isSupabaseEnabled, supabaseUrl, supabaseAnonKey, isOnline, currentUser, activeEventId, activeTab]);
 
   // Save matches change locally
   const saveLocalMatches = (updated: Match[]) => {
@@ -1175,14 +1202,33 @@ export default function App() {
       if (client) {
         try {
           const parsedId = isNaN(Number(id)) ? id : Number(id);
+          const payload: any = { ...fields, updated_at: new Date().toISOString() };
           const { error } = await client
             .from('matches')
-            .update({ ...fields, updated_at: new Date().toISOString() })
+            .update(payload)
             .eq('id', parsedId);
 
           if (error) {
-            console.error('Error syncing updated match fields:', error.message);
-            return false;
+            const isColumnErr = error.message?.toLowerCase().includes('column') || 
+                                error.message?.toLowerCase().includes('schema cache') || 
+                                error.message?.toLowerCase().includes('attribute') ||
+                                error.message?.toLowerCase().includes('not found');
+            if (isColumnErr) {
+              const { scheduled_date, scheduled_time, ...fallbackPayload } = payload;
+              const { error: secondErr } = await client
+                .from('matches')
+                .update(fallbackPayload)
+                .eq('id', parsedId);
+              if (secondErr) {
+                console.error('Error syncing updated match fields (fallback):', secondErr.message);
+                return false;
+              } else {
+                console.log('Successfully synced update (fallback without scheduled_date/time)');
+              }
+            } else {
+              console.error('Error syncing updated match fields:', error.message);
+              return false;
+            }
           }
         } catch (err) {
           console.error('Network push match fields failed:', err);
@@ -1250,7 +1296,7 @@ export default function App() {
       if (client) {
         try {
           // Send to database
-          const { error } = await client.from('matches').insert({
+          const payload: any = {
             sport_name: items.sport_name,
             match_label: items.match_label,
             team_a: items.team_a,
@@ -1260,8 +1306,25 @@ export default function App() {
             status: items.status,
             scheduled_date: items.scheduled_date || null,
             scheduled_time: items.scheduled_time || null,
-          });
-          if (error) console.error('Error inserting match:', error.message);
+          };
+          const { error } = await client.from('matches').insert(payload);
+          if (error) {
+            const isColumnErr = error.message?.toLowerCase().includes('column') || 
+                                error.message?.toLowerCase().includes('schema cache') || 
+                                error.message?.toLowerCase().includes('attribute') ||
+                                error.message?.toLowerCase().includes('not found');
+            if (isColumnErr) {
+              const { scheduled_date, scheduled_time, ...fallbackPayload } = payload;
+              const { error: secondErr } = await client.from('matches').insert(fallbackPayload);
+              if (secondErr) {
+                console.error('Error inserting match (fallback):', secondErr.message);
+              } else {
+                console.log('Successfully inserted match (fallback without scheduled_date/time)');
+              }
+            } else {
+              console.error('Error inserting match:', error.message);
+            }
+          }
         } catch (err) {
           console.error('Network push insert failed:', err);
         }

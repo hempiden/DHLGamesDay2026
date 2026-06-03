@@ -331,7 +331,7 @@ export default function AthleteUpload({
                             }}
                             className="w-4 h-4 text-[#D40511] focus:ring-[#FFCC00] border-gray-300 rounded"
                           />
-                          <span>{SPORT_CONFIGS[sportKey].icon} {sportKey}</span>
+                          <span>{getSportConfig(sportKey).icon} {sportKey}</span>
                         </label>
                       );
                     })}

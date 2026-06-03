@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Match, Participant, SportType } from '../types';
-import { SPORT_CONFIGS } from '../data';
+import { SPORT_CONFIGS, getSportConfig } from '../data';
 import { 
   BarChart3, 
   Users, 
@@ -170,7 +170,7 @@ export default function AnalyticsDashboard({ matches, participants, setActiveTab
 
       return {
         sport,
-        config: SPORT_CONFIGS[sport],
+        config: getSportConfig(sport),
         playersCount: sportPlayers.length,
         teamsCount: sportTeams.length,
         matchesCount: sportMatches.length,
@@ -570,9 +570,9 @@ export default function AnalyticsDashboard({ matches, participants, setActiveTab
                       <div className="space-y-1">
                         <p className="font-bold text-gray-800 text-[12px]">{p.name}</p>
                         <div className="flex items-center gap-1">
-                          <span className="text-[10px]">{SPORT_CONFIGS[p.sport_type]?.icon}</span>
+                          <span className="text-[10px]">{getSportConfig(p.sport_type)?.icon}</span>
                           <span className="text-[9px] font-black uppercase text-gray-400">
-                            {SPORT_CONFIGS[p.sport_type]?.khmerName}
+                            {getSportConfig(p.sport_type)?.khmerName}
                           </span>
                         </div>
                       </div>
@@ -620,7 +620,7 @@ export default function AnalyticsDashboard({ matches, participants, setActiveTab
                         <div>
                           <p className="font-bold text-gray-800 text-[12px]">{t.name}</p>
                           <span className="text-[9px] font-black text-gray-400 uppercase tracking-tight">
-                            {SPORT_CONFIGS[t.sport_type]?.icon} {SPORT_CONFIGS[t.sport_type]?.khmerName}
+                            {getSportConfig(t.sport_type)?.icon} {getSportConfig(t.sport_type)?.khmerName}
                           </span>
                         </div>
                         {setActiveTab && (
@@ -666,7 +666,7 @@ export default function AnalyticsDashboard({ matches, participants, setActiveTab
                       <div className="space-y-1">
                         <p className="font-bold text-gray-800 text-[12px]">{team.name}</p>
                         <p className="text-[9px] text-gray-400 font-bold uppercase">
-                          {SPORT_CONFIGS[team.sport_type]?.icon} {SPORT_CONFIGS[team.sport_type]?.khmerName}
+                          {getSportConfig(team.sport_type)?.icon} {getSportConfig(team.sport_type)?.khmerName}
                         </p>
                       </div>
 
@@ -727,8 +727,8 @@ export default function AnalyticsDashboard({ matches, participants, setActiveTab
                     <div className="flex flex-wrap gap-1.5">
                       {ath.sports.map((sup, sidx) => (
                         <span key={sidx} className="bg-white border border-blue-200 text-gray-800 px-2 py-1 rounded-lg font-bold text-[10px] uppercase flex items-center gap-1 shadow-sm">
-                          <span>{SPORT_CONFIGS[sup]?.icon}</span>
-                          <span>{SPORT_CONFIGS[sup]?.khmerName}</span>
+                          <span>{getSportConfig(sup)?.icon}</span>
+                          <span>{getSportConfig(sup)?.khmerName}</span>
                         </span>
                       ))}
                     </div>

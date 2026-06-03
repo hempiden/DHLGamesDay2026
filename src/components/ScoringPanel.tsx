@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { motion } from 'motion/react';
 import { Match, SportType, Participant, AppUser } from '../types';
 import { SPORT_CONFIGS, getSportConfig, getActiveSports, isSportMeasure, isSportDistance, getSportDistanceUnit } from '../data';
 import { Play, Check, Trophy, Trash2, ArrowRight, ShieldCheck, AlertCircle, Plus, Minus } from 'lucide-react';
@@ -31,6 +32,7 @@ export default function ScoringPanel({
 }: ScoringPanelProps) {
   const [selectedSport, setSelectedSport] = useState<SportType | 'All'>('All');
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [successSyncedId, setSuccessSyncedId] = useState<string | null>(null);
   const [showConfirmFinishId, setShowConfirmFinishId] = useState<string | null>(null);
 
   // Buffer input states for performance and real-time typing
@@ -88,9 +90,11 @@ export default function ScoringPanel({
     setSavingId(matchId);
     const success = await updateMatchScore(matchId, finalA, finalB);
     if (success) {
+      setSuccessSyncedId(matchId);
       setTimeout(() => {
         setSavingId(null);
-      }, 1500);
+        setSuccessSyncedId(null);
+      }, 2000);
     } else {
       setSavingId(null);
     }
@@ -258,17 +262,38 @@ export default function ScoringPanel({
                                 <Minus className="w-3.5 h-3.5" />
                               </button>
                               
-                              <input
-                                type="number"
-                                id={`score-a-${m.id}`}
-                                step={isDistance ? "0.01" : "1"}
-                                value={isDistance ? Number((currentA / distFactor).toFixed(2)) : currentA}
-                                onChange={(e) => {
-                                  const val = parseFloat(e.target.value);
-                                  setLocalScore(m.id, 'a', isDistance ? Math.round((isNaN(val) ? 0 : val) * distFactor) : (isNaN(val) ? 0 : Math.round(val)));
+                              <motion.div
+                                animate={successSyncedId === m.id ? {
+                                  scale: [1, 1.05, 1],
+                                  boxShadow: [
+                                    "0px 0px 0px rgba(16, 185, 129, 0)",
+                                    "0px 0px 20px rgba(16, 185, 129, 0.5)",
+                                    "0px 0px 0px rgba(16, 185, 129, 0)"
+                                  ]
+                                } : {}}
+                                transition={{
+                                  duration: 1.0,
+                                  repeat: successSyncedId === m.id ? Infinity : 0,
+                                  ease: "easeInOut"
                                 }}
-                                className={`score-input h-24 text-center text-5xl bg-gray-50 border-2 border-gray-100 focus:border-[#FFCC00] focus:bg-white rounded-2xl outline-none transition font-black score-display selection:bg-yellow-100 text-gray-800 ${isDistance ? 'w-28 text-3xl' : 'w-20'}`}
-                              />
+                                className="rounded-2xl"
+                              >
+                                <input
+                                  type="number"
+                                  id={`score-a-${m.id}`}
+                                  step={isDistance ? "0.01" : "1"}
+                                  value={isDistance ? Number((currentA / distFactor).toFixed(2)) : currentA}
+                                  onChange={(e) => {
+                                    const val = parseFloat(e.target.value);
+                                    setLocalScore(m.id, 'a', isDistance ? Math.round((isNaN(val) ? 0 : val) * distFactor) : (isNaN(val) ? 0 : Math.round(val)));
+                                  }}
+                                  className={`score-input h-24 text-center text-5xl rounded-2xl outline-none transition font-black score-display selection:bg-yellow-101 ${
+                                    successSyncedId === m.id
+                                      ? 'border-2 border-emerald-500 bg-emerald-50 text-emerald-800 shadow-[0_0_10px_rgba(16,185,129,0.2)]'
+                                      : 'bg-gray-50 border-2 border-gray-100 focus:border-[#FFCC00] focus:bg-white text-gray-800'
+                                  } ${isDistance ? 'w-28 text-3xl' : 'w-20'}`}
+                                />
+                              </motion.div>
 
                               <button
                                 type="button"
@@ -306,17 +331,38 @@ export default function ScoringPanel({
                                 <Minus className="w-3.5 h-3.5" />
                               </button>
 
-                              <input
-                                type="number"
-                                id={`score-b-${m.id}`}
-                                step={isDistance ? "0.01" : "1"}
-                                value={isDistance ? Number((currentB / distFactor).toFixed(2)) : currentB}
-                                onChange={(e) => {
-                                  const val = parseFloat(e.target.value);
-                                  setLocalScore(m.id, 'b', isDistance ? Math.round((isNaN(val) ? 0 : val) * distFactor) : (isNaN(val) ? 0 : Math.round(val)));
+                              <motion.div
+                                animate={successSyncedId === m.id ? {
+                                  scale: [1, 1.05, 1],
+                                  boxShadow: [
+                                    "0px 0px 0px rgba(16, 185, 129, 0)",
+                                    "0px 0px 20px rgba(16, 185, 129, 0.5)",
+                                    "0px 0px 0px rgba(16, 185, 129, 0)"
+                                  ]
+                                } : {}}
+                                transition={{
+                                  duration: 1.0,
+                                  repeat: successSyncedId === m.id ? Infinity : 0,
+                                  ease: "easeInOut"
                                 }}
-                                className={`score-input h-24 text-center text-5xl bg-gray-50 border-2 border-gray-100 focus:border-[#FFCC00] focus:bg-white rounded-2xl outline-none transition font-black score-display selection:bg-yellow-100 text-gray-800 ${isDistance ? 'w-28 text-3xl' : 'w-20'}`}
-                              />
+                                className="rounded-2xl"
+                              >
+                                <input
+                                  type="number"
+                                  id={`score-b-${m.id}`}
+                                  step={isDistance ? "0.01" : "1"}
+                                  value={isDistance ? Number((currentB / distFactor).toFixed(2)) : currentB}
+                                  onChange={(e) => {
+                                    const val = parseFloat(e.target.value);
+                                    setLocalScore(m.id, 'b', isDistance ? Math.round((isNaN(val) ? 0 : val) * distFactor) : (isNaN(val) ? 0 : Math.round(val)));
+                                  }}
+                                  className={`score-input h-24 text-center text-5xl rounded-2xl outline-none transition font-black score-display selection:bg-yellow-101 ${
+                                    successSyncedId === m.id
+                                      ? 'border-2 border-emerald-500 bg-emerald-50 text-emerald-800 shadow-[0_0_10px_rgba(16,185,129,0.2)]'
+                                      : 'bg-gray-50 border-2 border-gray-100 focus:border-[#FFCC00] focus:bg-white text-gray-800'
+                                  } ${isDistance ? 'w-28 text-3xl' : 'w-20'}`}
+                                />
+                              </motion.div>
 
                               <button
                                 type="button"

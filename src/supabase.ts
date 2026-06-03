@@ -51,7 +51,7 @@ export async function testSupabaseConnection(url: string, key: string): Promise<
 // Push local matches state to remote database
 export async function syncLocalToSupabase(matches: Match[], client: SupabaseClient): Promise<void> {
   for (const match of matches) {
-    const dbMatch = {
+    const dbMatch: any = {
       sport_name: match.sport_name,
       match_label: match.match_label,
       team_a: match.team_a,
@@ -64,12 +64,29 @@ export async function syncLocalToSupabase(matches: Match[], client: SupabaseClie
     };
 
     // Upsert by sport and teams if we are mapping
+    const payload = { ...dbMatch, updated_at: new Date().toISOString() };
     const { error } = await client
       .from('matches')
-      .upsert({ ...dbMatch, updated_at: new Date().toISOString() }, { onConflict: 'id' });
+      .upsert(payload, { onConflict: 'id' });
     
     if (error) {
-      console.error(`Sync error for match ${match.id}:`, error.message);
+      const isColumnErr = error.message?.toLowerCase().includes('column') || 
+                          error.message?.toLowerCase().includes('schema cache') || 
+                          error.message?.toLowerCase().includes('attribute') ||
+                          error.message?.toLowerCase().includes('not found');
+      if (isColumnErr) {
+        const { scheduled_date, scheduled_time, ...fallbackPayload } = payload;
+        const { error: secondErr } = await client
+          .from('matches')
+          .upsert(fallbackPayload, { onConflict: 'id' });
+        if (secondErr) {
+          console.error(`Sync error (fallback) for match ${match.id}:`, secondErr.message);
+        } else {
+          console.log(`Successfully synced match ${match.id} (fallback without scheduled_date/time)`);
+        }
+      } else {
+        console.error(`Sync error for match ${match.id}:`, error.message);
+      }
     }
   }
 }

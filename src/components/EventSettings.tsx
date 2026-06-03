@@ -186,15 +186,29 @@ export default function EventSettings({
           };
           const { error } = await client.from('events').upsert(payload);
           if (error) {
+            const isRLSErr = error.message?.toLowerCase().includes('row-level security') || 
+                             error.message?.toLowerCase().includes('policy') || 
+                             error.message?.toLowerCase().includes('permission') || 
+                             error.message?.toLowerCase().includes('violates');
             if (error.message?.includes('enabled_languages')) {
               // Fallback for older database schemas that lack the enabled_languages column
               const { enabled_languages, ...fallbackPayload } = payload;
               const { error: secondErr } = await client.from('events').upsert(fallbackPayload);
               if (secondErr) {
-                console.error('Failed to sync event upsert after retry:', secondErr.message);
+                const isSecondRLSErr = secondErr.message?.toLowerCase().includes('row-level security') || 
+                                       secondErr.message?.toLowerCase().includes('policy') || 
+                                       secondErr.message?.toLowerCase().includes('permission') || 
+                                       secondErr.message?.toLowerCase().includes('violates');
+                if (isSecondRLSErr) {
+                  console.warn('Failed to sync event upsert after retry (RLS/policy constraint):', secondErr.message);
+                } else {
+                  console.error('Failed to sync event upsert after retry:', secondErr.message);
+                }
               } else {
                 console.log('Successfully synced event upsert (fallback without enabled_languages column)');
               }
+            } else if (isRLSErr) {
+              console.warn('Failed to sync event upsert (RLS/policy constraint):', error.message);
             } else {
               console.error('Failed to sync event upsert:', error.message);
             }
