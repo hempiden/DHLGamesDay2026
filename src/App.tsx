@@ -538,6 +538,7 @@ export default function App() {
 
   // Supabase states
   const [supabaseUrl, setSupabaseUrl] = useState<string>(() => {
+    const envUrl = import.meta.env.VITE_SUPABASE_URL || import.meta.env.NEXT_PUBLIC_SUPABASE_URL;
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       const paramUrl = params.get('s_url');
@@ -546,10 +547,11 @@ export default function App() {
         return paramUrl;
       }
     }
-    return localStorage.getItem('dhl_supabase_url') || 'https://yaabfbyzvcqmnlzlribl.supabase.co';
+    return envUrl || localStorage.getItem('dhl_supabase_url') || 'https://yaabfbyzvcqmnlzlribl.supabase.co';
   });
 
   const [supabaseAnonKey, setSupabaseAnonKey] = useState<string>(() => {
+    const envKey = import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       const paramKey = params.get('s_key');
@@ -558,7 +560,7 @@ export default function App() {
         return paramKey;
       }
     }
-    return localStorage.getItem('dhl_supabase_anon_key') || 'sb_publishable_UG2etT68udwph9BSHi_ciw_ydzIUjLR';
+    return envKey || localStorage.getItem('dhl_supabase_anon_key') || 'sb_publishable_UG2etT68udwph9BSHi_ciw_ydzIUjLR';
   });
 
   const [isSupabaseEnabled, setIsSupabaseEnabled] = useState<boolean>(() => {
