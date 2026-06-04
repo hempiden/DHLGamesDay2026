@@ -157,18 +157,17 @@ export default function EventSettings({
 
   // Filter events dynamically to support administrative data isolation per creator session
   const filteredAdminEvents = useMemo(() => {
-    if (!currentUser) return [];
-    if (currentUser.role === 'super_admin' && currentUser.username === 'hempiden') {
-      return events;
-    }
-    return events.filter(e => e.created_by === currentUser.username);
-  }, [events, currentUser]);
+    return events;
+  }, [events]);
 
   const syncEventsToSupabase = async (updatedEventsList: EventInfo[]) => {
     if (isSupabaseEnabled && supabaseConnected && supabaseUrl && supabaseAnonKey) {
       const client = getSupabaseClient(supabaseUrl, supabaseAnonKey);
       if (client) {
-        const myAdminEvents = updatedEventsList.filter(e => e.created_by === currentUser?.username);
+        const myAdminEvents = updatedEventsList.filter(e => {
+          const orgSlug = e.organization_slug || 'dhl-games';
+          return orgSlug === organizationSlug;
+        });
         for (const ev of myAdminEvents) {
           const payload: any = {
             id: ev.id,

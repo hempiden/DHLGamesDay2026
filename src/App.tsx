@@ -892,40 +892,23 @@ export default function App() {
             }
           }
 
-          // Fetch isolated matches (isolate per admin or active event)
+          // Fetch isolated matches (isolate per active event)
           let matchesData = null;
           let matchesError = null;
 
-          if (currentUser) {
-            const matchesRes = await client
-              .from('matches')
-              .select('*')
-              .eq('created_by', currentUser.username)
-              .order('created_at', { ascending: false });
+          const matchesRes = await client
+            .from('matches')
+            .select('*')
+            .eq('event_id', activeEventId)
+            .order('created_at', { ascending: false });
 
-            if (matchesRes.error && (matchesRes.error.message.includes('column') || matchesRes.error.message.includes('attribute'))) {
-              const fallbackRes = await client.from('matches').select('*').order('created_at', { ascending: false });
-              matchesData = fallbackRes.data;
-              matchesError = fallbackRes.error;
-            } else {
-              matchesData = matchesRes.data;
-              matchesError = matchesRes.error;
-            }
+          if (matchesRes.error && (matchesRes.error.message.includes('column') || matchesRes.error.message.includes('attribute'))) {
+            const fallbackRes = await client.from('matches').select('*').order('created_at', { ascending: false });
+            matchesData = fallbackRes.data;
+            matchesError = fallbackRes.error;
           } else {
-            const matchesRes = await client
-              .from('matches')
-              .select('*')
-              .eq('event_id', activeEventId)
-              .order('created_at', { ascending: false });
-
-            if (matchesRes.error && (matchesRes.error.message.includes('column') || matchesRes.error.message.includes('attribute'))) {
-              const fallbackRes = await client.from('matches').select('*').order('created_at', { ascending: false });
-              matchesData = fallbackRes.data;
-              matchesError = fallbackRes.error;
-            } else {
-              matchesData = matchesRes.data;
-              matchesError = matchesRes.error;
-            }
+            matchesData = matchesRes.data;
+            matchesError = matchesRes.error;
           }
 
           if (matchesError) {
@@ -963,40 +946,23 @@ export default function App() {
             });
           }
 
-          // Fetch isolated participants table (isolate per admin or active event)
+          // Fetch isolated participants table (isolate per active event)
           let pData = null;
           let pError = null;
 
-          if (currentUser) {
-            const pRes = await client
-              .from('participants')
-              .select('*')
-              .eq('created_by', currentUser.username)
-              .order('name');
+          const pRes = await client
+            .from('participants')
+            .select('*')
+            .eq('event_id', activeEventId)
+            .order('name');
 
-            if (pRes.error && (pRes.error.message.includes('column') || pRes.error.message.includes('attribute'))) {
-              const fallbackRes = await client.from('participants').select('*').order('name');
-              pData = fallbackRes.data;
-              pError = fallbackRes.error;
-            } else {
-              pData = pRes.data;
-              pError = pRes.error;
-            }
+          if (pRes.error && (pRes.error.message.includes('column') || pRes.error.message.includes('attribute'))) {
+            const fallbackRes = await client.from('participants').select('*').order('name');
+            pData = fallbackRes.data;
+            pError = fallbackRes.error;
           } else {
-            const pRes = await client
-              .from('participants')
-              .select('*')
-              .eq('event_id', activeEventId)
-              .order('name');
-
-            if (pRes.error && (pRes.error.message.includes('column') || pRes.error.message.includes('attribute'))) {
-              const fallbackRes = await client.from('participants').select('*').order('name');
-              pData = fallbackRes.data;
-              pError = fallbackRes.error;
-            } else {
-              pData = pRes.data;
-              pError = pRes.error;
-            }
+            pData = pRes.data;
+            pError = pRes.error;
           }
           
           if (pError) {
@@ -1015,6 +981,7 @@ export default function App() {
               is_team: Boolean(item.is_team),
               team_id: item.team_id ? String(item.team_id) : null,
               photo_url: item.photo_url || null,
+              gender: item.gender || undefined,
               created_at: item.created_at,
               updated_at: item.updated_at,
               event_id: item.event_id || undefined,
@@ -1396,8 +1363,12 @@ export default function App() {
     localStorage.setItem('dhl_games_day_participants', JSON.stringify(updated));
   };
 
-  const addParticipant = async (name: string, sport_type: SportType, is_team: boolean, team_id: string | null, photo_url?: string, gender?: string): Promise<string | null> => {
+  const addParticipant = async (name: string, sport_type: SportType, is_team: boolean, team_id: string | null, photo_url?: string, gender?: string, eventId?: string, createdBy?: string, organizationSlugParam?: string): Promise<string | null> => {
     const newId = `p-${Date.now()}`;
+    const targetEventId = eventId || activeEventId;
+    const targetCreatedBy = createdBy || currentUser?.username || 'hempiden';
+    const targetOrgSlug = organizationSlugParam || organization?.slug || 'company-games';
+
     const newPar: Participant = {
       id: newId,
       name,
@@ -1406,6 +1377,9 @@ export default function App() {
       team_id,
       photo_url: photo_url || undefined,
       gender: gender || undefined,
+      event_id: targetEventId,
+      created_by: targetCreatedBy,
+      organization_slug: targetOrgSlug,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     };
@@ -1424,6 +1398,9 @@ export default function App() {
             team_id: team_id && !isNaN(Number(team_id)) ? Number(team_id) : null,
             photo_url: photo_url || null,
             gender: gender || null,
+            event_id: targetEventId,
+            created_by: targetCreatedBy,
+            organization_slug: targetOrgSlug,
           };
           
           let result = await client.from('participants').insert(payload).select('id');
@@ -1434,7 +1411,7 @@ export default function App() {
                                 result.error.message?.toLowerCase().includes('attribute') ||
                                 result.error.message?.toLowerCase().includes('not found');
             if (isColumnErr) {
-              const { gender, ...fallbackPayload } = payload;
+              const { gender, organization_slug, ...fallbackPayload } = payload;
               result = await client.from('participants').insert(fallbackPayload).select('id');
             }
           }

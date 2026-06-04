@@ -5,7 +5,7 @@ import { SPORT_CONFIGS, getSportConfig, getActiveSports } from '../data';
 
 interface AthleteUploadProps {
   participants: Participant[];
-  addParticipant: (name: string, sport_type: SportType, is_team: boolean, team_id: string | null, photo_url?: string, gender?: string) => Promise<any>;
+  addParticipant: (name: string, sport_type: SportType, is_team: boolean, team_id: string | null, photo_url?: string, gender?: string, eventId?: string, createdBy?: string) => Promise<any>;
   updateParticipantName: (id: string, name: string) => Promise<boolean>;
   updateParticipantPhoto: (id: string, photoUrl: string | null) => Promise<boolean>;
   assignPlayerToTeam: (playerId: string, teamId: string | null) => Promise<boolean>;
@@ -159,15 +159,32 @@ export default function AthleteUpload({
         if (!item.name || typeof item.name !== 'string') {
           throw new Error('Each record must contain a valid string "name" attribute.');
         }
-        const sType = item.sport_type || 'Soccer';
+        let sType = (item.sport_type || 'Soccer').trim();
+        
+        // Normalize common spelling variants of sport names
+        const sLower = sType.toLowerCase();
+        if (sLower === 'football' || sLower === 'soccer') {
+          sType = 'Soccer';
+        } else if (sLower === 'volleyball') {
+          sType = 'Volleyball';
+        } else if (sLower === 'ping pong' || sLower === 'pingpong') {
+          sType = 'Pingpong';
+        } else if (sLower === 'badminton') {
+          sType = 'Badminton';
+        } else if (sLower === 'swimming') {
+          sType = 'Swimming';
+        } else if (sLower === 'supporter') {
+          sType = 'Supporter';
+        }
+
         // Validate sport type against active sports
         const validSports = getActiveSports() as string[];
-        const isStandard = ['Soccer', 'Volleyball', 'Pingpong', 'Badminton', 'Swimming'].includes(sType);
+        const isStandard = ['Soccer', 'Volleyball', 'Pingpong', 'Badminton', 'Swimming', 'Supporter'].includes(sType);
         if (!validSports.includes(sType) && !isStandard) {
           throw new Error(`Invalid sport_type "${sType}". Must be one of standard sports or active custom event sports.`);
         }
 
-        await addParticipant(item.name.trim(), sType, false, null, item.photo_url || undefined, item.gender);
+        await addParticipant(item.name.trim(), sType, false, null, item.photo_url || undefined, item.gender, item.event_id, item.created_by);
         count++;
       }
 

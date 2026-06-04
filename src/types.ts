@@ -77,6 +77,7 @@ export interface Participant {
   gender?: string;
   event_id?: string;
   created_by?: string;
+  organization_slug?: string;
 }
 
 export interface AppUser {

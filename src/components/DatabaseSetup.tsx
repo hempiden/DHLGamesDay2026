@@ -73,6 +73,16 @@ export default function DatabaseSetup({
       const matches = localMatchesStr ? JSON.parse(localMatchesStr) : [];
       const participants = localParticipantsStr ? JSON.parse(localParticipantsStr) : [];
 
+      let organizationSlug = 'company-games';
+      try {
+        const savedOrg = localStorage.getItem('dhl_organization_settings');
+        if (savedOrg) {
+          organizationSlug = JSON.parse(savedOrg).slug || 'company-games';
+        }
+      } catch (e) {
+        console.warn('Could not read saved organization slug:', e);
+      }
+
       if (matches.length === 0 && participants.length === 0 && (!users || users.length === 0)) {
         setSyncStatus('failed');
         setSyncMessage('គ្មានទិន្នន័យក្នុង Browser memory ដើម្បី Sync ទេ។ No local database records found.');
@@ -94,6 +104,8 @@ export default function DatabaseSetup({
           score_a: Number(m.score_a) || 0,
           score_b: Number(m.score_b) || 0,
           status: m.status,
+          event_id: m.event_id || null,
+          created_by: m.created_by || null,
         }));
 
         const { error: matchError } = await client.from('matches').insert(matchesToInsert);
@@ -113,6 +125,9 @@ export default function DatabaseSetup({
           team_id: p.team_id && p.team_id !== 'null' ? String(p.team_id) : null,
           photo_url: p.photo_url || null,
           gender: p.gender || null,
+          event_id: p.event_id || 'dhl-games-2026',
+          created_by: p.created_by || 'hempiden',
+          organization_slug: p.organization_slug || organizationSlug,
         }));
 
         const { error: partError } = await client.from('participants').insert(partToInsert);
@@ -204,22 +219,31 @@ export default function DatabaseSetup({
               <div className="space-y-1.5 text-[11px]">
                 <p className="font-extrabold text-indigo-300 uppercase tracking-wider">របៀបដំណើរការទិន្នន័យ & Environment Keys (System Architecture Guide)</p>
                 
-                <div className="space-y-2.5 text-gray-300">
+                <div className="space-y-3 text-gray-300">
                   <p>
-                    <strong className="text-white">❓ ហេតុអ្វីបានជាគ្មានទិន្នន័យនៅក្នុងតារាង (Why is my table empty?):</strong><br />
-                    តាមលំនាំដើម កម្មវិធីនេះរក្សាទុកទិន្នន័យទាំងអស់នៅលើប្រព័ន្ធ <span className="bg-slate-850 px-1 py-0.5 rounded text-amber-400 font-mono">localStorage</span> របស់ Browser។ រហូតទាល់តែអ្នកចុចប៊ូតុង <strong className="text-emerald-400">"Push Local Data to Supabase"</strong> នៅផ្នែកខាងក្រោម ទើបកីឡាករ និងការប្រកួតទាំងអស់ត្រូវបានបញ្ចូលទៅកាន់ពពក (Supabase Cloud)!
+                    <strong className="text-white text-xs block mb-1">❓ ហេتوىអ្វីបានជាគ្មានទិន្នន័យនៅក្នុងតារាង (Why is my table empty?):</strong>
+                    តាមលំនាំដើម កម្មវិធីនេះរក្សាទុកទិន្នន័យទាំងអស់នៅលើប្រព័ន្ធ <span className="bg-slate-850 px-1.5 py-0.5 rounded text-amber-500 font-mono">localStorage</span> របស់ Browser។ រហូតទាល់តែអ្នកចុចប៊ូតុង <strong className="text-emerald-400">"Push Local Data to Supabase"</strong> នៅផ្នែកខាងក្រោម ទើបកីឡាករ និងការប្រកួតទាំងអស់ត្រូវបានបញ្ចូលទៅកាន់ពពក (Supabase Cloud)!
                   </p>
 
-                  <p>
-                    <strong className="text-white">🔑 ភាពខុសគ្នារវាង Environment Keys (VITE_ vs NEXT_PUBLIC_):</strong><br />
-                    • <span className="text-[#FFCC00] font-mono">VITE_SUPABASE_URL</span> / <span className="text-[#FFCC00] font-mono">_ANON_KEY</span> គឺជាឈ្មោះកូដលំនាំដើមដែលប្រើដោយ <strong className="text-white">Vite.js React builder</strong> (គម្រោងរបស់យើងកំពុងប្រើប្រាស់)។<br />
-                    • <span className="text-cyan-400 font-mono">NEXT_PUBLIC_SUPABASE_URL</span> / <span className="text-cyan-400 font-mono">_PUBLISHABLE_KEY</span> គឺជាឈ្មោះកូដសម្រាប់គម្រោងដែលបង្កើតឡើងដោយ <strong className="text-white">Next.js framework</strong>។<br />
-                    <i>💡 កម្មវិធីរបស់យើងត្រូវបានរចនាឡើងយ៉ាងឆ្លាតវៃ ដោយវាគាំទ្រ និងស្គាល់កូដទាំងពីរប្រភេទនេះដោយស្វ័យប្រវត្តិ។ ដូច្នេះអ្នកអាចបំពេញមួយណាក៏បាននៅក្នុង Vercel variables!</i>
-                  </p>
+                  <div className="border-t border-slate-850 my-2 pt-2.5">
+                    <strong className="text-[#FFCC00] text-xs block mb-1">🚀 ការកំណត់ Environment Variables នៅលើ Vercel ឬ AI Studio:</strong>
+                    ដើម្បីឱ្យកម្មវិធីរបស់អ្នកតភ្ជាប់ទៅកាន់ Supabase ដោយស្វ័យប្រវត្តិតាំងពីចាប់ផ្តើមដំណើរការ (ដោយមិនចាំបាច់បំពេញ URL រាល់ពេល) សូមចូលទៅកាន់ទំព័រ <strong className="text-white">Settings &gt; Environment Variables</strong> នៅក្នុង <strong className="text-white">Vercel Dashboard</strong> ឬប្រព័ន្ធគ្រប់គ្រងរបស់យើង រួចបង្កើតអថេរចម្បងទាំង ២ ខាងក្រោម៖
+                    <ul className="list-disc list-inside space-y-1.5 mt-2 pl-2 text-gray-300 font-medium">
+                      <li>
+                        <code className="text-[#FFCC00] font-mono font-bold bg-slate-950 px-1.5 py-0.5 rounded text-[10px]">VITE_SUPABASE_URL</code> : តំណភ្ជាប់ API URL នៃគម្រោង Supabase របស់អ្នក (e.g. <span className="text-slate-400 font-mono">https://xxxx.supabase.co</span>)។
+                      </li>
+                      <li>
+                        <code className="text-[#FFCC00] font-mono font-bold bg-slate-950 px-1.5 py-0.5 rounded text-[10px]">VITE_SUPABASE_ANON_KEY</code> : API anon / publishable key សាធារណៈសម្រាប់ភ្ជាប់មកកាន់ Database របស់អ្នក។
+                      </li>
+                    </ul>
+                    <p className="mt-2 text-[10px] text-slate-400 italic font-normal">
+                      💡 Fallback Support: ប្រសិនបើគម្រោងរបស់អ្នកប្រើ Next.js keys កម្មវិធីនេះក៏គាំទ្រស្វ័យប្រវត្តិនូវ <code className="text-cyan-400 font-mono text-[9px]">NEXT_PUBLIC_SUPABASE_URL</code> និង <code className="text-cyan-400 font-mono text-[9px]">NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY</code> ផងដែរ។
+                    </p>
+                  </div>
 
-                  <p>
-                    <strong className="text-white">📊 តារាងទិន្នន័យ (Database Tables Schema):</strong><br />
-                    គម្រោងរបស់ Dhl Games Day ត្រូវការតែ <strong className="text-indigo-300">២ តារាងប៉ុណ្ណោះ matches និង participants</strong>។ ទិន្នន័យគណនីអ្នកប្រើប្រាស់ (Users) ត្រូវបានគ្រប់គ្រងនៅលើម៉ាស៊ីន local space ដើម្បីសុវត្ថិភាពខ្ពស់ និងរហ័សទាន់ចិត្ត។
+                  <p className="border-t border-slate-850 pt-2 text-[10.5px]">
+                    <strong className="text-white text-xs block mb-1">📊 គំនូសតារាងទិន្នន័យ (Database Tables Schema):</strong>
+                    គម្រោងរបស់ Dhl Games Day ត្រូវបានរៀបចំឡើងយ៉ាងស្អិតរមួតដើម្បីគាំទ្រការគ្រប់គ្រង tournament ច្រើនដង និងអ្នកគ្រប់គ្រងច្រើនរូបដោយសុវត្ថិភាព។ គំនូសបំរែបំរួល SQL ខាងក្រោមមានលក្ខណៈពេញលេញសម្រាប់ការបង្កើតថ្មី ឬតំឡើងជំនាន់ (Upgrade) database របស់អ្នក។
                   </p>
                 </div>
               </div>
@@ -413,9 +437,6 @@ create table if not exists public.events (
   created_at timestamp with time zone default timezone('utc'::text, now())
 );
 
--- Ensure enabled_languages column exists for upgrading existing databases
-alter table public.events add column if not exists enabled_languages text default 'kh,en';
-
 -- 2. Create Matches Table (with Isolation)
 create table if not exists public.matches (
   id bigint generated by default as identity primary key,
@@ -445,6 +466,7 @@ create table if not exists public.participants (
   team_id text,
   photo_url text,
   gender text,
+  organization_slug text,
   created_at timestamp with time zone default timezone('utc'::text, now()),
   updated_at timestamp with time zone default timezone('utc'::text, now())
 );
@@ -483,6 +505,29 @@ create table if not exists public.organization_settings (
   updated_at timestamp with time zone default timezone('utc'::text, now())
 );
 
+-- ==========================================
+-- SAFE GRADUAL DATABASE UPGRADE STATEMENTS
+-- ==========================================
+-- Safe upgrades for events table columns
+alter table public.events add column if not exists show_public_teams boolean default false;
+alter table public.events add column if not exists is_enrolment_enabled boolean default true;
+alter table public.events add column if not exists organization_slug text;
+alter table public.events add column if not exists enabled_languages text default 'kh,en';
+
+-- Safe upgrades for matches table columns
+alter table public.matches add column if not exists event_id text;
+alter table public.matches add column if not exists created_by text;
+alter table public.matches add column if not exists scheduled_date text;
+alter table public.matches add column if not exists scheduled_time text;
+
+-- Safe upgrades for participants table columns
+alter table public.participants add column if not exists event_id text;
+alter table public.participants add column if not exists created_by text;
+alter table public.participants add column if not exists gender text;
+alter table public.participants add column if not exists team_id text;
+alter table public.participants add column if not exists photo_url text;
+alter table public.participants add column if not exists organization_slug text;
+
 -- 7. Insert fallback organization values
 insert into public.organization_settings (id, name, logo_url, slug, tagline, contact_email, contact_phone, website, address, footer_motto)
 values (
@@ -500,39 +545,63 @@ values (
 
 -- 8. Enable Public Access policies for quick testing
 alter table public.events enable row level security;
+drop policy if exists "Allow read events" on public.events;
 create policy "Allow read events" on public.events for select using (true);
+drop policy if exists "Allow insert events" on public.events;
 create policy "Allow insert events" on public.events for insert with check (true);
+drop policy if exists "Allow update events" on public.events;
 create policy "Allow update events" on public.events for update using (true);
+drop policy if exists "Allow delete events" on public.events;
 create policy "Allow delete events" on public.events for delete using (true);
 
 alter table public.matches enable row level security;
+drop policy if exists "Allow read matches" on public.matches;
 create policy "Allow read matches" on public.matches for select using (true);
+drop policy if exists "Allow insert matches" on public.matches;
 create policy "Allow insert matches" on public.matches for insert with check (true);
+drop policy if exists "Allow update matches" on public.matches;
 create policy "Allow update matches" on public.matches for update using (true);
+drop policy if exists "Allow delete matches" on public.matches;
 create policy "Allow delete matches" on public.matches for delete using (true);
 
 alter table public.participants enable row level security;
+drop policy if exists "Allow read participants" on public.participants;
 create policy "Allow read participants" on public.participants for select using (true);
+drop policy if exists "Allow insert participants" on public.participants;
 create policy "Allow insert participants" on public.participants for insert with check (true);
+drop policy if exists "Allow update participants" on public.participants;
 create policy "Allow update participants" on public.participants for update using (true);
+drop policy if exists "Allow delete participants" on public.participants;
 create policy "Allow delete participants" on public.participants for delete using (true);
 
 alter table public.admin_users enable row level security;
+drop policy if exists "Allow read admin_users" on public.admin_users;
 create policy "Allow read admin_users" on public.admin_users for select using (true);
+drop policy if exists "Allow insert admin_users" on public.admin_users;
 create policy "Allow insert admin_users" on public.admin_users for insert with check (true);
+drop policy if exists "Allow update admin_users" on public.admin_users;
 create policy "Allow update admin_users" on public.admin_users for update using (true);
+drop policy if exists "Allow delete admin_users" on public.admin_users;
 create policy "Allow delete admin_users" on public.admin_users for delete using (true);
 
 alter table public.event_settings enable row level security;
+drop policy if exists "Allow read event_settings" on public.event_settings;
 create policy "Allow read event_settings" on public.event_settings for select using (true);
+drop policy if exists "Allow insert event_settings" on public.event_settings;
 create policy "Allow insert event_settings" on public.event_settings for insert with check (true);
+drop policy if exists "Allow update event_settings" on public.event_settings;
 create policy "Allow update event_settings" on public.event_settings for update using (true);
+drop policy if exists "Allow delete event_settings" on public.event_settings;
 create policy "Allow delete event_settings" on public.event_settings for delete using (true);
 
 alter table public.organization_settings enable row level security;
+drop policy if exists "Allow read organization_settings" on public.organization_settings;
 create policy "Allow read organization_settings" on public.organization_settings for select using (true);
+drop policy if exists "Allow insert organization_settings" on public.organization_settings;
 create policy "Allow insert organization_settings" on public.organization_settings for insert with check (true);
+drop policy if exists "Allow update organization_settings" on public.organization_settings;
 create policy "Allow update organization_settings" on public.organization_settings for update using (true);
+drop policy if exists "Allow delete organization_settings" on public.organization_settings;
 create policy "Allow delete organization_settings" on public.organization_settings for delete using (true);`;
               navigator.clipboard.writeText(sqlText);
               alert("រក្សាទុក SQL នៅក្នុង Clipboard រួចរាល់! SQL copied to clipboard. Go to Supabase SQL Editor, paste and click 'Run'.");
@@ -557,7 +626,9 @@ create policy "Allow delete organization_settings" on public.organization_settin
 
           <div className="relative mt-2">
             <pre className="p-4 bg-gray-50 border border-gray-150 rounded-2xl text-[10px] font-mono text-gray-600 overflow-x-auto max-h-64 leading-relaxed shadow-inner">
-{`-- 1. Create Events Table
+{`-- Supabase Table Setup for Multi-Tenant Sports Tournaments
+
+-- 1. Create Events Table
 create table if not exists public.events (
   id text primary key,
   name text not null,
@@ -573,9 +644,6 @@ create table if not exists public.events (
   enabled_languages text default 'kh,en',
   created_at timestamp with time zone default timezone('utc'::text, now())
 );
-
--- Ensure enabled_languages column exists for upgrading existing databases
-alter table public.events add column if not exists enabled_languages text default 'kh,en';
 
 -- 2. Create Matches Table (with Isolation)
 create table if not exists public.matches (
@@ -606,6 +674,7 @@ create table if not exists public.participants (
   team_id text,
   photo_url text,
   gender text,
+  organization_slug text,
   created_at timestamp with time zone default timezone('utc'::text, now()),
   updated_at timestamp with time zone default timezone('utc'::text, now())
 );
@@ -644,6 +713,29 @@ create table if not exists public.organization_settings (
   updated_at timestamp with time zone default timezone('utc'::text, now())
 );
 
+-- ==========================================
+-- SAFE GRADUAL DATABASE UPGRADE STATEMENTS
+-- ==========================================
+-- Safe upgrades for events table columns
+alter table public.events add column if not exists show_public_teams boolean default false;
+alter table public.events add column if not exists is_enrolment_enabled boolean default true;
+alter table public.events add column if not exists organization_slug text;
+alter table public.events add column if not exists enabled_languages text default 'kh,en';
+
+-- Safe upgrades for matches table columns
+alter table public.matches add column if not exists event_id text;
+alter table public.matches add column if not exists created_by text;
+alter table public.matches add column if not exists scheduled_date text;
+alter table public.matches add column if not exists scheduled_time text;
+
+-- Safe upgrades for participants table columns
+alter table public.participants add column if not exists event_id text;
+alter table public.participants add column if not exists created_by text;
+alter table public.participants add column if not exists gender text;
+alter table public.participants add column if not exists team_id text;
+alter table public.participants add column if not exists photo_url text;
+alter table public.participants add column if not exists organization_slug text;
+
 -- 7. Insert fallback organization values
 insert into public.organization_settings (id, name, logo_url, slug, tagline, contact_email, contact_phone, website, address, footer_motto)
 values (
@@ -661,39 +753,63 @@ values (
 
 -- 8. Enable Public Access policies for all tables
 alter table public.events enable row level security;
+drop policy if exists "Allow read events" on public.events;
 create policy "Allow read events" on public.events for select using (true);
+drop policy if exists "Allow insert events" on public.events;
 create policy "Allow insert events" on public.events for insert with check (true);
+drop policy if exists "Allow update events" on public.events;
 create policy "Allow update events" on public.events for update using (true);
+drop policy if exists "Allow delete events" on public.events;
 create policy "Allow delete events" on public.events for delete using (true);
 
 alter table public.matches enable row level security;
+drop policy if exists "Allow read matches" on public.matches;
 create policy "Allow read matches" on public.matches for select using (true);
+drop policy if exists "Allow insert matches" on public.matches;
 create policy "Allow insert matches" on public.matches for insert with check (true);
+drop policy if exists "Allow update matches" on public.matches;
 create policy "Allow update matches" on public.matches for update using (true);
+drop policy if exists "Allow delete matches" on public.matches;
 create policy "Allow delete matches" on public.matches for delete using (true);
 
 alter table public.participants enable row level security;
+drop policy if exists "Allow read participants" on public.participants;
 create policy "Allow read participants" on public.participants for select using (true);
+drop policy if exists "Allow insert participants" on public.participants;
 create policy "Allow insert participants" on public.participants for insert with check (true);
+drop policy if exists "Allow update participants" on public.participants;
 create policy "Allow update participants" on public.participants for update using (true);
+drop policy if exists "Allow delete participants" on public.participants;
 create policy "Allow delete participants" on public.participants for delete using (true);
 
 alter table public.admin_users enable row level security;
+drop policy if exists "Allow read admin_users" on public.admin_users;
 create policy "Allow read admin_users" on public.admin_users for select using (true);
+drop policy if exists "Allow insert admin_users" on public.admin_users;
 create policy "Allow insert admin_users" on public.admin_users for insert with check (true);
+drop policy if exists "Allow update admin_users" on public.admin_users;
 create policy "Allow update admin_users" on public.admin_users for update using (true);
+drop policy if exists "Allow delete admin_users" on public.admin_users;
 create policy "Allow delete admin_users" on public.admin_users for delete using (true);
 
 alter table public.event_settings enable row level security;
+drop policy if exists "Allow read event_settings" on public.event_settings;
 create policy "Allow read event_settings" on public.event_settings for select using (true);
+drop policy if exists "Allow insert event_settings" on public.event_settings;
 create policy "Allow insert event_settings" on public.event_settings for insert with check (true);
+drop policy if exists "Allow update event_settings" on public.event_settings;
 create policy "Allow update event_settings" on public.event_settings for update using (true);
+drop policy if exists "Allow delete event_settings" on public.event_settings;
 create policy "Allow delete event_settings" on public.event_settings for delete using (true);
 
 alter table public.organization_settings enable row level security;
+drop policy if exists "Allow read organization_settings" on public.organization_settings;
 create policy "Allow read organization_settings" on public.organization_settings for select using (true);
+drop policy if exists "Allow insert organization_settings" on public.organization_settings;
 create policy "Allow insert organization_settings" on public.organization_settings for insert with check (true);
+drop policy if exists "Allow update organization_settings" on public.organization_settings;
 create policy "Allow update organization_settings" on public.organization_settings for update using (true);
+drop policy if exists "Allow delete organization_settings" on public.organization_settings;
 create policy "Allow delete organization_settings" on public.organization_settings for delete using (true);`}
             </pre>
           </div>
