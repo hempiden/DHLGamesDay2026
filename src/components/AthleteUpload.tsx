@@ -20,8 +20,8 @@ export default function AthleteUpload({
   assignPlayerToTeam,
   deleteParticipant
 }: AthleteUploadProps) {
-  // Tabs within Athlete register: ('single' or 'bulk')
-  const [uploadMode, setUploadMode] = useState<'single' | 'bulk'>('single');
+  // Forced to single player register mode
+  const uploadMode = 'single';
   const [selectedSport, setSelectedSport] = useState<SportType>('Soccer');
 
   // Single player states
@@ -224,33 +224,11 @@ export default function AthleteUpload({
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-3xl border border-gray-100 shadow-sm md:p-8">
         <div>
           <h2 className="font-dhl-title text-2xl text-[#D40511] italic tracking-tight uppercase">
-            Athlete Hub & Upload Terminal
+            Athlete Hub Terminal
           </h2>
           <p className="text-gray-400 text-[11px] font-bold uppercase tracking-wider mt-0.5">
-            Register and upload profile assets for tournament sports players (crude bulk capability included)
+            Register players and upload profile assets for tournament sports
           </p>
-        </div>
-        <div className="flex bg-gray-100 p-1 rounded-2xl border border-gray-200">
-          <button
-            onClick={() => setUploadMode('single')}
-            className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-200 select-none ${
-              uploadMode === 'single'
-                ? 'bg-white text-gray-950 shadow-sm'
-                : 'text-gray-500 hover:text-gray-800'
-            }`}
-          >
-            បាំងម្នាក់ៗ (Single Player Form)
-          </button>
-          <button
-            onClick={() => setUploadMode('bulk')}
-            className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-200 select-none ${
-              uploadMode === 'bulk'
-                ? 'bg-white text-gray-950 shadow-sm'
-                : 'text-gray-500 hover:text-gray-800'
-            }`}
-          >
-            បញ្ចូលជាក្រុម (Crude Bulk upload)
-          </button>
         </div>
       </div>
 
@@ -258,158 +236,112 @@ export default function AthleteUpload({
         
         {/* Left Side: Uploading Section */}
         <div className="lg:col-span-4 bg-white p-6 rounded-3xl border border-gray-100 shadow-sm space-y-6">
-          {uploadMode === 'single' ? (
-            <div className="space-y-4">
-              <h3 className="font-dhl-title text-base text-gray-800 italic uppercase pb-2 border-b border-gray-100">
-                ចុះឈ្មោះកីឡាករម្នាក់ៗ (Single Athlete Roster Form)
-              </h3>
+          <div className="space-y-4">
+            <h3 className="font-dhl-title text-base text-gray-800 italic uppercase pb-2 border-b border-gray-100">
+              ចុះឈ្មោះកីឡាករម្នាក់ៗ (Single Athlete Roster Form)
+            </h3>
 
-              <form onSubmit={handleSingleRegisterSubmit} className="space-y-4">
-                
-                {/* Photo Upload Thumbnail Field */}
-                <div>
-                  <label className="text-[10px] font-black uppercase text-gray-400 block mb-1.5">
-                    រូបថតកីឡាករ (Athlete Photo Preview)
-                  </label>
-                  <div className="flex items-center gap-4">
-                    <div className="w-16 h-16 rounded-full bg-gray-100 border border-gray-200 overflow-hidden shrink-0 flex items-center justify-center relative">
-                      {singlePhotoBase64 ? (
-                        <img 
-                          src={singlePhotoBase64} 
-                          alt="Athlete Preview" 
-                          className="w-full h-full object-cover" 
-                          referrerPolicy="no-referrer"
-                        />
-                      ) : (
-                        <User className="w-7 h-7 text-gray-300" />
-                      )}
-                    </div>
-                    <div className="flex-1">
-                      <input
-                        type="file"
-                        accept="image/*"
-                        id="single-avatar-upload"
-                        className="hidden"
-                        onChange={handleSinglePhotoSelect}
-                      />
-                      <label
-                        htmlFor="single-avatar-upload"
-                        className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-[10.5px] font-black uppercase tracking-wider cursor-pointer transition active:scale-95 border"
-                      >
-                        <Camera className="w-3.5 h-3.5 text-[#D40511]" />
-                        <span>Select Face Shot</span>
-                      </label>
-                      <p className="text-[9px] text-gray-400 mt-1 leading-tight uppercase font-medium">PNG/JPG formatted picture</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="text-[10px] font-black uppercase text-gray-400 block mb-1">
-                    ឈ្មោះកីឡាករ (Athlete Full Name)
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Bunly Phal"
-                    value={singleName}
-                    onChange={(e) => setSingleName(e.target.value)}
-                    className="w-full bg-gray-50 border border-gray-300 p-3 rounded-xl font-bold text-sm tracking-wide outline-none focus:ring-2 focus:ring-[#FFCC00]"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase text-gray-400 block">
-                    ប្រភេទវិញ្ញាសា (Select Sport Divisions - Multiple allowed)
-                  </label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {(getActiveSports() as SportType[]).map((sportKey) => {
-                      const isChecked = singleSports.includes(sportKey);
-                      return (
-                        <label
-                          key={sportKey}
-                          className={`flex items-center gap-2 p-2.5 rounded-xl border text-xs font-bold cursor-pointer select-none transition ${
-                            isChecked
-                              ? 'bg-[#FFCC00]/15 border-[#FFCC00] text-gray-950'
-                              : 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100'
-                          }`}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={isChecked}
-                            onChange={() => {
-                              if (isChecked) {
-                                // Keep at least one sport
-                                if (singleSports.length > 1) {
-                                  setSingleSports(singleSports.filter((s) => s !== sportKey));
-                                }
-                              } else {
-                                setSingleSports([...singleSports, sportKey]);
-                              }
-                            }}
-                            className="w-4 h-4 text-[#D40511] focus:ring-[#FFCC00] border-gray-300 rounded"
-                          />
-                          <span>{getSportConfig(sportKey).icon} {sportKey}</span>
-                        </label>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <button
-                  type="submit"
-                  className="w-full py-3 bg-[#D40511] hover:bg-red-700 text-white font-black uppercase italic tracking-wider text-xs rounded-xl shadow-md flex items-center justify-center gap-1.5 transition active:scale-95 cursor-pointer mt-2"
-                >
-                  <UserPlus className="w-4 h-4 text-[#FFCC00]" />
-                  <span>ចុះឈ្មោះកីឡាករ (Register Athlete)</span>
-                </button>
-              </form>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <h3 className="font-dhl-title text-base text-gray-800 italic uppercase pb-2 border-b border-gray-100 flex items-center gap-2">
-                <FileText className="w-5 h-5 text-fuchsia-600" />
-                <span>ចុះឈ្មោះជាក្រុមយីហោរ (Crude Bulk JSON Import)</span>
-              </h3>
+            <form onSubmit={handleSingleRegisterSubmit} className="space-y-4">
               
-              <div className="p-3 bg-fuchsia-50 border border-fuchsia-100 rounded-2xl text-[10px] text-fuchsia-800 leading-relaxed font-semibold">
-                🔔 Paste raw JSON structured array mapping name and sport branch below. We will batch register them automatically:
+              {/* Photo Upload Thumbnail Field */}
+              <div>
+                <label className="text-[10px] font-black uppercase text-gray-400 block mb-1.5">
+                  រូបថតកីឡាករ (Athlete Photo Preview)
+                </label>
+                <div className="flex items-center gap-4">
+                  <div className="w-16 h-16 rounded-full bg-gray-100 border border-gray-200 overflow-hidden shrink-0 flex items-center justify-center relative">
+                    {singlePhotoBase64 ? (
+                      <img 
+                        src={singlePhotoBase64} 
+                        alt="Athlete Preview" 
+                        className="w-full h-full object-cover" 
+                        referrerPolicy="no-referrer"
+                      />
+                    ) : (
+                      <User className="w-7 h-7 text-gray-300" />
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      id="single-avatar-upload"
+                      className="hidden"
+                      onChange={handleSinglePhotoSelect}
+                    />
+                    <label
+                      htmlFor="single-avatar-upload"
+                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-[10.5px] font-black uppercase tracking-wider cursor-pointer transition active:scale-95 border"
+                    >
+                      <Camera className="w-3.5 h-3.5 text-[#D40511]" />
+                      <span>Select Face Shot</span>
+                    </label>
+                    <p className="text-[9px] text-gray-400 mt-1 leading-tight uppercase font-medium">PNG/JPG formatted picture</p>
+                  </div>
+                </div>
               </div>
 
-              <div className="space-y-4">
-                <textarea
-                  rows={8}
-                  value={bulkInputText}
-                  onChange={(e) => setBulkInputText(e.target.value)}
-                  className="w-full bg-gray-50 border border-gray-300 p-3 rounded-xl font-mono text-xs focus:ring-2 focus:ring-[#FFCC00] focus:outline-none"
+              <div>
+                <label className="text-[10px] font-black uppercase text-gray-400 block mb-1">
+                  ឈ្មោះកីឡាករ (Athlete Full Name)
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Bunly Phal"
+                  value={singleName}
+                  onChange={(e) => setSingleName(e.target.value)}
+                  className="w-full bg-gray-50 border border-gray-300 p-3 rounded-xl font-bold text-sm tracking-wide outline-none focus:ring-2 focus:ring-[#FFCC00]"
                 />
-
-                {bulkError && (
-                  <div className="p-3 bg-red-50 text-red-700 rounded-xl border border-red-200 text-xs flex gap-1.5 items-start">
-                    <AlertCircle className="w-4 h-4 shrink-0 text-red-500 mt-0.5" />
-                    <span>{bulkError}</span>
-                  </div>
-                )}
-
-                {bulkSuccess && (
-                  <div className="p-3 bg-emerald-50 text-emerald-800 rounded-xl border border-emerald-200 text-xs flex gap-1.5 items-start">
-                    <Check className="w-4 h-4 shrink-0 text-emerald-600 mt-0.5" />
-                    <span>
-                      បាច់កីឡាករ {bulkParsedCount} នាក់ ត្រូវបានដាក់បញ្ចូលដោយជោគជ័យ! Success register loop.
-                    </span>
-                  </div>
-                )}
-
-                <button
-                  onClick={handleBulkSubmit}
-                  className="w-full py-3 bg-fuchsia-600 hover:bg-fuchsia-700 text-white font-black uppercase tracking-wider text-xs rounded-xl shadow-md flex items-center justify-center gap-1.5 transition active:scale-95 cursor-pointer animate-pulse"
-                >
-                  <Upload className="w-4 h-4 text-[#FFCC00]" />
-                  <span>ចាប់ផ្តើម IMPORT BULK PLAYERS</span>
-                </button>
               </div>
-            </div>
-          )}
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase text-gray-400 block">
+                  ប្រភេទវិញ្ញាសា (Select Sport Divisions - Multiple allowed)
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  {(getActiveSports() as SportType[]).map((sportKey) => {
+                    const isChecked = singleSports.includes(sportKey);
+                    return (
+                      <label
+                        key={sportKey}
+                        className={`flex items-center gap-2 p-2.5 rounded-xl border text-xs font-bold cursor-pointer select-none transition ${
+                          isChecked
+                            ? 'bg-[#FFCC00]/15 border-[#FFCC00] text-gray-950'
+                            : 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => {
+                            if (isChecked) {
+                              // Keep at least one sport
+                              if (singleSports.length > 1) {
+                                setSingleSports(singleSports.filter((s) => s !== sportKey));
+                              }
+                            } else {
+                              setSingleSports([...singleSports, sportKey]);
+                            }
+                          }}
+                          className="w-4 h-4 text-[#D40511] focus:ring-[#FFCC00] border-gray-300 rounded"
+                        />
+                        <span>{getSportConfig(sportKey).icon} {sportKey}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                className="w-full py-3 bg-[#D40511] hover:bg-red-700 text-white font-black uppercase italic tracking-wider text-xs rounded-xl shadow-md flex items-center justify-center gap-1.5 transition active:scale-95 cursor-pointer mt-2"
+              >
+                <UserPlus className="w-4 h-4 text-[#FFCC00]" />
+                <span>ចុះឈ្មោះកីឡាករ (Register Athlete)</span>
+              </button>
+            </form>
+          </div>
         </div>
 
         {/* Right Side: Active Athletes Live List & Advanced Action Grid */}

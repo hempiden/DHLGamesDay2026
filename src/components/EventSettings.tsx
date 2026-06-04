@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
   ToggleLeft, ToggleRight, QrCode, Copy, Check, ExternalLink, Settings2, Sliders, 
   ShieldCheck, Trophy, Layers, Users, Calendar, Plus, Trash2, Edit, CheckCircle, 
-  Clock, Award, HelpCircle, Activity, LayoutGrid, Settings, KeyRound, Play, ChevronRight, AlertTriangle, Languages
+  Clock, Award, HelpCircle, Activity, LayoutGrid, Settings, KeyRound, Play, ChevronRight, AlertTriangle, Languages, UserPlus
 } from 'lucide-react';
 import { Match, Participant, AppUser, EventInfo, Sport, SportType, DEFAULT_TRANSLATIONS } from '../types';
 import { getSupabaseClient } from '../supabase';
@@ -227,7 +227,7 @@ export default function EventSettings({
     }
   };
   // Sidebar states
-  const [activeSubTab, setActiveSubTab] = useState<'events_sports' | 'design' | 'setup_matches' | 'teams_athletes' | 'enrolment' | 'language'>('events_sports');
+  const [activeSubTab, setActiveSubTab] = useState<'events_sports' | 'design' | 'setup_matches' | 'teams_structure' | 'athletes_hub' | 'enrolment' | 'language'>('events_sports');
 
   // Event Creation Form States
   const [newEventName, setNewEventName] = useState('');
@@ -510,16 +510,32 @@ export default function EventSettings({
 
           <button
             type="button"
-            onClick={() => setActiveSubTab('teams_athletes')}
+            onClick={() => setActiveSubTab('teams_structure')}
             className={`w-full flex items-center justify-between px-4 py-3.5 rounded-xl font-bold text-xs uppercase tracking-wide transition-all duration-150 ${
-              activeSubTab === 'teams_athletes'
+              activeSubTab === 'teams_structure'
                 ? 'bg-[#1a1a1a] text-white shadow-md'
                 : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
             }`}
           >
             <div className="flex items-center gap-2.5">
-              <Users className="w-4 h-4" />
-              <span>ក្រុម & កីឡាករ (Teams / rosters)</span>
+              <Users className="w-4 h-4 text-blue-500" />
+              <span>រៀបចំរចនាសម្ព័ន្ធក្រុម (Team Structure Roster)</span>
+            </div>
+            <ChevronRight className="w-3.5 h-3.5 opacity-50" />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveSubTab('athletes_hub')}
+            className={`w-full flex items-center justify-between px-4 py-3.5 rounded-xl font-bold text-xs uppercase tracking-wide transition-all duration-150 ${
+              activeSubTab === 'athletes_hub'
+                ? 'bg-[#1a1a1a] text-white shadow-md'
+                : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+            }`}
+          >
+            <div className="flex items-center gap-2.5">
+              <UserPlus className="w-4 h-4 text-emerald-500" />
+              <span>បញ្ជីឈ្មោះកីឡាករ & បន្ថែមរូប (Athlete Hub)</span>
             </div>
             <ChevronRight className="w-3.5 h-3.5 opacity-50" />
           </button>
@@ -967,15 +983,15 @@ export default function EventSettings({
             </div>
           )}
 
-          {/* TAB 3: EMBEDDED TEAMS & ATHLETES ROUTINE */}
-          {activeSubTab === 'teams_athletes' && (
+          {/* TAB 3a: EMBEDDED TEAM STRUCTURE ROSTER */}
+          {activeSubTab === 'teams_structure' && (
             <div className="bg-white rounded-3xl border border-gray-150 p-6 shadow-sm">
               <div className="border-b border-gray-100 pb-3 mb-6 select-none">
                 <h3 className="text-sm font-black text-gray-800 uppercase tracking-wide">
-                  គ្រប់គ្រងក្រុម និង បញ្ជីឈ្មោះកីឡាករ (Teams & Athletes Registry)
+                  រៀបចំរចនាសម្ព័ន្ធក្រុម (Team Structure Roster)
                 </h3>
                 <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wide">
-                  Assign registered employees to teams and upload athlete profiles
+                  Config and associate team structures for active tournament schedules
                 </p>
               </div>
 
@@ -989,6 +1005,34 @@ export default function EventSettings({
                 assignPlayerToTeam={assignPlayerToTeam}
                 deleteParticipant={deleteParticipant}
                 resetParticipantsToDefault={resetParticipantsToDefault}
+                forceTab="structure"
+              />
+            </div>
+          )}
+
+          {/* TAB 3b: EMBEDDED ATHLETE HUB */}
+          {activeSubTab === 'athletes_hub' && (
+            <div className="bg-white rounded-3xl border border-gray-150 p-6 shadow-sm">
+              <div className="border-b border-gray-100 pb-3 mb-6 select-none">
+                <h3 className="text-sm font-black text-gray-800 uppercase tracking-wide">
+                  បញ្ជីឈ្មោះកីឡាករ & បន្ថែមរូប (Athlete Hub)
+                </h3>
+                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wide">
+                  Register players and upload profile assets for tournament sports
+                </p>
+              </div>
+
+              <TeamManagement
+                participants={participants}
+                isOnline={isOnline}
+                supabaseConnected={supabaseConnected}
+                addParticipant={addParticipant}
+                updateParticipantName={updateParticipantName}
+                updateParticipantPhoto={updateParticipantPhoto}
+                assignPlayerToTeam={assignPlayerToTeam}
+                deleteParticipant={deleteParticipant}
+                resetParticipantsToDefault={resetParticipantsToDefault}
+                forceTab="athletes"
               />
             </div>
           )}

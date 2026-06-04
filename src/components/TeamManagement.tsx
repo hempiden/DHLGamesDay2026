@@ -14,6 +14,7 @@ interface TeamManagementProps {
   assignPlayerToTeam: (playerId: string, teamId: string | null) => Promise<boolean>;
   deleteParticipant: (id: string) => Promise<boolean>;
   resetParticipantsToDefault: () => void;
+  forceTab?: 'structure' | 'athletes';
 }
 
 export default function TeamManagement({
@@ -25,9 +26,10 @@ export default function TeamManagement({
   updateParticipantPhoto,
   assignPlayerToTeam,
   deleteParticipant,
-  resetParticipantsToDefault
+  resetParticipantsToDefault,
+  forceTab
 }: TeamManagementProps) {
-  const [activeSubTab, setActiveSubTab] = useState<'structure' | 'athletes'>('structure');
+  const [activeSubTab, setActiveSubTab] = useState<'structure' | 'athletes'>(forceTab || 'structure');
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
   const [selectedSport, setSelectedSport] = useState<SportType>(() => getActiveSports()[0] || 'Soccer');
   
@@ -386,30 +388,32 @@ export default function TeamManagement({
     <div className="space-y-6">
       
       {/* Consolidating Switch Tabs */}
-      <div className="flex border-b border-gray-150 bg-white px-2 rounded-2xl shadow-sm border border-gray-100">
-        <button
-          onClick={() => setActiveSubTab('structure')}
-          className={`flex items-center gap-2 px-6 py-4 font-black text-xs uppercase tracking-wider transition-all duration-200 cursor-pointer border-b-4 ${
-            activeSubTab === 'structure'
-              ? 'border-blue-600 text-blue-600'
-              : 'border-transparent text-gray-500 hover:text-gray-755'
-          }`}
-        >
-          <Users className="w-4 h-4 text-blue-500" />
-          <span>រៀបចំរចនាសម្ព័ន្ធក្រុម (Team Structure Roster)</span>
-        </button>
-        <button
-          onClick={() => setActiveSubTab('athletes')}
-          className={`flex items-center gap-2 px-6 py-4 font-black text-xs uppercase tracking-wider transition-all duration-200 cursor-pointer border-b-4 ${
-            activeSubTab === 'athletes'
-              ? 'border-blue-600 text-blue-600'
-              : 'border-transparent text-gray-500 hover:text-gray-755'
-          }`}
-        >
-          <UserPlus className="w-4 h-4 text-emerald-500" />
-          <span>បញ្ជីឈ្មោះកីឡាករ & បន្ថែមរូប (Athlete Hub / Bulk Upload)</span>
-        </button>
-      </div>
+      {!forceTab && (
+        <div className="flex border-b border-gray-150 bg-white px-2 rounded-2xl shadow-sm border border-gray-100">
+          <button
+            onClick={() => setActiveSubTab('structure')}
+            className={`flex items-center gap-2 px-6 py-4 font-black text-xs uppercase tracking-wider transition-all duration-200 cursor-pointer border-b-4 ${
+              activeSubTab === 'structure'
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-755'
+            }`}
+          >
+            <Users className="w-4 h-4 text-blue-500" />
+            <span>រៀបចំរចនាសម្ព័ន្ធក្រុម (Team Structure Roster)</span>
+          </button>
+          <button
+            onClick={() => setActiveSubTab('athletes')}
+            className={`flex items-center gap-2 px-6 py-4 font-black text-xs uppercase tracking-wider transition-all duration-200 cursor-pointer border-b-4 ${
+              activeSubTab === 'athletes'
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-755'
+            }`}
+          >
+            <UserPlus className="w-4 h-4 text-emerald-500" />
+            <span>បញ្ជីឈ្មោះកីឡាករ & បន្ថែមរូប (Athlete Hub)</span>
+          </button>
+        </div>
+      )}
 
       {activeSubTab === 'athletes' ? (
         <AthleteUpload

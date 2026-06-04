@@ -28,7 +28,7 @@ export default function App() {
       const tab = p.get('tab');
       if (tab === 'public_teams') return 'public_teams';
       if (tab === 'leaderboard') return 'leaderboard';
-      if (tab === 'dashboard') return 'dashboard';
+      if (tab === 'dashboard' || tab === 'analytic' || tab === 'analytics') return 'dashboard';
       if (tab === 'scoring') return 'scoring';
       if (tab === 'admin') return 'admin';
       if (tab === 'teams') return 'teams';
@@ -231,6 +231,22 @@ export default function App() {
       }
     }
   }, [activeEventId, organization.slug]);
+
+  // Synchronize activeTab state to URL search parameters (?tab=...)
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.history.replaceState) {
+      try {
+        const url = new URL(window.location.href);
+        const mappedTab = activeTab === 'dashboard' ? 'analytic' : activeTab;
+        if (url.searchParams.get('tab') !== mappedTab) {
+          url.searchParams.set('tab', mappedTab);
+          window.history.replaceState({}, '', url.pathname + url.search + url.hash);
+        }
+      } catch (err) {
+        console.error('Failed to sync activeTab to URL search params:', err);
+      }
+    }
+  }, [activeTab]);
 
   const [matches, setMatches] = useState<Match[]>([]);
   const [participants, setParticipants] = useState<Participant[]>([]);
