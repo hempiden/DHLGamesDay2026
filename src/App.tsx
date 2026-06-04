@@ -780,6 +780,22 @@ export default function App() {
               };
               setOrganization(remoteOrg);
               localStorage.setItem('dhl_organization_settings', JSON.stringify(remoteOrg));
+            } else if (active) {
+              // Safe automatic seed to remote database
+              const idToUse = hasCustomSlug ? pathname : 'current';
+              await client.from('organization_settings').upsert({
+                id: idToUse,
+                name: organization.name,
+                logo_url: organization.logoUrl,
+                slug: organization.slug,
+                tagline: organization.tagline,
+                contact_email: organization.contactEmail,
+                contact_phone: organization.contactPhone,
+                website: organization.website,
+                address: organization.address,
+                footer_motto: organization.footerMotto,
+                updated_at: new Date().toISOString()
+              }, { onConflict: 'id' });
             }
           } catch (errOrg) {
             console.warn('Silent note: organization_settings table could not be fetched or does not exist yet.', errOrg);
@@ -800,6 +816,14 @@ export default function App() {
                 setTranslations(parsedTrans);
                 localStorage.setItem('dhl_custom_translations', val);
               }
+            } else if (active) {
+              // Auto-upsert default translation layout key so database is instantly seeded
+              const transStr = JSON.stringify(DEFAULT_TRANSLATIONS);
+              await client.from('event_settings').upsert({
+                key: 'wording_translations',
+                value: transStr,
+                updated_at: new Date().toISOString()
+              }, { onConflict: 'key' });
             }
           } catch (errTrans) {
             console.warn('Silent note: event_settings could not be fetched or does not exist yet for translations.', errTrans);
