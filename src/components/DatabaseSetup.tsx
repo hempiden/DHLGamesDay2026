@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Database, RefreshCw, Save, CheckCircle, AlertTriangle, Cloud, CloudOff, Info, Upload } from 'lucide-react';
+import { Database, RefreshCw, Save, CheckCircle, AlertTriangle, Cloud, CloudOff, Info, Upload, Download } from 'lucide-react';
 import { testSupabaseConnection, getSupabaseClient } from '../supabase';
 
 interface DatabaseSetupProps {
@@ -24,6 +24,8 @@ export default function DatabaseSetup({
   const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'success' | 'failed'>('idle');
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'success' | 'failed'>('idle');
   const [syncMessage, setSyncMessage] = useState<string>('');
+  const [pullStatus, setPullStatus] = useState<'idle' | 'pulling' | 'success' | 'failed'>('idle');
+  const [pullMessage, setPullMessage] = useState<string>('');
 
   const handleTestConnection = async () => {
     if (!supabaseUrl || !supabaseAnonKey) {
@@ -165,6 +167,177 @@ export default function DatabaseSetup({
       console.error(err);
       setSyncStatus('failed');
       setSyncMessage(`បរាជ័យក្នុងការបញ្ជូនទៅ Cloud: ${err.message || err}`);
+    }
+  };
+
+  const handlePullCloudToLocal = async () => {
+    if (!supabaseUrl || !supabaseAnonKey) {
+      alert('សូមបំពេញ URL និង Anon Key រួចរក្សាទុកជាមុនសិន។ Please define and save Supabase credentials first.');
+      return;
+    }
+
+    const client = getSupabaseClient(supabaseUrl, supabaseAnonKey);
+    if (!client) {
+      alert('មិនអាចបង្កើត Supabase client បានទេ។ Could not initialize client.');
+      return;
+    }
+
+    const confirmed = window.confirm(
+      "តើអ្នកពិតជាចង់ទាញយកទិន្នន័យ (Matches, Participants, Events & Admins) ពី Supabase មកកាន់ម៉ាស៊ីនស្រុករបស់អ្នកមែនទេ? វានឹងជំនួសទិន្នន័យចាស់នៅក្នុង Browser memory របស់អ្នក។\n\nAre you sure you want to pull data from Supabase? This will overwrite your current browser local storage settings for matches, participants, and users."
+    );
+    if (!confirmed) return;
+
+    setPullStatus('pulling');
+    setPullMessage('កំពុងទាញយកទិន្នន័យពី Supabase... Fetching tables from Cloud...');
+
+    try {
+      // 1. Fetch organization settings
+      setPullMessage('កំពុងទាញយកការកំណត់ក្រុមហ៊ុន... Fetching organization settings...');
+      const { data: orgData, error: orgErr } = await client
+        .from('organization_settings')
+        .select('*')
+        .eq('id', 'current')
+        .maybeSingle();
+
+      if (orgErr) {
+        console.warn('Could not fetch organization settings:', orgErr.message);
+      } else if (orgData) {
+        const remoteOrg = {
+          name: orgData.name || 'Corporate Arena',
+          logoUrl: orgData.logo_url || '',
+          slug: orgData.slug || 'company-games',
+          tagline: orgData.tagline || '',
+          contactEmail: orgData.contact_email || '',
+          contactPhone: orgData.contact_phone || '',
+          website: orgData.website || '',
+          address: orgData.address || '',
+          footerMotto: orgData.footer_motto || '',
+        };
+        localStorage.setItem('dhl_organization_settings', JSON.stringify(remoteOrg));
+      }
+
+      // 2. Fetch event translations
+      setPullMessage('កំពុងទាញយកភាសា... Fetching event wordings / translations...');
+      const { data: transData, error: transErr } = await client
+        .from('event_settings')
+        .select('*')
+        .eq('key', 'wording_translations')
+        .maybeSingle();
+      if (transData && transData.value) {
+        localStorage.setItem('dhl_custom_translations', transData.value);
+      }
+
+      // 3. Fetch events
+      setPullMessage('កំពុងទាញយកព្រឹត្តិការណ៍... Fetching games events...');
+      const { data: eventsData, error: eventsErr } = await client
+        .from('events')
+        .select('*');
+
+      if (eventsErr) {
+        console.warn('Could not fetch events:', eventsErr.message);
+      } else if (eventsData) {
+        const mappedEvents = eventsData.map((item: any) => ({
+          id: String(item.id),
+          name: item.name,
+          khmerName: item.khmer_name || item.khmerName || '',
+          date: item.date || '',
+          description: item.description || '',
+          sports: typeof item.sports === 'string' ? JSON.parse(item.sports) : (item.sports || []),
+          themeColor: item.theme_color || item.themeColor || 'dhl',
+          created_by: item.created_by || 'hempiden',
+          show_public_teams: item.show_public_teams ?? false,
+          is_enrolment_enabled: item.is_enrolment_enabled ?? true,
+          organization_slug: item.organization_slug || 'dhl-games',
+          enabled_languages: item.enabled_languages ? item.enabled_languages.split(',') : ['kh', 'en']
+        }));
+        localStorage.setItem('dhl_events', JSON.stringify(mappedEvents));
+      }
+
+      // 4. Fetch matches
+      setPullMessage('កំពុងទាញយកការប្រកួត... Fetching tournament matches...');
+      const { data: matchesData, error: matchesErr } = await client
+        .from('matches')
+        .select('*');
+
+      if (matchesErr) {
+        throw new Error(`Error fetching matches: ${matchesErr.message}`);
+      }
+
+      const mappedMatches = (matchesData || []).map((item: any) => ({
+        id: String(item.id),
+        sport_name: item.sport_name,
+        match_label: item.match_label || 'Regular Match',
+        team_a: item.team_a,
+        team_b: item.team_b,
+        score_a: Number(item.score_a) || 0,
+        score_b: Number(item.score_b) || 0,
+        status: item.status || 'Upcoming',
+        created_at: item.created_at || new Date().toISOString(),
+        updated_at: item.updated_at || new Date().toISOString(),
+        scheduled_date: item.scheduled_date || undefined,
+        scheduled_time: item.scheduled_time || undefined,
+        event_id: item.event_id || undefined,
+        created_by: item.created_by || undefined
+      }));
+      localStorage.setItem('dhl_games_day_matches', JSON.stringify(mappedMatches));
+
+      // 5. Fetch participants
+      setPullMessage('កំពុងទាញយកកីឡាករ... Fetching tournament athletes...');
+      const { data: participantsData, error: participantsErr } = await client
+        .from('participants')
+        .select('*');
+
+      if (participantsErr) {
+        throw new Error(`Error fetching participants: ${participantsErr.message}`);
+      }
+
+      const mappedParticipants = (participantsData || []).map((item: any) => ({
+        id: String(item.id),
+        name: item.name,
+        sport_type: item.sport_type,
+        is_team: Boolean(item.is_team),
+        team_id: item.team_id ? String(item.team_id) : null,
+        photo_url: item.photo_url || null,
+        gender: item.gender || undefined,
+        created_at: item.created_at,
+        updated_at: item.updated_at,
+        event_id: item.event_id || undefined,
+        created_by: item.created_by || undefined
+      }));
+      localStorage.setItem('dhl_games_day_participants', JSON.stringify(mappedParticipants));
+
+      // 6. Fetch admin users
+      setPullMessage('កំពុងទាញយកគណនីអភិបាល... Fetching admin credentials...');
+      const { data: usersData, error: usersErr } = await client
+        .from('admin_users')
+        .select('*');
+
+      if (usersErr) {
+        console.warn('Could not fetch admin users:', usersErr.message);
+      } else if (usersData) {
+        const mappedUsers = (usersData || []).map((item: any) => ({
+          id: String(item.id),
+          username: item.username,
+          email: item.email,
+          name: item.name,
+          role: item.role,
+          status: item.status,
+          passwordPlain: item.password_plain || item.passwordPlain || '',
+          created_at: item.created_at
+        }));
+        localStorage.setItem('dhl_games_day_users', JSON.stringify(mappedUsers));
+      }
+
+      setPullStatus('success');
+      setPullMessage(`ការទាញយកបានជោគជ័យ! Pulled down matches (${mappedMatches.length}), participants (${mappedParticipants.length}), and admins securely.`);
+      alert(`ទាញយកជោគជ័យ! Pulled down ${mappedMatches.length} matches and ${mappedParticipants.length} participants from Cloud.`);
+      
+      // Reload page to re-render clean state in UI
+      window.location.reload();
+    } catch (err: any) {
+      console.error(err);
+      setPullStatus('failed');
+      setPullMessage(`បរាជ័យក្នុងការទាញយកពី Cloud: ${err.message || err}`);
     }
   };
 
@@ -393,6 +566,60 @@ export default function DatabaseSetup({
                 {syncStatus === 'success' && <CheckCircle className="w-4.5 h-4.5 text-emerald-600 shrink-0" />}
                 {syncStatus === 'failed' && <AlertTriangle className="w-4.5 h-4.5 text-red-600 shrink-0" />}
                 <p>{syncMessage}</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* BULK DATA PULL SECTION */}
+      {isSupabaseEnabled && (
+        <div id="bulk-data-pull-section" className="bg-white rounded-3xl p-6 sm:p-8 shadow-md border border-gray-100 space-y-4">
+          <div className="flex items-center gap-3 border-b border-gray-100 pb-4">
+            <div className="w-10 h-10 rounded-2xl bg-blue-50 flex items-center justify-center">
+              <Download className="w-5 h-5 text-blue-600" />
+            </div>
+            <div>
+              <h3 className="text-sm font-black text-gray-800 uppercase tracking-wide">
+                ទាញយកទិន្នន័យពី Cloud មកកាន់ Browser (PULL DATA FROM CLOUD TO LOCAL SETTING)
+              </h3>
+              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wide">
+                Download current cloud tournaments, matches & admins back into local settings
+              </p>
+            </div>
+          </div>
+
+          <div className="text-xs space-y-3">
+            <p className="text-gray-500 font-medium leading-relaxed">
+              សកម្មភាពនេះនឹងទាញយកទិន្នន័យ (Matches, Participants, Events និង Admins) ពីក្នុង Supabase Database មកជំនួស និងរក្សាទុកនៅលើប្រព័ន្ធ Local Browser របស់អ្នកសម្រាប់ធ្វើការកែប្រែ ឬ Sync បន្ត។
+            </p>
+
+            <button
+              type="button"
+              disabled={pullStatus === 'pulling'}
+              onClick={handlePullCloudToLocal}
+              className={`w-full py-4 px-5 rounded-2xl font-black uppercase tracking-wider text-xs duration-150 active:scale-95 transition cursor-pointer flex items-center justify-center gap-2.5 ${
+                pullStatus === 'pulling' 
+                  ? 'bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed'
+                  : 'bg-blue-600 hover:bg-blue-700 text-white shadow-sm font-bold'
+              }`}
+            >
+              <Download className={`w-4.5 h-4.5 ${pullStatus === 'pulling' ? 'animate-bounce' : ''}`} />
+              <span>{pullStatus === 'pulling' ? 'កំពុងទាញយកទិន្នន័យ (Pulling...)' : 'ទាញយកទិន្នន័យពី Supabase (Pull Cloud Data to Local Setting)'}</span>
+            </button>
+
+            {pullStatus !== 'idle' && (
+              <div className={`p-4 rounded-2xl border text-[11px] leading-relaxed flex items-center gap-3 animate-fade-in ${
+                pullStatus === 'success' 
+                  ? 'bg-blue-50/70 border-blue-200 text-blue-800 font-semibold' 
+                  : pullStatus === 'failed'
+                  ? 'bg-red-50/70 border-red-200 text-red-800 font-semibold'
+                  : 'bg-indigo-50/70 border-indigo-200 text-indigo-800 font-semibold'
+              }`}>
+                {pullStatus === 'pulling' && <RefreshCw className="w-4.5 h-4.5 text-indigo-600 animate-spin shrink-0" />}
+                {pullStatus === 'success' && <CheckCircle className="w-4.5 h-4.5 text-emerald-600 shrink-0" />}
+                {pullStatus === 'failed' && <AlertTriangle className="w-4.5 h-4.5 text-red-600 shrink-0" />}
+                <p>{pullMessage}</p>
               </div>
             )}
           </div>
