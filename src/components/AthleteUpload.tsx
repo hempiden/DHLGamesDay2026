@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { User, UserPlus, Upload, Trash2, Users, Check, AlertCircle, RefreshCw, FileText, Briefcase, Camera, Image } from 'lucide-react';
+import { User, UserPlus, Upload, Trash2, Users, Check, AlertCircle, RefreshCw, FileText, Briefcase, Camera, Image, Info } from 'lucide-react';
 import { Participant, SportType } from '../types';
 import { SPORT_CONFIGS, getSportConfig, getActiveSports } from '../data';
 
@@ -20,8 +20,7 @@ export default function AthleteUpload({
   assignPlayerToTeam,
   deleteParticipant
 }: AthleteUploadProps) {
-  // Forced to single player register mode
-  const uploadMode = 'single';
+  const [uploadMode, setUploadMode] = useState<'single' | 'bulk_csv'>('single');
   const [selectedSport, setSelectedSport] = useState<SportType>('Soccer');
 
   // Single player states
@@ -29,13 +28,243 @@ export default function AthleteUpload({
   const [singleSports, setSingleSports] = useState<SportType[]>(['Soccer']);
   const [singlePhotoBase64, setSinglePhotoBase64] = useState<string | null>(null);
 
-  // Bulk player states
+  // Bulk player states (Original text block left intact)
   const [bulkInputText, setBulkInputText] = useState(
     '[\n  { "name": "Sok Vannak", "sport_type": "Soccer" },\n  { "name": "Keo Dara", "sport_type": "Soccer" },\n  { "name": "Chan Pisey", "sport_type": "Volleyball" }\n]'
   );
   const [bulkError, setBulkError] = useState<string | null>(null);
   const [bulkParsedCount, setBulkParsedCount] = useState<number | null>(null);
   const [bulkSuccess, setBulkSuccess] = useState(false);
+
+  // Bulk CSV States
+  const [csvFileName, setCsvFileName] = useState<string | null>(null);
+  const [csvDragOver, setCsvDragOver] = useState(false);
+  const [csvRawText, setCsvRawText] = useState('');
+  const [csvParsedRows, setCsvParsedRows] = useState<{ name: string; sport_type: SportType; gender?: string; photo_url?: string }[]>([]);
+  const [csvError, setCsvError] = useState<string | null>(null);
+  const [csvImportSuccessCount, setCsvImportSuccessCount] = useState<number | null>(null);
+  const [csvImportProgress, setCsvImportProgress] = useState(false);
+
+  // Custom standard CSV Parsing algorithm
+  const parseCSV = (text: string): string[][] => {
+    const lines: string[][] = [];
+    let row: string[] = [];
+    let currentVal = '';
+    let inQuotes = false;
+
+    for (let i = 0; i < text.length; i++) {
+      const char = text[i];
+      const nextChar = text[i + 1];
+
+      if (inQuotes) {
+        if (char === '"') {
+          if (nextChar === '"') {
+            currentVal += '"';
+            i++; 
+          } else {
+            inQuotes = false;
+          }
+        } else {
+          currentVal += char;
+        }
+      } else {
+        if (char === '"') {
+          inQuotes = true;
+        } else if (char === ',') {
+          row.push(currentVal.trim());
+          currentVal = '';
+        } else if (char === '\n' || char === '\r') {
+          row.push(currentVal.trim());
+          currentVal = '';
+          if (row.length > 0 && (row.length > 1 || row[0] !== '')) {
+            lines.push(row);
+          }
+          row = [];
+          if (char === '\r' && nextChar === '\n') {
+            i++; 
+          }
+        } else {
+          currentVal += char;
+        }
+      }
+    }
+    if (row.length > 0 || currentVal !== '') {
+      row.push(currentVal.trim());
+      if (row.length > 0 && (row.length > 1 || row[0] !== '')) {
+        lines.push(row);
+      }
+    }
+    return lines;
+  };
+
+  const handleParseCsvText = (text: string, filename?: string) => {
+    setCsvError(null);
+    setCsvImportSuccessCount(null);
+    try {
+      const parsedArray = parseCSV(text);
+      if (parsedArray.length === 0) {
+        throw new Error('ទីនេះទទេរ ឬគ្មានជួរទិន្នន័យដើម្បីទាញយកឡើយ។ CSV content is empty.');
+      }
+
+      // Check for headers
+      const potentialHeaders = parsedArray[0].map(h => h.toLowerCase().trim());
+      const hasHeader = potentialHeaders.includes('name') || potentialHeaders.includes('ឈ្មោះ') || potentialHeaders.includes('username') || potentialHeaders.includes('sport_type') || potentialHeaders.includes('sport');
+
+      let startIndex = 0;
+      let nameColIndex = 0;
+      let sportColIndex = 1;
+      let genderColIndex = 2;
+      let photoColIndex = 3;
+
+      if (hasHeader) {
+        startIndex = 1;
+        // Find indices
+        const nameIdx = potentialHeaders.findIndex(h => h.includes('name') || h === 'ឈ្មោះ' || h === 'username' || h === 'fullname');
+        if (nameIdx !== -1) nameColIndex = nameIdx;
+
+        const sportIdx = potentialHeaders.findIndex(h => h.includes('sport') || h.includes('game') || h.includes('វិញ្ញាសា'));
+        if (sportIdx !== -1) sportColIndex = sportIdx;
+
+        const genderIdx = potentialHeaders.findIndex(h => h.includes('gender') || h.includes('sex') || h === 'ភេទ');
+        if (genderIdx !== -1) genderColIndex = genderIdx;
+
+        const photoIdx = potentialHeaders.findIndex(h => h.includes('photo') || h.includes('image') || h.includes('picture') || h === 'រូបថត');
+        if (photoIdx !== -1) photoColIndex = photoIdx;
+      }
+
+      const rowsToImport: { name: string; sport_type: SportType; gender?: string; photo_url?: string }[] = [];
+
+      for (let i = startIndex; i < parsedArray.length; i++) {
+        const row = parsedArray[i];
+        if (row.length === 0 || (row.length === 1 && row[0] === '')) {
+          continue;
+        }
+
+        const rawName = row[nameColIndex] || '';
+        const name = rawName.trim();
+        if (!name) continue;
+
+        // Extract gender and normalize ('Man' -> 'Male', 'Woman' -> 'Female')
+        const rawGender = row[genderColIndex];
+        let gender = rawGender ? rawGender.trim() : undefined;
+        if (gender) {
+          const gLower = gender.toLowerCase();
+          if (gLower === 'man' || gLower === 'male') {
+            gender = 'Male';
+          } else if (gLower === 'woman' || gLower === 'female') {
+            gender = 'Female';
+          }
+        }
+
+        const rawPhoto = row[photoColIndex];
+        const photo_url = rawPhoto ? rawPhoto.trim() : undefined;
+
+        // Extract and normalize sport types (can be multiple separated by ';')
+        const rawSportValue = row[sportColIndex] || 'Soccer';
+        // Split by semicolon and parse each
+        const sportTokens = rawSportValue.split(';').map(s => s.trim()).filter(Boolean);
+        
+        // If empty tokens, fallback to soccer
+        if (sportTokens.length === 0) {
+          sportTokens.push('Soccer');
+        }
+
+        for (const token of sportTokens) {
+          let sType: SportType = 'Soccer';
+          const sLower = token.toLowerCase().trim();
+          
+          if (sLower === 'football' || sLower === 'soccer' || sLower === 'បាល់ទាត់') {
+            sType = 'Soccer';
+          } else if (sLower === 'volleyball' || sLower === 'បាល់ទះ') {
+            sType = 'Volleyball';
+          } else if (sLower === 'ping pong' || sLower === 'pingpong' || sLower === 'table tennis' || sLower === 'វាយកូនឃ្លីលើតុ' || sLower === 'tabletennis') {
+            sType = 'Pingpong';
+          } else if (sLower === 'badminton' || sLower === 'វាយសី' || sLower === 'badmington') {
+            sType = 'Badminton';
+          } else if (sLower === 'swimming' || sLower === 'ហែលទឹក') {
+            sType = 'Swimming';
+          } else if (sLower === 'supporter' || sLower === 'អ្នកគាំទ្រ') {
+            sType = 'Supporter';
+          } else {
+            const validSports = getActiveSports() as string[];
+            const matched = validSports.find(s => s.toLowerCase() === sLower);
+            if (matched) {
+              sType = matched as SportType;
+            } else {
+              sType = (validSports[0] || 'Soccer') as SportType;
+            }
+          }
+
+          // Check for duplicate in the current import list to maintain integrity
+          const isDuplicateInBatch = rowsToImport.some(
+            r => r.name.toLowerCase() === name.toLowerCase() && r.sport_type === sType
+          );
+
+          if (!isDuplicateInBatch) {
+            rowsToImport.push({
+              name,
+              sport_type: sType,
+              gender,
+              photo_url
+            });
+          }
+        }
+      }
+
+      if (rowsToImport.length === 0) {
+        throw new Error('គ្មានកីឡាករដែលមានឈ្មោះត្រឹមត្រូវឡើយ។ No valid athlete rows found after parsing.');
+      }
+
+      setCsvParsedRows(rowsToImport);
+      if (filename) {
+        setCsvFileName(filename);
+      }
+    } catch (err: any) {
+      setCsvError(err.message || 'Error occurred while parsing CSV.');
+    }
+  };
+
+  const handleCsvImportCommit = async () => {
+    if (csvParsedRows.length === 0) return;
+    setCsvImportProgress(true);
+    setCsvError(null);
+    setCsvImportSuccessCount(null);
+
+    let successCount = 0;
+    try {
+      for (const item of csvParsedRows) {
+        const exists = players.some(
+          (p) => p.name.toLowerCase().trim() === item.name.toLowerCase().trim() && p.sport_type === item.sport_type
+        );
+        if (exists) {
+          continue;
+        }
+
+        // We explicitly do NOT specify nor pass event_id, created_by parameters,
+        // fulfilling "event_id, created_by should be defined by system".
+        const success = await addParticipant(
+          item.name,
+          item.sport_type,
+          false,
+          null,
+          item.photo_url || undefined,
+          item.gender || undefined
+        );
+        if (success) {
+          successCount++;
+        }
+      }
+      setCsvImportSuccessCount(successCount);
+      alert(`កីឡាករចំនួន ${successCount} នាក់ត្រូវបានបញ្ចូលដោយជោគជ័យ! Imported ${successCount} new athletes.`);
+      setCsvParsedRows([]);
+      setCsvFileName(null);
+      setCsvRawText('');
+    } catch (err: any) {
+      setCsvError(err.message || 'Error occurred during database import.');
+    } finally {
+      setCsvImportProgress(false);
+    }
+  };
 
   // Search & edit states of athlete lists
   const [searchText, setSearchText] = useState('');
@@ -230,118 +459,293 @@ export default function AthleteUpload({
             Register players and upload profile assets for tournament sports
           </p>
         </div>
+        <div className="flex bg-gray-50 p-1.5 rounded-2xl border border-gray-200">
+          <button
+            onClick={() => setUploadMode('single')}
+            className={`px-4 py-2 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all duration-200 select-none cursor-pointer ${
+              uploadMode === 'single'
+                ? 'bg-white text-gray-950 shadow-sm'
+                : 'text-gray-500 hover:text-gray-800'
+            }`}
+          >
+            ចុះឈ្មោះម្នាក់ៗ (Single Athlete)
+          </button>
+          <button
+            onClick={() => setUploadMode('bulk_csv')}
+            className={`px-4 py-2 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all duration-200 select-none cursor-pointer ${
+              uploadMode === 'bulk_csv'
+                ? 'bg-white text-gray-950 shadow-sm'
+                : 'text-gray-500 hover:text-gray-800'
+            }`}
+          >
+            បញ្ចូលជាក្រុម CSV (Bulk CSV)
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         
         {/* Left Side: Uploading Section */}
         <div className="lg:col-span-4 bg-white p-6 rounded-3xl border border-gray-100 shadow-sm space-y-6">
-          <div className="space-y-4">
-            <h3 className="font-dhl-title text-base text-gray-800 italic uppercase pb-2 border-b border-gray-100">
-              ចុះឈ្មោះកីឡាករម្នាក់ៗ (Single Athlete Roster Form)
-            </h3>
+          {uploadMode === 'single' ? (
+            <div className="space-y-4">
+              <h3 className="font-dhl-title text-base text-gray-800 italic uppercase pb-2 border-b border-gray-100">
+                ចុះឈ្មោះកីឡាករម្នាក់ៗ (Single Athlete Roster Form)
+              </h3>
 
-            <form onSubmit={handleSingleRegisterSubmit} className="space-y-4">
-              
-              {/* Photo Upload Thumbnail Field */}
-              <div>
-                <label className="text-[10px] font-black uppercase text-gray-400 block mb-1.5">
-                  រូបថតកីឡាករ (Athlete Photo Preview)
-                </label>
-                <div className="flex items-center gap-4">
-                  <div className="w-16 h-16 rounded-full bg-gray-100 border border-gray-200 overflow-hidden shrink-0 flex items-center justify-center relative">
-                    {singlePhotoBase64 ? (
-                      <img 
-                        src={singlePhotoBase64} 
-                        alt="Athlete Preview" 
-                        className="w-full h-full object-cover" 
-                        referrerPolicy="no-referrer"
-                      />
-                    ) : (
-                      <User className="w-7 h-7 text-gray-300" />
-                    )}
-                  </div>
-                  <div className="flex-1">
-                    <input
-                      type="file"
-                      accept="image/*"
-                      id="single-avatar-upload"
-                      className="hidden"
-                      onChange={handleSinglePhotoSelect}
-                    />
-                    <label
-                      htmlFor="single-avatar-upload"
-                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-[10.5px] font-black uppercase tracking-wider cursor-pointer transition active:scale-95 border"
-                    >
-                      <Camera className="w-3.5 h-3.5 text-[#D40511]" />
-                      <span>Select Face Shot</span>
-                    </label>
-                    <p className="text-[9px] text-gray-400 mt-1 leading-tight uppercase font-medium">PNG/JPG formatted picture</p>
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <label className="text-[10px] font-black uppercase text-gray-400 block mb-1">
-                  ឈ្មោះកីឡាករ (Athlete Full Name)
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Bunly Phal"
-                  value={singleName}
-                  onChange={(e) => setSingleName(e.target.value)}
-                  className="w-full bg-gray-50 border border-gray-300 p-3 rounded-xl font-bold text-sm tracking-wide outline-none focus:ring-2 focus:ring-[#FFCC00]"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase text-gray-400 block">
-                  ប្រភេទវិញ្ញាសា (Select Sport Divisions - Multiple allowed)
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                  {(getActiveSports() as SportType[]).map((sportKey) => {
-                    const isChecked = singleSports.includes(sportKey);
-                    return (
-                      <label
-                        key={sportKey}
-                        className={`flex items-center gap-2 p-2.5 rounded-xl border text-xs font-bold cursor-pointer select-none transition ${
-                          isChecked
-                            ? 'bg-[#FFCC00]/15 border-[#FFCC00] text-gray-950'
-                            : 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100'
-                        }`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={isChecked}
-                          onChange={() => {
-                            if (isChecked) {
-                              // Keep at least one sport
-                              if (singleSports.length > 1) {
-                                setSingleSports(singleSports.filter((s) => s !== sportKey));
-                              }
-                            } else {
-                              setSingleSports([...singleSports, sportKey]);
-                            }
-                          }}
-                          className="w-4 h-4 text-[#D40511] focus:ring-[#FFCC00] border-gray-300 rounded"
+              <form onSubmit={handleSingleRegisterSubmit} className="space-y-4">
+                
+                {/* Photo Upload Thumbnail Field */}
+                <div>
+                  <label className="text-[10px] font-black uppercase text-gray-400 block mb-1.5">
+                    រូបថតកីឡាករ (Athlete Photo Preview)
+                  </label>
+                  <div className="flex items-center gap-4">
+                    <div className="w-16 h-16 rounded-full bg-gray-100 border border-gray-200 overflow-hidden shrink-0 flex items-center justify-center relative">
+                      {singlePhotoBase64 ? (
+                        <img 
+                          src={singlePhotoBase64} 
+                          alt="Athlete Preview" 
+                          className="w-full h-full object-cover" 
+                          referrerPolicy="no-referrer"
                         />
-                        <span>{getSportConfig(sportKey).icon} {sportKey}</span>
+                      ) : (
+                        <User className="w-7 h-7 text-gray-300" />
+                      )}
+                    </div>
+                    <div className="flex-1">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        id="single-avatar-upload"
+                        className="hidden"
+                        onChange={handleSinglePhotoSelect}
+                      />
+                      <label
+                        htmlFor="single-avatar-upload"
+                        className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-[10.5px] font-black uppercase tracking-wider cursor-pointer transition active:scale-95 border"
+                      >
+                        <Camera className="w-3.5 h-3.5 text-[#D40511]" />
+                        <span>Select Face Shot</span>
                       </label>
-                    );
-                  })}
+                      <p className="text-[9px] text-gray-400 mt-1 leading-tight uppercase font-medium">PNG/JPG formatted picture</p>
+                    </div>
+                  </div>
                 </div>
-              </div>
 
-              <button
-                type="submit"
-                className="w-full py-3 bg-[#D40511] hover:bg-red-700 text-white font-black uppercase italic tracking-wider text-xs rounded-xl shadow-md flex items-center justify-center gap-1.5 transition active:scale-95 cursor-pointer mt-2"
-              >
-                <UserPlus className="w-4 h-4 text-[#FFCC00]" />
-                <span>ចុះឈ្មោះកីឡាករ (Register Athlete)</span>
-              </button>
-            </form>
-          </div>
+                <div>
+                  <label className="text-[10px] font-black uppercase text-gray-400 block mb-1">
+                    ឈ្មោះកីឡាករ (Athlete Full Name)
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Bunly Phal"
+                    value={singleName}
+                    onChange={(e) => setSingleName(e.target.value)}
+                    className="w-full bg-gray-50 border border-gray-300 p-3 rounded-xl font-bold text-sm tracking-wide outline-none focus:ring-2 focus:ring-[#FFCC00]"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase text-gray-400 block">
+                    ប្រភេទវិញ្ញាសា (Select Sport Divisions - Multiple allowed)
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {(getActiveSports() as SportType[]).map((sportKey) => {
+                      const isChecked = singleSports.includes(sportKey);
+                      return (
+                        <label
+                          key={sportKey}
+                          className={`flex items-center gap-2 p-2.5 rounded-xl border text-xs font-bold cursor-pointer select-none transition ${
+                            isChecked
+                              ? 'bg-[#FFCC00]/15 border-[#FFCC00] text-gray-950'
+                              : 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={() => {
+                              if (isChecked) {
+                                // Keep at least one sport
+                                if (singleSports.length > 1) {
+                                  setSingleSports(singleSports.filter((s) => s !== sportKey));
+                                }
+                              } else {
+                                setSingleSports([...singleSports, sportKey]);
+                              }
+                            }}
+                            className="w-4 h-4 text-[#D40511] focus:ring-[#FFCC00] border-gray-300 rounded"
+                          />
+                          <span>{getSportConfig(sportKey).icon} {sportKey}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  className="w-full py-3 bg-[#D40511] hover:bg-red-700 text-white font-black uppercase italic tracking-wider text-xs rounded-xl shadow-md flex items-center justify-center gap-1.5 transition active:scale-95 cursor-pointer mt-2"
+                >
+                  <UserPlus className="w-4 h-4 text-[#FFCC00]" />
+                  <span>ចុះឈ្មោះកីឡាករ (Register Athlete)</span>
+                </button>
+              </form>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <h3 className="font-dhl-title text-base text-gray-800 italic uppercase pb-2 border-b border-gray-100">
+                បញ្ចូលកីឡាករដោយប្រើ CSV (Bulk CSV Uploader)
+              </h3>
+
+              <div className="space-y-4">
+                {/* Drag and Drop Zone */}
+                <div
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    setCsvDragOver(true);
+                  }}
+                  onDragLeave={() => setCsvDragOver(false)}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    setCsvDragOver(false);
+                    const file = e.dataTransfer.files?.[0];
+                    if (file) {
+                      const reader = new FileReader();
+                      reader.onload = (evt) => {
+                        const text = evt.target?.result as string;
+                        setCsvRawText(text);
+                        handleParseCsvText(text, file.name);
+                      };
+                      reader.readAsText(file);
+                    }
+                  }}
+                  onClick={() => {
+                    document.getElementById('csv-file-input')?.click();
+                  }}
+                  className={`border-2 border-dashed rounded-2xl p-6 text-center cursor-pointer transition-all duration-150 ${
+                    csvDragOver
+                      ? 'border-[#FFCC00] bg-[#FFCC00]/5 scale-[0.99]'
+                      : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                  }`}
+                >
+                  <input
+                    id="csv-file-input"
+                    type="file"
+                    accept=".csv"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        const reader = new FileReader();
+                        reader.onload = (evt) => {
+                          const text = evt.target?.result as string;
+                          setCsvRawText(text);
+                          handleParseCsvText(text, file.name);
+                        };
+                        reader.readAsText(file);
+                      }
+                    }}
+                  />
+                  <Upload className="w-10 h-10 text-[#D40511] mx-auto mb-2" />
+                  <p className="text-xs font-black text-gray-700 uppercase tracking-wide">
+                    {csvFileName ? `Selected: ${csvFileName}` : 'ទម្លាក់ឯកសារ CSV ឬចុចទីនេះដើម្បីជ្រើសរើស (Drag & Drop CSV)'}
+                  </p>
+                  <p className="text-[9.5px] text-gray-400 mt-1 uppercase font-bold leading-tight">
+                    Files up to 10MB accepted
+                  </p>
+                </div>
+
+                {/* Or Text Area Manual Paste */}
+                <div>
+                  <label className="text-[10px] font-black uppercase text-gray-400 block mb-1">
+                    ឬបិទភ្ជាប់ទិន្នន័យ CSV (Or Paste Raw CSV Data)
+                  </label>
+                  <textarea
+                    placeholder="name,sport_type,gender&#10;Sok Vannak,Soccer,Male&#10;Keo Dara,Volleyball,Male"
+                    value={csvRawText}
+                    onChange={(e) => {
+                      setCsvRawText(e.target.value);
+                      handleParseCsvText(e.target.value, 'Pasted Data.csv');
+                    }}
+                    rows={5}
+                    className="w-full bg-gray-50 border border-gray-300 p-2.5 rounded-xl font-mono text-[10.5px] outline-none focus:ring-2 focus:ring-[#FFCC00]"
+                  />
+                </div>
+
+                {/* Sample Layout Card */}
+                <div className="p-3.5 bg-yellow-50/70 border border-yellow-200 rounded-2xl text-[10.5px] leading-relaxed text-yellow-900 font-medium">
+                  <p className="font-extrabold uppercase text-[9.5px] text-yellow-800 tracking-wider mb-1 flex items-center gap-1">
+                    <Info className="w-3.5 h-3.5" /> គំរូទម្រង់តារាង (CSV Columns)
+                  </p>
+                  <code className="block bg-white/80 p-1.5 rounded-lg font-mono text-[9.5px] text-gray-700">
+                    name,sport_type,gender,photo_url
+                  </code>
+                  <p className="mt-1">
+                    * វិញ្ញាសាដែលគាំទ្រ (Supported sports): Soccer, Volleyball, Pingpong, Badminton, Swimming, Supporter
+                  </p>
+                </div>
+
+                {/* Display Error if any */}
+                {csvError && (
+                  <div className="p-3 bg-red-50 border border-red-200 text-red-800 rounded-xl text-[10.5px] font-bold flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
+                    <p>{csvError}</p>
+                  </div>
+                )}
+
+                {/* Display bulk csv summary count */}
+                {csvParsedRows.length > 0 && (
+                  <div className="p-3.5 bg-blue-50/70 border border-blue-200 text-blue-900 rounded-2xl space-y-2">
+                    <p className="text-[11px] font-extrabold uppercase text-blue-800 tracking-wider">
+                      កែសម្រួលដើម្បីត្រៀមបញ្ជូល (Ready to Import: {csvParsedRows.length} Rows)
+                    </p>
+                    <div className="max-h-[120px] overflow-y-auto divide-y divide-blue-150 text-[10px]">
+                      {csvParsedRows.slice(0, 5).map((row, idx) => (
+                        <div key={idx} className="py-1 flex justify-between font-bold">
+                          <span className="truncate max-w-[120px]">{row.name}</span>
+                          <span className="text-blue-700">{row.sport_type}</span>
+                        </div>
+                      ))}
+                      {csvParsedRows.length > 5 && (
+                        <div className="py-1 text-center font-bold text-[9px] text-blue-500 uppercase tracking-widest">
+                          And {csvParsedRows.length - 5} more rows...
+                        </div>
+                      )}
+                    </div>
+
+                    <button
+                      onClick={handleCsvImportCommit}
+                      disabled={csvImportProgress}
+                      className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-black uppercase tracking-wider text-[10.5px] rounded-xl shadow transition duration-150 active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer font-bold"
+                    >
+                      {csvImportProgress ? (
+                        <>
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                          <span>កំពុងបញ្ចូល... (Importing...)</span>
+                        </>
+                      ) : (
+                        <>
+                          <Check className="w-4 h-4 text-white" />
+                          <span>បញ្ជូនទិន្នន័យ (Import {csvParsedRows.length} Athletes)</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                )}
+
+                {/* Import Success Message */}
+                {csvImportSuccessCount !== null && (
+                  <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-[10.5px] font-bold flex items-center gap-2">
+                    <Check className="w-4 h-4 shrink-0 text-emerald-600" />
+                    <p>បានទាញបញ្ចូលកីឡាករ {csvImportSuccessCount} នាក់ដោយជោគជ័យ! Commited athletes to database.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Right Side: Active Athletes Live List & Advanced Action Grid */}
