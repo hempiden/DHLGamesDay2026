@@ -468,129 +468,108 @@ export default function EventSettings({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-        
-        {/* Left Sidebar Menu */}
-        <div className="lg:col-span-3 bg-white p-4.5 rounded-[24px] border border-gray-150 shadow-sm space-y-2 select-none shrink-0 w-full">
-          <p className="text-[9.5px] text-gray-400 uppercase font-extrabold tracking-wider px-3 mb-2.5">
-            ម៉ឺនុយចាត់ការ (Admin Operations)
-          </p>
+      {/* Admin Operations panel horizontal: right below Administrator Suite banner */}
+      <div id="admin-operations-horizontal-panel" className="bg-white p-5 rounded-3xl border border-gray-150 shadow-sm space-y-3.5 select-none w-full">
+        <p className="text-[10px] text-gray-400 uppercase font-extrabold tracking-wider px-1">
+          ម៉ឺនុយចាត់ការ (Admin Operations)
+        </p>
 
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-2.5">
           <button
             type="button"
             onClick={() => setActiveSubTab('events_sports')}
-            className={`w-full flex items-center justify-between px-4 py-3.5 rounded-xl font-bold text-xs uppercase tracking-wide transition-all duration-150 ${
+            className={`w-full flex items-center justify-center gap-2 px-3 py-3 rounded-xl font-bold text-[11px] uppercase tracking-wide transition-all duration-150 border cursor-pointer ${
               activeSubTab === 'events_sports'
-                ? 'bg-[#1a1a1a] text-white shadow-md'
-                : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+                ? 'bg-[#1a1a1a] border-[#1a1a1a] text-white shadow-md'
+                : 'bg-gray-50 border-gray-100 text-gray-600 hover:bg-gray-100'
             }`}
           >
-            <div className="flex items-center gap-2.5">
-              <Trophy className="w-4 h-4" />
-              <span>ព្រឹត្តិការណ៍ & ប្រភេទកីឡា</span>
-            </div>
-            <ChevronRight className="w-3.5 h-3.5 opacity-50" />
+            <Trophy className="w-4 h-4 shrink-0 text-amber-500" />
+            <span className="truncate">ព្រឹត្តិការណ៍ & កីឡា</span>
           </button>
 
           <button
             type="button"
             onClick={() => setActiveSubTab('setup_matches')}
-            className={`w-full flex items-center justify-between px-4 py-3.5 rounded-xl font-bold text-xs uppercase tracking-wide transition-all duration-150 ${
+            className={`w-full flex items-center justify-center gap-2 px-3 py-3 rounded-xl font-bold text-[11px] uppercase tracking-wide transition-all duration-150 border cursor-pointer ${
               activeSubTab === 'setup_matches'
-                ? 'bg-[#1a1a1a] text-white shadow-md'
-                : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+                ? 'bg-[#1a1a1a] border-[#1a1a1a] text-white shadow-md'
+                : 'bg-gray-50 border-gray-100 text-gray-600 hover:bg-gray-100'
             }`}
           >
-            <div className="flex items-center gap-2.5">
-              <Settings2 className="w-4 h-4" />
-              <span>រៀបចំការប្រកួត (Setup matches)</span>
-            </div>
-            <ChevronRight className="w-3.5 h-3.5 opacity-50" />
+            <Settings2 className="w-4 h-4 shrink-0 text-indigo-500" />
+            <span className="truncate">រៀបចំការប្រកួត</span>
           </button>
 
           <button
             type="button"
             onClick={() => setActiveSubTab('teams_structure')}
-            className={`w-full flex items-center justify-between px-4 py-3.5 rounded-xl font-bold text-xs uppercase tracking-wide transition-all duration-150 ${
+            className={`w-full flex items-center justify-center gap-2 px-3 py-3 rounded-xl font-bold text-[11px] uppercase tracking-wide transition-all duration-150 border cursor-pointer ${
               activeSubTab === 'teams_structure'
-                ? 'bg-[#1a1a1a] text-white shadow-md'
-                : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+                ? 'bg-[#1a1a1a] border-[#1a1a1a] text-white shadow-md'
+                : 'bg-gray-50 border-gray-100 text-gray-600 hover:bg-gray-100'
             }`}
           >
-            <div className="flex items-center gap-2.5">
-              <Users className="w-4 h-4 text-blue-500" />
-              <span>រៀបចំរចនាសម្ព័ន្ធក្រុម (Team Structure Roster)</span>
-            </div>
-            <ChevronRight className="w-3.5 h-3.5 opacity-50" />
+            <Users className="w-4 h-4 shrink-0 text-blue-500" />
+            <span className="truncate">រចនាសម្ព័ន្ធក្រុម</span>
           </button>
 
           <button
             type="button"
             onClick={() => setActiveSubTab('athletes_hub')}
-            className={`w-full flex items-center justify-between px-4 py-3.5 rounded-xl font-bold text-xs uppercase tracking-wide transition-all duration-150 ${
+            className={`w-full flex items-center justify-center gap-2 px-3 py-3 rounded-xl font-bold text-[11px] uppercase tracking-wide transition-all duration-150 border cursor-pointer ${
               activeSubTab === 'athletes_hub'
-                ? 'bg-[#1a1a1a] text-white shadow-md'
-                : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+                ? 'bg-[#1a1a1a] border-[#1a1a1a] text-white shadow-md'
+                : 'bg-gray-50 border-gray-100 text-gray-600 hover:bg-gray-100'
             }`}
           >
-            <div className="flex items-center gap-2.5">
-              <UserPlus className="w-4 h-4 text-emerald-500" />
-              <span>បញ្ជីឈ្មោះកីឡាករ & បន្ថែមរូប (Athlete Hub)</span>
-            </div>
-            <ChevronRight className="w-3.5 h-3.5 opacity-50" />
+            <UserPlus className="w-4 h-4 shrink-0 text-emerald-500" />
+            <span className="truncate">កីឡាករ & បន្ថែមរូប</span>
           </button>
 
           <button
             type="button"
             onClick={() => setActiveSubTab('design')}
-            className={`w-full flex items-center justify-between px-4 py-3.5 rounded-xl font-bold text-xs uppercase tracking-wide transition duration-150 ${
+            className={`w-full flex items-center justify-center gap-2 px-3 py-3 rounded-xl font-bold text-[11px] uppercase tracking-wide transition duration-150 border cursor-pointer ${
               activeSubTab === 'design'
-                ? 'bg-dhl-red text-white shadow-md'
-                : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+                ? 'bg-dhl-red border-dhl-red text-white shadow-md'
+                : 'bg-gray-50 border-gray-100 text-gray-600 hover:bg-gray-100'
             }`}
           >
-            <div className="flex items-center gap-2.5">
-              <Sliders className="w-4 h-4" />
-              <span>ការរចនា និងការចែកចាយ (Design)</span>
-            </div>
-            <ChevronRight className="w-3.5 h-3.5 opacity-50" />
+            <Sliders className="w-4 h-4 shrink-0 text-rose-500" />
+            <span className="truncate">ការរចនា & ចែករំលែក</span>
           </button>
 
           <button
             type="button"
             onClick={() => setActiveSubTab('enrolment')}
-            className={`w-full flex items-center justify-between px-4 py-3.5 rounded-xl font-bold text-xs uppercase tracking-wide transition duration-150 ${
+            className={`w-full flex items-center justify-center gap-2 px-3 py-3 rounded-xl font-bold text-[11px] uppercase tracking-wide transition duration-150 border cursor-pointer ${
               activeSubTab === 'enrolment'
-                ? 'bg-dhl-red text-white shadow-md'
-                : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+                ? 'bg-dhl-red border-dhl-red text-white shadow-md'
+                : 'bg-gray-50 border-gray-100 text-gray-600 hover:bg-gray-100'
             }`}
           >
-            <div className="flex items-center gap-2.5">
-              <Award className="w-4 h-4" />
-              <span>ទម្រង់ចុះឈ្មោះ (Enrolment Form)</span>
-            </div>
-            <ChevronRight className="w-3.5 h-3.5 opacity-50" />
+            <Award className="w-4 h-4 shrink-0 text-amber-600" />
+            <span className="truncate">ទម្រង់ចុះឈ្មោះ</span>
           </button>
 
           <button
             type="button"
             onClick={() => setActiveSubTab('language')}
-            className={`w-full flex items-center justify-between px-4 py-3.5 rounded-xl font-bold text-xs uppercase tracking-wide transition duration-150 ${
+            className={`w-full flex items-center justify-center gap-2 px-3 py-3 rounded-xl font-bold text-[11px] uppercase tracking-wide transition duration-150 border cursor-pointer ${
               activeSubTab === 'language'
-                ? 'bg-[#1a1a1a] text-white shadow-md'
-                : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+                ? 'bg-[#1a1a1a] border-[#1a1a1a] text-white shadow-md'
+                : 'bg-gray-50 border-gray-100 text-gray-600 hover:bg-gray-100'
             }`}
           >
-            <div className="flex items-center gap-2.5">
-              <Languages className="w-4 h-4" />
-              <span>ការកំណត់ភាសា (Languages)</span>
-            </div>
-            <ChevronRight className="w-3.5 h-3.5 opacity-50" />
+            <Languages className="w-4 h-4 shrink-0 text-cyan-500" />
+            <span className="truncate">ភាសា (Languages)</span>
           </button>
         </div>
+      </div>
 
-        {/* Right Main Content Panel */}
-        <div className="lg:col-span-9 space-y-6 w-full">
+      {/* Main Content Panels occupying 100% full width */}
+      <div id="admin-operations-content-panel" className="w-full space-y-6">
 
           {/* TAB 1: EVENTS AND SPORTS ARCHITECT */}
           {activeSubTab === 'events_sports' && (
@@ -1858,6 +1837,5 @@ export default function EventSettings({
 
         </div>
       </div>
-    </div>
   );
 }

@@ -74,11 +74,11 @@ export default function AnalyticsDashboard({ matches, participants, setActiveTab
       .sort((a, b) => b.sports.length - a.sports.length);
   }, [playerGroupsByName]);
 
-  // At-Risk Players: Players NOT assigned to any team in team-based sports (Soccer, Volleyball, Pingpong)
+  // At-Risk Players: Players NOT assigned to any team in team-based sports (Soccer, Volleyball, Pingpong, Badminton)
   const unassignedPlayers = useMemo(() => {
     return players.filter(p => {
-      // Soccer, Volleyball, Pingpong are strictly team-based
-      const needsTeam = ['Soccer', 'Volleyball', 'Pingpong'].includes(p.sport_type);
+      // Soccer, Volleyball, Pingpong, Badminton are team-based / require assignments
+      const needsTeam = ['Soccer', 'Volleyball', 'Pingpong', 'Badminton'].includes(p.sport_type);
       return needsTeam && (!p.team_id || p.team_id === 'null' || p.team_id === '');
     });
   }, [players]);
@@ -164,7 +164,7 @@ export default function AnalyticsDashboard({ matches, participants, setActiveTab
       const sportMatches = matches.filter(m => m.sport_name === sport);
       
       const unassignedInSport = sportPlayers.filter(p => {
-        const isTeamSport = ['Soccer', 'Volleyball', 'Pingpong'].includes(sport);
+        const isTeamSport = ['Soccer', 'Volleyball', 'Pingpong', 'Badminton'].includes(sport);
         return isTeamSport && (!p.team_id || p.team_id === 'null' || p.team_id === '');
       });
 
