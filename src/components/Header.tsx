@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Award, Layers, ToggleLeft, RefreshCw, AlertCircle, Laptop, Settings, Wifi, WifiOff, Users, Upload, Monitor, Database, ShieldAlert, LogOut, KeyRound, BarChart3, Timer, ChevronDown, Share2, Check, Languages } from 'lucide-react';
+import { Award, Layers, ToggleLeft, RefreshCw, AlertCircle, Laptop, Settings, Wifi, WifiOff, Users, Upload, Monitor, Database, ShieldAlert, LogOut, KeyRound, BarChart3, Timer, ChevronDown, Share2, Check, Languages, Calendar } from 'lucide-react';
 import { AppUser, EventInfo, OrganizationInfo } from '../types';
 
 interface HeaderProps {
-  activeTab: 'leaderboard' | 'public_teams' | 'dashboard' | 'scoring' | 'admin' | 'teams' | 'database' | 'users' | 'login' | 'settings' | 'enrolment' | 'organization';
-  setActiveTab: (tab: 'leaderboard' | 'public_teams' | 'dashboard' | 'scoring' | 'admin' | 'teams' | 'database' | 'users' | 'login' | 'settings' | 'enrolment' | 'organization') => void;
+  activeTab: 'leaderboard' | 'public_teams' | 'dashboard' | 'scoring' | 'admin' | 'teams' | 'database' | 'users' | 'login' | 'settings' | 'enrolment' | 'organization' | 'calendar';
+  setActiveTab: (tab: 'leaderboard' | 'public_teams' | 'dashboard' | 'scoring' | 'admin' | 'teams' | 'database' | 'users' | 'login' | 'settings' | 'enrolment' | 'organization' | 'calendar') => void;
   isOnline: boolean;
   supabaseConnected: boolean;
   currentUser: AppUser | null;
@@ -227,6 +227,19 @@ export default function Header({
                 <span>{t('menu_enrol', 'ចុះឈ្មោះលេងកីឡា (Enrol Athlete)', 'Enrol Athlete')}</span>
               </button>
             )}
+
+            <button
+              id="tab-calendar"
+              onClick={() => setActiveTab('calendar')}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs uppercase cursor-pointer tracking-wide transition-all duration-200 active:scale-95 whitespace-nowrap ${
+                activeTab === 'calendar'
+                  ? `${colors.primaryBg} text-white shadow-md`
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              <Calendar className="w-4 h-4 text-orange-500 animate-pulse" />
+              <span>{t('menu_calendar', 'កាលវិភាគទីលាន (Pitch Plan)', 'Pitch Calendar')}</span>
+            </button>
  
             <button
               id="tab-dashboard"

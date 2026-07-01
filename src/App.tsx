@@ -19,10 +19,11 @@ import { INITIAL_MATCHES, INITIAL_PARTICIPANTS } from './data';
 import { getSupabaseClient, testSupabaseConnection } from './supabase';
 import { Laptop, Wifi, WifiOff, RefreshCw, Layers, ShieldAlert, Heart, Calendar } from 'lucide-react';
 import OrganizationSettings from './components/OrganizationSettings';
+import PitchCalendar from './components/PitchCalendar';
 
 export default function App() {
   const hasAttemptedEventsSync = useRef(false);
-  const [activeTab, setActiveTab] = useState<'leaderboard' | 'public_teams' | 'dashboard' | 'scoring' | 'admin' | 'teams' | 'database' | 'users' | 'login' | 'settings' | 'enrolment' | 'organization'>(() => {
+  const [activeTab, setActiveTab] = useState<'leaderboard' | 'public_teams' | 'dashboard' | 'scoring' | 'admin' | 'teams' | 'database' | 'users' | 'login' | 'settings' | 'enrolment' | 'organization' | 'calendar'>(() => {
     if (typeof window !== 'undefined') {
       const p = new URLSearchParams(window.location.search);
       const tab = p.get('tab');
@@ -38,6 +39,7 @@ export default function App() {
       if (tab === 'settings') return 'settings';
       if (tab === 'enrolment') return 'enrolment';
       if (tab === 'organization') return 'organization';
+      if (tab === 'calendar' || tab === 'pitch' || tab === 'booking') return 'calendar';
     }
     return 'leaderboard';
   });
@@ -1789,6 +1791,17 @@ export default function App() {
                 addParticipant={addParticipant}
                 currentLanguage={currentLanguage}
                 translations={translations}
+              />
+            )}
+
+            {/* TAB FOR PITCH PLANNER DAY CALENDAR */}
+            {activeTab === 'calendar' && (
+              <PitchCalendar
+                organization={organization}
+                currentUser={currentUser}
+                matches={filteredMatches}
+                onUpdateMatchFields={updateMatchFields}
+                currentLanguage={currentLanguage}
               />
             )}
 

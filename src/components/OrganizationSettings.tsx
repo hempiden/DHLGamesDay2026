@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Building2, Save, Globe, Mail, Phone, MapPin, Sparkles, CheckCircle } from 'lucide-react';
+import { Building2, Save, Globe, Mail, Phone, MapPin, Sparkles, CheckCircle, Flame, Plus, Minus } from 'lucide-react';
 import { OrganizationInfo } from '../types';
+import { getActiveSports, getSportConfig } from '../data';
 
 interface OrganizationSettingsProps {
   organization: OrganizationInfo;
@@ -20,9 +21,28 @@ export default function OrganizationSettings({
   const [website, setWebsite] = useState(organization.website);
   const [address, setAddress] = useState(organization.address);
   const [footerMotto, setFooterMotto] = useState(organization.footerMotto);
+  
+  const [pitchesConfig, setPitchesConfig] = useState<Record<string, number>>(() => {
+    return {
+      Soccer: 2,
+      Volleyball: 2,
+      Pingpong: 4,
+      Badminton: 4,
+      Swimming: 6,
+      ...(organization.pitchesConfig || {})
+    };
+  });
 
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
+
+  const updatePitchCount = (sport: string, delta: number) => {
+    setPitchesConfig(prev => {
+      const current = prev[sport] || 2;
+      const next = Math.max(1, Math.min(20, current + delta));
+      return { ...prev, [sport]: next };
+    });
+  };
 
   // Auto-sanitize slugs to be lowercase letters, digits, and hyphens only
   const handleSlugChange = (value: string) => {
@@ -57,6 +77,7 @@ export default function OrganizationSettings({
       website: website.trim(),
       address: address.trim(),
       footerMotto: footerMotto.trim(),
+      pitchesConfig: pitchesConfig,
     };
 
     try {
@@ -257,6 +278,55 @@ export default function OrganizationSettings({
                     className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 outline-none focus:ring-2 focus:ring-yellow-400 font-medium"
                   />
                 </div>
+              </div>
+            </div>
+
+            {/* Pitches & Courts Capacity Configuration */}
+            <div className="border-t border-gray-100 my-4 pt-4 space-y-3">
+              <div className="flex items-center gap-1.5">
+                <Flame className="w-3.5 h-3.5 text-amber-500 animate-pulse" />
+                <h4 className="text-[10px] font-black uppercase tracking-wider text-gray-400">កំណត់ចំនួនទីលាន / តុប្រកួត (Pitches & Courts Configuration)</h4>
+              </div>
+              <p className="text-[10px] text-gray-400 font-semibold leading-relaxed">
+                កំណត់ចំនួនទីលានដែលមានសម្រាប់ការប្រកួតនីមួយៗ (ឧ. ទីលានទី១, ទីលានទី២) ដើម្បីងាយស្រួលរៀបចំលីគ និងការកក់ទុកក្នុងកាលវិភាគ។
+              </p>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {getActiveSports().map(sport => {
+                  const conf = getSportConfig(sport);
+                  const count = pitchesConfig[sport] || 2;
+                  return (
+                    <div key={sport} className="flex items-center justify-between p-3 bg-gray-50 rounded-2xl border border-gray-150">
+                      <div className="flex items-center gap-2.5 select-none text-xs">
+                        <span className="text-lg shrink-0">{conf.icon}</span>
+                        <div>
+                          <p className="font-extrabold text-gray-800 text-[11.5px] leading-tight">{conf.khmerName}</p>
+                          <p className="text-[9px] font-mono font-black text-gray-400 uppercase tracking-wider leading-none">{sport}</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => updatePitchCount(sport, -1)}
+                          className="w-7 h-7 bg-white hover:bg-gray-100 rounded-lg flex items-center justify-center text-gray-650 border border-gray-200 shadow-3xs hover:shadow-2xs transition select-none active:scale-95 cursor-pointer"
+                        >
+                          <Minus className="w-3.5 h-3.5" />
+                        </button>
+                        <span className="w-6 text-center font-mono font-black text-xs text-gray-800 select-none">
+                          {count}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => updatePitchCount(sport, 1)}
+                          className="w-7 h-7 bg-white hover:bg-gray-100 rounded-lg flex items-center justify-center text-gray-650 border border-gray-200 shadow-3xs hover:shadow-2xs transition select-none active:scale-95 cursor-pointer"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
 

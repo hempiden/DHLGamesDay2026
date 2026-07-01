@@ -101,6 +101,7 @@ export interface OrganizationInfo {
   website: string;
   address: string;
   footerMotto: string;
+  pitchesConfig?: Record<string, number>;
 }
 
 export const DEFAULT_TRANSLATIONS: Record<string, { kh: string; en: string }> = {
