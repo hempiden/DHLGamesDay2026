@@ -202,7 +202,7 @@ export default function PitchCalendar({
   const [newBooker, setNewBooker] = useState('');
   const [newPitchNum, setNewPitchNum] = useState(1);
   const [newStartHour, setNewStartHour] = useState('08:00');
-  const [newEndHour, setNewEndHour] = useState('09:00');
+  const [newEndHour, setNewEndHour] = useState('08:30');
   const [newStatus, setNewStatus] = useState<'Reserved' | 'Approved' | 'Host-Blocked'>('Approved');
   const [newNotes, setNewNotes] = useState('');
   const [newIsLeagueMatch, setNewIsLeagueMatch] = useState(false);
@@ -805,7 +805,7 @@ export default function PitchCalendar({
                                 // Pick suitable defaults for pitch and hour selection
                                 setNewPitchNum(1);
                                 setNewStartHour('09:00');
-                                setNewEndHour('10:00');
+                                setNewEndHour('09:30');
                                 setShowAddModal(true);
                               }}
                               className="px-2.5 py-1 text-[9px] font-black uppercase text-gray-700 bg-amber-500 hover:bg-amber-600 hover:shadow-3xs font-extrabold rounded-lg cursor-pointer transition active:scale-95 flex items-center gap-1"
@@ -938,35 +938,38 @@ export default function PitchCalendar({
                   <label className="text-[10px] font-extrabold text-gray-400 uppercase tracking-wide">
                     ម៉ោងចាប់ផ្តើម (Start Time)
                   </label>
-                  <select
+                  <input
+                    type="time"
+                    required
+                    step="300"
                     value={newStartHour}
                     onChange={(e) => {
                       const newStart = e.target.value;
-                      const currentDur = getDurationMinutes(newStartHour, newEndHour) || 30;
                       setNewStartHour(newStart);
-                      setNewEndHour(addMinutesToTime(newStart, currentDur));
+                      if (newStart) {
+                        const dur = getDurationMinutes(newStart, newEndHour);
+                        // If duration is <= 0 or unassigned, default to 30 mins automatically
+                        if (dur <= 0) {
+                          setNewEndHour(addMinutesToTime(newStart, 30));
+                        }
+                      }
                     }}
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 outline-none focus:ring-2 focus:ring-yellow-400 font-mono font-bold cursor-pointer"
-                  >
-                    {TIME_OPTIONS.slice(0, -1).map(h => (
-                      <option key={h} value={h}>{h}</option>
-                    ))}
-                  </select>
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 outline-none focus:ring-2 focus:ring-yellow-400 font-mono font-bold text-sm text-gray-800 cursor-pointer"
+                  />
                 </div>
 
                 <div className="space-y-1">
                   <label className="text-[10px] font-extrabold text-gray-400 uppercase tracking-wide">
                     ម៉ោងបញ្ចាប់ (End Time)
                   </label>
-                  <select
+                  <input
+                    type="time"
+                    required
+                    step="300"
                     value={newEndHour}
                     onChange={(e) => setNewEndHour(e.target.value)}
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 outline-none focus:ring-2 focus:ring-yellow-400 font-mono font-bold cursor-pointer"
-                  >
-                    {TIME_OPTIONS.filter(h => h > newStartHour).map(h => (
-                      <option key={h} value={h}>{h}</option>
-                    ))}
-                  </select>
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 outline-none focus:ring-2 focus:ring-yellow-400 font-mono font-bold text-sm text-gray-800 cursor-pointer"
+                  />
                 </div>
               </div>
 
