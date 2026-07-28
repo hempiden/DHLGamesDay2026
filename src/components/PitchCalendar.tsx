@@ -987,26 +987,24 @@ export default function PitchCalendar({
                                 )}
 
                                 {booking && isContinuation && (
-                                  <div className="py-1 px-2 bg-amber-500/10 border-l-3 border-amber-500 rounded-md flex items-center justify-between text-[9.5px] text-amber-900 font-bold group/item hover:bg-amber-500/20 transition">
-                                    <span className="truncate max-w-[140px] font-mono">
-                                      ↳ {booking.bookerName.replace('★ League Match: ', '')}
+                                  <div 
+                                    className="h-full min-h-[18px] bg-amber-500/10 hover:bg-amber-500/20 border-l-2 border-amber-400 rounded-r-sm px-1.5 py-0.5 flex items-center justify-between text-[9px] text-amber-900/80 font-mono transition cursor-pointer"
+                                    onClick={(e) => {
+                                      if (isAdmin) {
+                                        e.stopPropagation();
+                                        handleOpenEditModal(booking);
+                                      }
+                                    }}
+                                    title={`${booking.bookerName} (${booking.startTime} - ${booking.endTime})`}
+                                  >
+                                    <span className="truncate max-w-[150px] text-[8.5px] font-bold text-amber-900/70">
+                                      {/* Only show label if it's near top continuation or hover */}
+                                      <span className="hidden group-hover/item:inline">↳ {booking.bookerName.replace('★ League Match: ', '')} </span>
+                                      <span className="inline group-hover/item:hidden font-extrabold text-amber-700/60">┊</span>
                                     </span>
-                                    <div className="flex items-center gap-1 shrink-0">
-                                      <span className="text-[8.5px] font-mono text-amber-700">({booking.endTime})</span>
-                                      {isAdmin && (
-                                        <button
-                                          type="button"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleOpenEditModal(booking);
-                                          }}
-                                          className="p-0.5 text-amber-800 hover:text-black bg-amber-200/50 hover:bg-amber-300 rounded cursor-pointer"
-                                          title="Move/Edit"
-                                        >
-                                          <ArrowRightLeft className="w-2.5 h-2.5" />
-                                        </button>
-                                      )}
-                                    </div>
+                                    <span className="text-[8px] font-mono text-amber-700/70 shrink-0 font-bold">
+                                      Until {booking.endTime}
+                                    </span>
                                   </div>
                                 )}
 
