@@ -25,32 +25,35 @@ interface PitchBooking {
   matchId?: string;
 }
 
-// Expanded 30-minute interval grid hours for fine-grained slot placement
-const HOURS = [
-  '07:00', '07:30', '08:00', '08:30', '09:00', '09:30', '10:00', '10:30',
-  '11:00', '11:30', '12:00', '12:30', '13:00', '13:30', '14:00', '14:30',
-  '15:00', '15:30', '16:00', '16:30', '17:00', '17:30', '18:00', '18:30',
-  '19:00', '19:30', '20:00', '20:30', '21:00'
-];
+// Helper to generate hours for grid step
+const generateHours = (stepMins: number = 5, startH: number = 7, endH: number = 22): string[] => {
+  const result: string[] = [];
+  for (let h = startH; h <= endH; h++) {
+    for (let m = 0; m < 60; m += stepMins) {
+      if (h === endH && m > 0) break;
+      const hStr = String(h).padStart(2, '0');
+      const mStr = String(m).padStart(2, '0');
+      result.push(`${hStr}:${mStr}`);
+    }
+  }
+  return result;
+};
 
-// Sub-hour start time options for fine precision (15m / 25m / 30m offsets)
-const TIME_OPTIONS = [
-  '07:00', '07:15', '07:25', '07:30', '07:45',
-  '08:00', '08:15', '08:25', '08:30', '08:45',
-  '09:00', '09:15', '09:25', '09:30', '09:45',
-  '10:00', '10:15', '10:25', '10:30', '10:45',
-  '11:00', '11:15', '11:25', '11:30', '11:45',
-  '12:00', '12:15', '12:25', '12:30', '12:45',
-  '13:00', '13:15', '13:25', '13:30', '13:45',
-  '14:00', '14:15', '14:25', '14:30', '14:45',
-  '15:00', '15:15', '15:25', '15:30', '15:45',
-  '16:00', '16:15', '16:25', '16:30', '16:45',
-  '17:00', '17:15', '17:25', '17:30', '17:45',
-  '18:00', '18:15', '18:25', '18:30', '18:45',
-  '19:00', '19:15', '19:25', '19:30', '19:45',
-  '20:00', '20:15', '20:25', '20:30', '20:45',
-  '21:00', '21:30', '22:00'
-];
+// Generated 5-minute step time options for dropdown select inputs (06:00 to 23:00)
+const generateTimeOptions = (stepMins: number = 5, startH: number = 6, endH: number = 23): string[] => {
+  const options: string[] = [];
+  for (let h = startH; h <= endH; h++) {
+    for (let m = 0; m < 60; m += stepMins) {
+      if (h === endH && m > 0) break;
+      const hStr = String(h).padStart(2, '0');
+      const mStr = String(m).padStart(2, '0');
+      options.push(`${hStr}:${mStr}`);
+    }
+  }
+  return options;
+};
+
+const TIME_OPTIONS = generateTimeOptions(5, 6, 23);
 
 const addMinutesToTime = (timeStr: string, mins: number): string => {
   const [hStr, mStr] = timeStr.split(':');
@@ -220,6 +223,23 @@ export default function PitchCalendar({
   // Toast notification state
   const [toastMessage, setToastMessage] = useState<{ text: string; isError?: boolean } | null>(null);
 
+  // Grid step resolution (5 mins by default as requested, with 15m / 30m toggle)
+  const [gridStep, setGridStep] = useState<number>(5);
+
+  const hoursList = useMemo(() => {
+    return generateHours(gridStep, 7, 22);
+  }, [gridStep]);
+
+  const gridScrollRef = React.useRef<HTMLDivElement>(null);
+
+  const scrollToSlot = (timeStr: string) => {
+    if (!gridScrollRef.current) return;
+    const targetRow = gridScrollRef.current.querySelector(`[data-slot-time="${timeStr}"]`);
+    if (targetRow) {
+      targetRow.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+
   const showToast = (text: string, isError = false) => {
     setToastMessage({ text, isError });
     setTimeout(() => {
@@ -328,17 +348,38 @@ export default function PitchCalendar({
     return [...filteredBookings, ...autoMatchBookings];
   }, [filteredBookings, autoMatchBookings]);
 
-  // Get booking that starts within this 30-minute slot or matches slot
-  const getCellBooking = (pitchNum: number, slotHour: string) => {
-    return allBookingsForDay.find(b => {
+  // Helper to get booking at a specific slot hour
+  const getSlotBookingInfo = (pitchNum: number, slotHour: string, stepMins: number) => {
+    const [sH, sM] = slotHour.split(':').map(Number);
+    const slotStartMins = sH * 60 + sM;
+    const slotEndMins = slotStartMins + stepMins;
+
+    const booking = allBookingsForDay.find(b => {
       if (b.pitchNumber !== pitchNum) return false;
-      if (b.startTime === slotHour) return true;
-      const [h, m] = slotHour.split(':').map(Number);
-      const slotMins = h * 60 + m;
       const [bH, bM] = b.startTime.split(':').map(Number);
-      const bMins = bH * 60 + bM;
-      return bMins >= slotMins && bMins < slotMins + 30;
+      const [eH, eM] = b.endTime.split(':').map(Number);
+      const bStartMins = bH * 60 + bM;
+      const bEndMins = eH * 60 + eM;
+
+      return slotStartMins < bEndMins && slotEndMins > bStartMins;
     });
+
+    if (!booking) return null;
+
+    const [bH, bM] = booking.startTime.split(':').map(Number);
+    const bStartMins = bH * 60 + bM;
+
+    const isStartSlot = (bStartMins >= slotStartMins && bStartMins < slotEndMins);
+
+    return {
+      booking,
+      isStartSlot,
+      isContinuation: !isStartSlot
+    };
+  };
+
+  const getCellBooking = (pitchNum: number, slotHour: string) => {
+    return getSlotBookingInfo(pitchNum, slotHour, gridStep)?.booking;
   };
 
   // List of active unscheduled/unassigned matches belonging to this sport
@@ -729,11 +770,11 @@ export default function PitchCalendar({
         <div className="xl:col-span-9 space-y-6">
           
           {/* Calendar visual wrapper */}
-          <div className="bg-white rounded-3xl p-5 border border-gray-150 shadow-sm overflow-hidden space-y-4">
+          <div className="bg-white rounded-3xl p-5 border border-gray-150 shadow-sm space-y-4">
             
-            {/* Grid Header Details */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-3">
-              <div className="flex items-center gap-2 select-none text-xs text-gray-400 uppercase font-black">
+            {/* Grid Header Details & Step Controls */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-gray-100 pb-3">
+              <div className="flex items-center gap-2 select-none text-xs text-gray-400 uppercase font-black flex-wrap">
                 <span className="text-lg">{activeSportConfig.icon}</span>
                 <span>
                   {activeSportConfig.khmerName} &bull; {selectedSport}
@@ -743,148 +784,255 @@ export default function PitchCalendar({
                 </span>
               </div>
 
-              <div className="text-[11px] font-mono font-bold text-gray-550 bg-gray-50 border border-gray-150 px-2.5 py-1 rounded-xl">
-                🗓️ Selected: {selectedDate}
+              <div className="flex items-center gap-2 flex-wrap justify-between md:justify-end">
+                {/* 5-Min Time Range / Step Selector */}
+                <div className="flex items-center bg-gray-100 p-0.5 rounded-xl border border-gray-200 text-[10px] font-extrabold shadow-3xs">
+                  <span className="px-2 text-gray-400 uppercase tracking-wide text-[9px]">Grid:</span>
+                  <button
+                    type="button"
+                    onClick={() => setGridStep(5)}
+                    className={`px-2.5 py-1 rounded-lg transition cursor-pointer font-bold ${
+                      gridStep === 5 ? 'bg-amber-500 text-slate-900 shadow-3xs font-black' : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    ⚡ 5 Min Range
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setGridStep(15)}
+                    className={`px-2.5 py-1 rounded-lg transition cursor-pointer font-bold ${
+                      gridStep === 15 ? 'bg-amber-500 text-slate-900 shadow-3xs font-black' : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    15 Min
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setGridStep(30)}
+                    className={`px-2.5 py-1 rounded-lg transition cursor-pointer font-bold ${
+                      gridStep === 30 ? 'bg-amber-500 text-slate-900 shadow-3xs font-black' : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    30 Min
+                  </button>
+                </div>
+
+                <div className="text-[11px] font-mono font-bold text-gray-550 bg-gray-50 border border-gray-150 px-2.5 py-1 rounded-xl">
+                  🗓️ {selectedDate}
+                </div>
               </div>
             </div>
 
-            {/* Scrollable Calendar Grid Container */}
-            <div className="overflow-x-auto min-w-full rounded-2xl border border-gray-150">
-              <table className="min-w-full border-collapse text-left select-none text-[11px]">
-                
-                {/* Columns representing pitches */}
-                <thead>
-                  <tr className="bg-gray-50 border-b border-gray-150">
-                    <th className="p-3.5 font-bold text-gray-400 uppercase tracking-wider border-r border-gray-150 w-24 text-center">
-                      ⏱️ {currentLanguage === 'kh' ? 'ម៉ោង' : 'Hour'}
-                    </th>
-                    {Array.from({ length: pitchesCount }).map((_, idx) => {
-                      const pitchNum = idx + 1;
+            {/* Quick Time Jump Navigation bar */}
+            <div className="flex items-center gap-1.5 overflow-x-auto py-1 text-[10px] font-bold text-gray-500 scrollbar-none border-b border-gray-50 pb-2">
+              <span className="text-[9px] font-extrabold uppercase text-gray-400 tracking-wider shrink-0 flex items-center gap-1">
+                <Clock className="w-3 h-3 text-amber-500" />
+                {currentLanguage === 'kh' ? 'រំលងទៅម៉ោង:' : 'Quick Jump:'}
+              </span>
+              {['07:00', '08:00', '09:00', '10:00', '12:00', '14:00', '16:00', '18:00', '20:00'].map(t => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => scrollToSlot(t)}
+                  className="px-2 py-0.5 bg-gray-50 hover:bg-amber-100 hover:text-amber-900 border border-gray-200 rounded-lg transition font-mono cursor-pointer shrink-0 text-[9.5px] font-bold"
+                >
+                  {t}
+                </button>
+              ))}
+            </div>
+
+            {/* Slide-Scrollable Calendar Grid Container */}
+            <div className="relative rounded-2xl border border-gray-200 shadow-inner bg-slate-50/40">
+              <div 
+                ref={gridScrollRef}
+                className="overflow-x-auto overflow-y-auto max-h-[600px] md:max-h-[660px] scroll-smooth rounded-2xl custom-scrollbar"
+              >
+                <table className="min-w-full border-collapse text-left select-none text-[11px] relative">
+                  
+                  {/* Sticky Columns Header */}
+                  <thead className="sticky top-0 z-30 bg-gray-100/95 backdrop-blur-md shadow-3xs border-b border-gray-200">
+                    <tr>
+                      <th className="p-3 font-extrabold text-gray-500 uppercase tracking-wider border-r border-gray-200 w-24 text-center sticky left-0 z-40 bg-gray-100 shadow-3xs">
+                        ⏱️ {currentLanguage === 'kh' ? 'ម៉ោង' : 'Hour'}
+                      </th>
+                      {Array.from({ length: pitchesCount }).map((_, idx) => {
+                        const pitchNum = idx + 1;
+                        return (
+                          <th 
+                            key={pitchNum} 
+                            className="p-3.5 font-black text-gray-800 uppercase tracking-wider text-center border-r border-gray-200 last:border-r-0 min-w-[210px]"
+                          >
+                            📍 {currentLanguage === 'kh' ? `${activeSportConfig.khmerName} ទី ${pitchNum}` : `Pitch/Court ${pitchNum}`}
+                          </th>
+                        );
+                      })}
+                    </tr>
+                  </thead>
+
+                  {/* Dynamic 5-minute / Step interval rows */}
+                  <tbody>
+                    {hoursList.map(hour => {
+                      const isTopHour = hour.endsWith(':00');
+                      const isHalfHour = hour.endsWith(':30');
+
                       return (
-                        <th 
-                          key={pitchNum} 
-                          className="p-3.5 font-black text-gray-800 uppercase tracking-wider text-center border-r border-gray-150 last:border-r-0 min-w-[200px]"
+                        <tr 
+                          key={hour} 
+                          data-slot-time={hour}
+                          className={`group transition ${
+                            isTopHour 
+                              ? 'border-t-2 border-t-gray-200 border-b border-gray-150 bg-gray-100/30' 
+                              : isHalfHour
+                              ? 'border-b border-gray-150 bg-gray-50/30'
+                              : 'border-b border-gray-100/80 hover:bg-yellow-400/5'
+                          }`}
                         >
-                          📍 {currentLanguage === 'kh' ? `${activeSportConfig.khmerName} ទី ${pitchNum}` : `Pitch/Court ${pitchNum}`}
-                        </th>
-                      );
-                    })}
-                  </tr>
-                </thead>
+                          <td className={`p-2 font-mono border-r border-gray-200 border-b border-gray-100 align-middle text-center sticky left-0 z-20 transition ${
+                            isTopHour 
+                              ? 'bg-gray-100 font-extrabold text-gray-900 text-[11px]' 
+                              : isHalfHour
+                              ? 'bg-gray-50 font-bold text-gray-700 text-[10px]'
+                              : 'bg-white/90 font-medium text-gray-400 text-[9.5px]'
+                          }`}>
+                            {hour}
+                          </td>
 
-                {/* Rows representing hours */}
-                <tbody>
-                  {HOURS.map(hour => {
-                    return (
-                      <tr key={hour} className="border-b border-gray-100 last:border-b-0 group hover:bg-gray-50/20">
-                        <td className="p-3 font-mono font-black text-gray-500 bg-gray-50/50 border-r border-gray-100 border-b border-gray-100 align-middle text-center">
-                          {hour}
-                        </td>
+                          {Array.from({ length: pitchesCount }).map((_, colIdx) => {
+                            const pitchNum = colIdx + 1;
+                            const slotInfo = getSlotBookingInfo(pitchNum, hour, gridStep);
+                            const booking = slotInfo?.booking;
+                            const isStartSlot = slotInfo?.isStartSlot;
+                            const isContinuation = slotInfo?.isContinuation;
+                            const durationMins = booking ? getDurationMinutes(booking.startTime, booking.endTime) : 0;
 
-                        {Array.from({ length: pitchesCount }).map((_, colIdx) => {
-                          const pitchNum = colIdx + 1;
-                          const booking = getCellBooking(pitchNum, hour);
-                          const durationMins = booking ? getDurationMinutes(booking.startTime, booking.endTime) : 0;
-
-                          return (
-                            <td 
-                              key={pitchNum} 
-                              onClick={() => handleCellClick(pitchNum, hour)}
-                              className={`p-2 border-r border-gray-100 last:border-r-0 align-top relative min-h-[64px] transition ${
-                                booking 
-                                  ? 'bg-amber-500/5' 
-                                  : isAdmin 
-                                  ? 'hover:bg-yellow-400/10 cursor-pointer group-hover:transition duration-75' 
-                                  : 'bg-white'
-                              }`}
-                            >
-                              {booking ? (
-                                <div className="p-3 bg-white border border-gray-200 shadow-3xs rounded-xl space-y-2 relative group/item hover:border-gray-300 transition duration-150">
-                                  
-                                  {/* Actions for admin */}
-                                  {isAdmin && (
-                                    <div className="absolute top-2 right-2 flex items-center gap-1 z-10">
-                                      <button
-                                        type="button"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleOpenEditModal(booking);
-                                        }}
-                                        className="p-1 text-amber-700 hover:text-amber-900 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg shadow-3xs cursor-pointer transition active:scale-95 flex items-center gap-0.5 text-[9.5px] font-extrabold px-1.5"
-                                        title={currentLanguage === 'kh' ? 'ផ្លាស់ប្តូរទីលាន/ម៉ោង' : 'Move Pitch / Edit Time'}
-                                      >
-                                        <ArrowRightLeft className="w-3 h-3 text-amber-600" />
-                                        <span>{currentLanguage === 'kh' ? 'ផ្លាស់ទី' : 'Move'}</span>
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleDeleteBooking(booking.id, booking.matchId);
-                                        }}
-                                        className="p-1 text-rose-500 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-lg shadow-3xs cursor-pointer transition active:scale-95"
-                                        title={currentLanguage === 'kh' ? 'លុបការកក់ទីលាន' : 'Remove allocation'}
-                                      >
-                                        <Trash2 className="w-3 h-3" />
-                                      </button>
-                                    </div>
-                                  )}
-
-                                  <div className="space-y-1">
-                                    <div className="flex items-start gap-1 pr-6 flex-wrap">
-                                      {booking.isLeagueMatch && (
-                                        <span className="bg-yellow-100 text-amber-800 border border-yellow-200 text-[8px] font-black uppercase px-1 py-0.25 rounded-md tracking-wider flex items-center gap-0.5">
-                                          ★ League
-                                        </span>
-                                      )}
-                                      {getStatusBadge(booking.status)}
-                                    </div>
-
-                                    <h5 className="font-extrabold text-gray-800 text-[11.5px] leading-snug">
-                                      {booking.bookerName}
-                                    </h5>
-                                  </div>
-
-                                  <div className="flex items-center gap-2 pt-1.5 border-t border-gray-50 text-[9.5px] text-gray-400 font-bold flex-wrap">
-                                    <div className="flex items-center gap-1">
-                                      <Clock className="w-3 h-3 text-amber-600" />
-                                      <span className="font-mono font-black text-gray-700">{booking.startTime} - {booking.endTime}</span>
-                                    </div>
-                                    {durationMins > 0 && (
-                                      <span className="bg-amber-100 text-amber-900 px-1.5 py-0.5 rounded-md font-mono font-black text-[8.5px]">
-                                        ⚡ {durationMins}m
-                                      </span>
-                                    )}
-                                    {booking.notes && (
-                                      <div className="flex items-center gap-0.5 max-w-[120px] truncate text-[9px] text-gray-500">
-                                        <span>&bull;</span>
-                                        <span>{booking.notes}</span>
+                            return (
+                              <td 
+                                key={pitchNum} 
+                                onClick={() => {
+                                  if (!booking) handleCellClick(pitchNum, hour);
+                                }}
+                                className={`p-1.5 border-r border-gray-100 last:border-r-0 align-top relative transition ${
+                                  booking 
+                                    ? 'bg-amber-500/5' 
+                                    : isAdmin 
+                                    ? 'hover:bg-yellow-400/10 cursor-pointer' 
+                                    : 'bg-white'
+                                }`}
+                              >
+                                {booking && isStartSlot && (
+                                  <div className="p-3 bg-white border border-amber-300 shadow-3xs rounded-xl space-y-2 relative group/item hover:border-amber-400 transition duration-150 z-10">
+                                    
+                                    {/* Actions for admin */}
+                                    {isAdmin && (
+                                      <div className="absolute top-2 right-2 flex items-center gap-1 z-10">
+                                        <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleOpenEditModal(booking);
+                                          }}
+                                          className="p-1 text-amber-700 hover:text-amber-900 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg shadow-3xs cursor-pointer transition active:scale-95 flex items-center gap-0.5 text-[9.5px] font-extrabold px-1.5"
+                                          title={currentLanguage === 'kh' ? 'ផ្លាស់ប្តូរទីលាន/ម៉ោង' : 'Move Pitch / Edit Time'}
+                                        >
+                                          <ArrowRightLeft className="w-3 h-3 text-amber-600" />
+                                          <span>{currentLanguage === 'kh' ? 'ផ្លាស់ទី' : 'Move'}</span>
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleDeleteBooking(booking.id, booking.matchId);
+                                          }}
+                                          className="p-1 text-rose-500 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-lg shadow-3xs cursor-pointer transition active:scale-95"
+                                          title={currentLanguage === 'kh' ? 'លុបការកក់ទីលាន' : 'Remove allocation'}
+                                        >
+                                          <Trash2 className="w-3 h-3" />
+                                        </button>
                                       </div>
                                     )}
+
+                                    <div className="space-y-1">
+                                      <div className="flex items-start gap-1 pr-14 flex-wrap">
+                                        {booking.isLeagueMatch && (
+                                          <span className="bg-yellow-100 text-amber-800 border border-yellow-200 text-[8px] font-black uppercase px-1 py-0.25 rounded-md tracking-wider flex items-center gap-0.5">
+                                            ★ League
+                                          </span>
+                                        )}
+                                        {getStatusBadge(booking.status)}
+                                      </div>
+
+                                      <h5 className="font-extrabold text-gray-800 text-[11.5px] leading-snug">
+                                        {booking.bookerName}
+                                      </h5>
+                                    </div>
+
+                                    <div className="flex items-center gap-2 pt-1.5 border-t border-gray-50 text-[9.5px] text-gray-400 font-bold flex-wrap">
+                                      <div className="flex items-center gap-1">
+                                        <Clock className="w-3 h-3 text-amber-600" />
+                                        <span className="font-mono font-black text-gray-700">{booking.startTime} - {booking.endTime}</span>
+                                      </div>
+                                      {durationMins > 0 && (
+                                        <span className="bg-amber-100 text-amber-900 px-1.5 py-0.5 rounded-md font-mono font-black text-[8.5px]">
+                                          ⚡ {durationMins}m
+                                        </span>
+                                      )}
+                                      {booking.notes && (
+                                        <div className="flex items-center gap-0.5 max-w-[120px] truncate text-[9px] text-gray-500">
+                                          <span>&bull;</span>
+                                          <span>{booking.notes}</span>
+                                        </div>
+                                      )}
+                                    </div>
                                   </div>
-                                </div>
-                              ) : (
-                                <div className="h-10 flex items-center justify-center opacity-0 group-hover:opacity-100 transition duration-150">
-                                  {isAdmin ? (
-                                    <span className="text-[9.5px] text-yellow-600 bg-yellow-100 border border-yellow-200 px-2 py-1 rounded-lg font-black uppercase tracking-wider flex items-center gap-1 hover:scale-105">
-                                      <Plus className="w-3 h-3" />
-                                      {currentLanguage === 'kh' ? 'កក់ម៉ោងទំនេរ' : 'Reserve Slot'}
+                                )}
+
+                                {booking && isContinuation && (
+                                  <div className="py-1 px-2 bg-amber-500/10 border-l-3 border-amber-500 rounded-md flex items-center justify-between text-[9.5px] text-amber-900 font-bold group/item hover:bg-amber-500/20 transition">
+                                    <span className="truncate max-w-[140px] font-mono">
+                                      ↳ {booking.bookerName.replace('★ League Match: ', '')}
                                     </span>
-                                  ) : (
-                                    <span className="text-[9.5px] text-gray-300 font-bold select-none">
-                                      {currentLanguage === 'kh' ? 'ទំនេរ' : 'Slot Vacant'}
-                                    </span>
-                                  )}
-                                </div>
-                              )}
-                            </td>
-                          );
-                        })}
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                                    <div className="flex items-center gap-1 shrink-0">
+                                      <span className="text-[8.5px] font-mono text-amber-700">({booking.endTime})</span>
+                                      {isAdmin && (
+                                        <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleOpenEditModal(booking);
+                                          }}
+                                          className="p-0.5 text-amber-800 hover:text-black bg-amber-200/50 hover:bg-amber-300 rounded cursor-pointer"
+                                          title="Move/Edit"
+                                        >
+                                          <ArrowRightLeft className="w-2.5 h-2.5" />
+                                        </button>
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {!booking && (
+                                  <div className="h-6 flex items-center justify-center opacity-0 group-hover:opacity-100 transition duration-150">
+                                    {isAdmin ? (
+                                      <span className="text-[9px] text-yellow-700 bg-yellow-100 border border-yellow-200 px-1.5 py-0.5 rounded font-black uppercase tracking-wider flex items-center gap-0.5 hover:scale-105">
+                                        <Plus className="w-2.5 h-2.5" />
+                                        {currentLanguage === 'kh' ? 'កក់' : '+ Slot'}
+                                      </span>
+                                    ) : (
+                                      <span className="text-[8.5px] text-gray-300 font-bold select-none">
+                                        &bull;
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
 
           </div>
