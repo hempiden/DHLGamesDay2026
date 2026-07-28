@@ -961,9 +961,12 @@ export default function App() {
             }));
             
             setMatches((prev) => {
-              if (JSON.stringify(prev) !== JSON.stringify(mappedMatches)) {
-                localStorage.setItem('dhl_games_day_matches', JSON.stringify(mappedMatches));
-                return mappedMatches;
+              // Combine remote mapped matches with any local unsynced matches so local data is never wiped
+              const localUnsynced = prev.filter(p => p.id.startsWith('match-') && !mappedMatches.some(m => m.id === p.id));
+              const combinedMatches = [...mappedMatches, ...localUnsynced];
+              if (JSON.stringify(prev) !== JSON.stringify(combinedMatches)) {
+                localStorage.setItem('dhl_games_day_matches', JSON.stringify(combinedMatches));
+                return combinedMatches;
               }
               return prev;
             });
@@ -1011,9 +1014,11 @@ export default function App() {
               created_by: item.created_by || undefined
             }));
             setParticipants((prev) => {
-              if (JSON.stringify(prev) !== JSON.stringify(mappedParticipants)) {
-                localStorage.setItem('dhl_games_day_participants', JSON.stringify(mappedParticipants));
-                return mappedParticipants;
+              const localUnsynced = prev.filter(p => p.id.startsWith('p-') && !mappedParticipants.some(m => m.id === p.id));
+              const combinedParticipants = [...mappedParticipants, ...localUnsynced];
+              if (JSON.stringify(prev) !== JSON.stringify(combinedParticipants)) {
+                localStorage.setItem('dhl_games_day_participants', JSON.stringify(combinedParticipants));
+                return combinedParticipants;
               }
               return prev;
             });
@@ -1286,9 +1291,14 @@ export default function App() {
     }
 
     const newId = `match-${Date.now()}`;
+    const targetEventId = items.event_id || activeEventId;
+    const targetCreatedBy = items.created_by || currentUser?.username || 'hempiden';
+
     const newMatch: Match = {
       ...items,
       id: newId,
+      event_id: targetEventId,
+      created_by: targetCreatedBy,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
@@ -1301,7 +1311,7 @@ export default function App() {
       const client = getSupabaseClient(supabaseUrl, supabaseAnonKey);
       if (client) {
         try {
-          // Send to database
+          // Send to database with event_id and created_by included
           const payload: any = {
             sport_name: items.sport_name,
             match_label: items.match_label,
@@ -1312,24 +1322,29 @@ export default function App() {
             status: items.status,
             scheduled_date: items.scheduled_date || null,
             scheduled_time: items.scheduled_time || null,
+            event_id: targetEventId,
+            created_by: targetCreatedBy,
           };
-          const { error } = await client.from('matches').insert(payload);
-          if (error) {
-            const isColumnErr = error.message?.toLowerCase().includes('column') || 
-                                error.message?.toLowerCase().includes('schema cache') || 
-                                error.message?.toLowerCase().includes('attribute') ||
-                                error.message?.toLowerCase().includes('not found');
+          
+          let result = await client.from('matches').insert(payload).select('id');
+          if (result.error) {
+            const isColumnErr = result.error.message?.toLowerCase().includes('column') || 
+                                result.error.message?.toLowerCase().includes('schema cache') || 
+                                result.error.message?.toLowerCase().includes('attribute') ||
+                                result.error.message?.toLowerCase().includes('not found');
             if (isColumnErr) {
-              const { scheduled_date, scheduled_time, ...fallbackPayload } = payload;
-              const { error: secondErr } = await client.from('matches').insert(fallbackPayload);
-              if (secondErr) {
-                console.error('Error inserting match (fallback):', secondErr.message);
-              } else {
-                console.log('Successfully inserted match (fallback without scheduled_date/time)');
-              }
-            } else {
-              console.error('Error inserting match:', error.message);
+              const { scheduled_date, scheduled_time, event_id, created_by, ...fallbackPayload } = payload;
+              result = await client.from('matches').insert(fallbackPayload).select('id');
             }
+          }
+          
+          const { data, error } = result;
+          if (error) {
+            console.error('Error inserting match:', error.message);
+          } else if (data && data[0]) {
+            const finalId = String(data[0].id);
+            const updatedWithDbId = updated.map(m => m.id === newId ? { ...m, id: finalId } : m);
+            saveLocalMatches(updatedWithDbId);
           }
         } catch (err) {
           console.error('Network push insert failed:', err);
