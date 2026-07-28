@@ -85,7 +85,7 @@ export default function OrganizationSettings({
   const planMaxPitches = currentPlan === 'elite' ? 20 : currentPlan === 'pro' ? 4 : 1;
 
   const [pitchesConfig, setPitchesConfig] = useState<Record<string, number>>(() => {
-    const initialConfig = {
+    return {
       Soccer: 2,
       Volleyball: 2,
       Pingpong: 4,
@@ -93,13 +93,6 @@ export default function OrganizationSettings({
       Swimming: 6,
       ...(organization.pitchesConfig || {})
     };
-    const capped: Record<string, number> = {};
-    const plan = organization.subscriptionPlan || 'free';
-    const limit = plan === 'elite' ? 20 : plan === 'pro' ? 4 : 1;
-    Object.keys(initialConfig).forEach(key => {
-      capped[key] = Math.min(limit, initialConfig[key as keyof typeof initialConfig] || 1);
-    });
-    return capped;
   });
 
   const [saving, setSaving] = useState(false);
@@ -126,12 +119,21 @@ export default function OrganizationSettings({
   const [reportDateFilter, setReportDateFilter] = useState<string>('2026-06-16'); // default tournament day
 
   const updatePitchCount = (sport: string, delta: number) => {
-    const limit = currentPlan === 'elite' ? 20 : currentPlan === 'pro' ? 4 : 1;
     setPitchesConfig(prev => {
-      const current = prev[sport] || 1;
-      const next = Math.max(1, Math.min(limit, current + delta));
+      const current = prev[sport] ?? 2;
+      const next = Math.max(1, Math.min(50, current + delta));
       return { ...prev, [sport]: next };
     });
+  };
+
+  const handlePitchCountChange = (sport: string, value: string) => {
+    const parsed = parseInt(value, 10);
+    if (isNaN(parsed) || parsed < 1) {
+      setPitchesConfig(prev => ({ ...prev, [sport]: 1 }));
+    } else {
+      const next = Math.min(50, parsed);
+      setPitchesConfig(prev => ({ ...prev, [sport]: next }));
+    }
   };
 
   const handleSlugChange = (value: string) => {
@@ -573,21 +575,26 @@ export default function OrganizationSettings({
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1.5">
                           <button
                             type="button"
                             onClick={() => updatePitchCount(sport, -1)}
-                            className="w-7 h-7 bg-white hover:bg-gray-100 rounded-lg flex items-center justify-center text-gray-650 border border-gray-200 shadow-3xs hover:shadow-2xs transition select-none active:scale-95 cursor-pointer"
+                            className="w-8 h-8 bg-white hover:bg-gray-100 rounded-lg flex items-center justify-center text-gray-700 border border-gray-200 shadow-3xs hover:shadow-2xs transition select-none active:scale-95 cursor-pointer shrink-0"
                           >
                             <Minus className="w-3.5 h-3.5" />
                           </button>
-                          <span className="w-6 text-center font-mono font-black text-xs text-gray-800 select-none">
-                            {count}
-                          </span>
+                          <input
+                            type="number"
+                            min="1"
+                            max="50"
+                            value={count}
+                            onChange={(e) => handlePitchCountChange(sport, e.target.value)}
+                            className="w-12 h-8 text-center font-mono font-black text-xs text-gray-800 bg-white border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400"
+                          />
                           <button
                             type="button"
                             onClick={() => updatePitchCount(sport, 1)}
-                            className="w-7 h-7 bg-white hover:bg-gray-100 rounded-lg flex items-center justify-center text-gray-650 border border-gray-200 shadow-3xs hover:shadow-2xs transition select-none active:scale-95 cursor-pointer"
+                            className="w-8 h-8 bg-white hover:bg-gray-100 rounded-lg flex items-center justify-center text-gray-700 border border-gray-200 shadow-3xs hover:shadow-2xs transition select-none active:scale-95 cursor-pointer shrink-0"
                           >
                             <Plus className="w-3.5 h-3.5" />
                           </button>
