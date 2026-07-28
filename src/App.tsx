@@ -122,13 +122,28 @@ export default function App() {
       subscriptionPlan: 'free',
       subscriptionStatus: 'active',
       subscriptionExpiresAt: '2026-12-31',
+      pitchesConfig: {
+        Soccer: 2,
+        Volleyball: 2,
+        Pingpong: 4,
+        Badminton: 4,
+        Swimming: 6,
+      },
     };
 
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('dhl_organization_settings');
       if (saved) {
         try {
-          baseOrg = { ...baseOrg, ...JSON.parse(saved) };
+          const parsed = JSON.parse(saved);
+          baseOrg = {
+            ...baseOrg,
+            ...parsed,
+            pitchesConfig: {
+              ...baseOrg.pitchesConfig,
+              ...(parsed.pitchesConfig || {})
+            }
+          };
         } catch (err) {
           console.error('Failed to parse local organization settings:', err);
         }
@@ -167,6 +182,7 @@ export default function App() {
               website: updated.website,
               address: updated.address,
               footer_motto: updated.footerMotto,
+              pitches_config: updated.pitchesConfig ? JSON.stringify(updated.pitchesConfig) : null,
               updated_at: new Date().toISOString()
             });
         } catch (err) {
@@ -772,6 +788,37 @@ export default function App() {
 
             if (orgResult && orgResult.data && active) {
               const d = orgResult.data;
+              let remotePitchesConfig: Record<string, number> | undefined = undefined;
+              if (d.pitches_config) {
+                try {
+                  remotePitchesConfig = typeof d.pitches_config === 'string' ? JSON.parse(d.pitches_config) : d.pitches_config;
+                } catch (e) {
+                  console.warn('Failed to parse pitches_config from Supabase:', e);
+                }
+              }
+
+              // Also check localStorage in case local pitchesConfig is present
+              let localPitchesConfig: Record<string, number> | undefined = undefined;
+              if (typeof window !== 'undefined') {
+                const savedLocal = localStorage.getItem('dhl_organization_settings');
+                if (savedLocal) {
+                  try {
+                    const parsedLocal = JSON.parse(savedLocal);
+                    localPitchesConfig = parsedLocal.pitchesConfig;
+                  } catch (e) {}
+                }
+              }
+
+              const mergedPitchesConfig = {
+                Soccer: 2,
+                Volleyball: 2,
+                Pingpong: 4,
+                Badminton: 4,
+                Swimming: 6,
+                ...(localPitchesConfig || {}),
+                ...(remotePitchesConfig || {}),
+              };
+
               const remoteOrg: OrganizationInfo = {
                 name: d.name || 'Corporate Arena',
                 logoUrl: d.logo_url || 'https://images.unsplash.com/photo-1517649763962-0c623066013b?q=80&w=200&auto=format&fit=crop',
@@ -782,6 +829,7 @@ export default function App() {
                 website: d.website || 'https://www.company.com',
                 address: d.address || 'Phnom Penh, Cambodia',
                 footerMotto: d.footer_motto || 'Connecting Teams, Creating Champions.',
+                pitchesConfig: mergedPitchesConfig,
               };
               setOrganization(remoteOrg);
               localStorage.setItem('dhl_organization_settings', JSON.stringify(remoteOrg));

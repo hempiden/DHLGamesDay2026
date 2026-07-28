@@ -729,8 +729,12 @@ create table if not exists public.organization_settings (
   website text,
   address text,
   footer_motto text,
+  pitches_config text,
   updated_at timestamp with time zone default timezone('utc'::text, now())
 );
+
+-- Safe upgrades for organization_settings table columns
+alter table public.organization_settings add column if not exists pitches_config text;
 
 -- ==========================================
 -- SAFE GRADUAL DATABASE UPGRADE STATEMENTS

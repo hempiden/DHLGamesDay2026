@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   Building2, 
   Save, 
@@ -94,6 +94,29 @@ export default function OrganizationSettings({
       ...(organization.pitchesConfig || {})
     };
   });
+
+  useEffect(() => {
+    setName(organization.name);
+    setLogoUrl(organization.logoUrl);
+    setSlug(organization.slug);
+    setTagline(organization.tagline);
+    setContactEmail(organization.contactEmail);
+    setContactPhone(organization.contactPhone);
+    setWebsite(organization.website);
+    setAddress(organization.address);
+    setFooterMotto(organization.footerMotto);
+    if (organization.pitchesConfig) {
+      setPitchesConfig(prev => ({
+        Soccer: 2,
+        Volleyball: 2,
+        Pingpong: 4,
+        Badminton: 4,
+        Swimming: 6,
+        ...prev,
+        ...organization.pitchesConfig
+      }));
+    }
+  }, [organization]);
 
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
