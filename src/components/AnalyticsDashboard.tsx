@@ -74,18 +74,48 @@ export default function AnalyticsDashboard({ matches, participants, setActiveTab
       .sort((a, b) => b.sports.length - a.sports.length);
   }, [playerGroupsByName]);
 
-  // At-Risk Players: Players NOT assigned to any team in team-based sports (Soccer, Volleyball, Pingpong, Badminton)
+  // Helper to check if a player is already scheduled in any match
+  const isPlayerScheduledInMatch = (player: Participant) => {
+    const pNameLower = player.name.trim().toLowerCase();
+    if (!pNameLower) return false;
+    return matches.some(m => {
+      if (m.sport_name !== player.sport_type) return false;
+      const teamA = (m.team_a || '').trim().toLowerCase();
+      const teamB = (m.team_b || '').trim().toLowerCase();
+      return (
+        teamA === pNameLower ||
+        teamB === pNameLower ||
+        (teamA.length > 2 && pNameLower.length > 2 && teamA.includes(pNameLower)) ||
+        (teamB.length > 2 && pNameLower.length > 2 && teamB.includes(pNameLower))
+      );
+    });
+  };
+
+  // At-Risk Players: Players NOT assigned to any team AND NOT placed in any match schedule
+  // Swimming single players are excluded as Swimming is an individual time-trial event.
   const unassignedPlayers = useMemo(() => {
     return players.filter(p => {
-      // Soccer, Volleyball, Pingpong, Badminton are team-based / require assignments
-      const needsTeam = ['Soccer', 'Volleyball', 'Pingpong', 'Badminton'].includes(p.sport_type);
-      return needsTeam && (!p.team_id || p.team_id === 'null' || p.team_id === '');
+      // Swimming players do not require team or match assignment alerts
+      if (p.sport_type === 'Swimming') {
+        return false;
+      }
+
+      // Check if assigned to a team
+      const hasTeam = Boolean(p.team_id && p.team_id !== 'null' && p.team_id !== '');
+      if (hasTeam) return false;
+
+      // Check if player is already added/scheduled in a match
+      if (isPlayerScheduledInMatch(p)) return false;
+
+      // Player has no team and is not scheduled in any match -> Genuine pending athlete
+      return true;
     });
-  }, [players]);
+  }, [players, matches]);
 
   // Teams with no play schedule (not present in team_a or team_b of any match)
   const teamsWithNoMatches = useMemo(() => {
     return teams.filter(t => {
+      if (t.name.trim().toLowerCase() === 'no team' || !t.name.trim()) return false;
       const scheduled = matches.some(m => 
         m.team_a.trim().toLowerCase() === t.name.trim().toLowerCase() ||
         m.team_b.trim().toLowerCase() === t.name.trim().toLowerCase()
@@ -118,9 +148,9 @@ export default function AnalyticsDashboard({ matches, participants, setActiveTab
   }, [teamRosterDetails]);
 
   // Athletes completely without games scheduled
-  // Let's analyze if an athlete's assigned team has NO matches, or if an individual sport player has NO matches
   const playersMissingMatches = useMemo(() => {
     return players.filter(p => {
+      if (p.sport_type === 'Swimming') return false;
       if (p.team_id && p.team_id !== 'null') {
         const team = teams.find(t => t.id === p.team_id);
         if (!team) return true;
@@ -130,13 +160,7 @@ export default function AnalyticsDashboard({ matches, participants, setActiveTab
         );
         return !hasMatch;
       } else {
-        // Individual sport players (Swimming, Badminton).
-        // Let's see if their name is scheduled in any matches!
-        const hasMatch = matches.some(m => 
-          m.team_a.trim().toLowerCase() === p.name.trim().toLowerCase() ||
-          m.team_b.trim().toLowerCase() === p.name.trim().toLowerCase()
-        );
-        return !hasMatch;
+        return !isPlayerScheduledInMatch(p);
       }
     });
   }, [players, teams, matches]);
@@ -164,8 +188,10 @@ export default function AnalyticsDashboard({ matches, participants, setActiveTab
       const sportMatches = matches.filter(m => m.sport_name === sport);
       
       const unassignedInSport = sportPlayers.filter(p => {
-        const isTeamSport = ['Soccer', 'Volleyball', 'Pingpong', 'Badminton'].includes(sport);
-        return isTeamSport && (!p.team_id || p.team_id === 'null' || p.team_id === '');
+        if (sport === 'Swimming') return false;
+        const hasTeam = Boolean(p.team_id && p.team_id !== 'null' && p.team_id !== '');
+        if (hasTeam) return false;
+        return !isPlayerScheduledInMatch(p);
       });
 
       return {
