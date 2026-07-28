@@ -988,24 +988,15 @@ export default function PitchCalendar({
 
                                 {booking && isContinuation && (
                                   <div 
-                                    className="h-full min-h-[18px] bg-amber-500/10 hover:bg-amber-500/20 border-l-2 border-amber-400 rounded-r-sm px-1.5 py-0.5 flex items-center justify-between text-[9px] text-amber-900/80 font-mono transition cursor-pointer"
+                                    className="h-full min-h-[14px] bg-amber-500/5 hover:bg-amber-500/15 border-l-2 border-amber-300/60 rounded-r-xs transition cursor-pointer"
                                     onClick={(e) => {
                                       if (isAdmin) {
                                         e.stopPropagation();
                                         handleOpenEditModal(booking);
                                       }
                                     }}
-                                    title={`${booking.bookerName} (${booking.startTime} - ${booking.endTime})`}
-                                  >
-                                    <span className="truncate max-w-[150px] text-[8.5px] font-bold text-amber-900/70">
-                                      {/* Only show label if it's near top continuation or hover */}
-                                      <span className="hidden group-hover/item:inline">↳ {booking.bookerName.replace('★ League Match: ', '')} </span>
-                                      <span className="inline group-hover/item:hidden font-extrabold text-amber-700/60">┊</span>
-                                    </span>
-                                    <span className="text-[8px] font-mono text-amber-700/70 shrink-0 font-bold">
-                                      Until {booking.endTime}
-                                    </span>
-                                  </div>
+                                    title={`Occupied by: ${booking.bookerName} (${booking.startTime} - ${booking.endTime})`}
+                                  />
                                 )}
 
                                 {!booking && (
