@@ -102,6 +102,9 @@ export interface OrganizationInfo {
   address: string;
   footerMotto: string;
   pitchesConfig?: Record<string, number>;
+  subscriptionPlan?: 'free' | 'pro' | 'elite';
+  subscriptionStatus?: 'active' | 'trialing' | 'expired';
+  subscriptionExpiresAt?: string;
 }
 
 export const DEFAULT_TRANSLATIONS: Record<string, { kh: string; en: string }> = {

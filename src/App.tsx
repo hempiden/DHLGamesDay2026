@@ -119,6 +119,9 @@ export default function App() {
       website: 'https://www.company.com',
       address: 'Phnom Penh, Cambodia',
       footerMotto: 'Connecting Teams, Creating Champions.',
+      subscriptionPlan: 'free',
+      subscriptionStatus: 'active',
+      subscriptionExpiresAt: '2026-12-31',
     };
 
     if (typeof window !== 'undefined') {
@@ -1268,6 +1271,20 @@ export default function App() {
 
   // Helper component action: Create Match
   const addMatch = async (items: Omit<Match, 'id' | 'created_at' | 'updated_at'>) => {
+    const plan = organization.subscriptionPlan || 'free';
+    const maxMatches = plan === 'elite' ? Infinity : plan === 'pro' ? 2000 : 20;
+
+    const currentMonthStr = new Date().toISOString().substring(0, 7); // e.g. "2026-07"
+    const currentMonthMatches = filteredMatches.filter(m => {
+      const dateStr = m.scheduled_date || m.created_at || '';
+      return dateStr.startsWith(currentMonthStr);
+    });
+
+    if (currentMonthMatches.length >= maxMatches) {
+      alert(`បរាជ័យ៖ គម្រោង ${plan.toUpperCase()} របស់អ្នកអនុញ្ញាតឱ្យបង្កើតការប្រកួតបានត្រឹមតែ ${maxMatches} ក្នុងមួយខែប៉ុណ្ណោះ។ សូមដំឡើងគម្រោងរបស់អ្នក! (Match limit reached: Your ${plan.toUpperCase()} plan is restricted to ${maxMatches} matches per month. Please upgrade your subscription.)`);
+      return;
+    }
+
     const newId = `match-${Date.now()}`;
     const newMatch: Match = {
       ...items,
@@ -1384,10 +1401,25 @@ export default function App() {
   };
 
   const addParticipant = async (name: string, sport_type: SportType, is_team: boolean, team_id: string | null, photo_url?: string, gender?: string, eventId?: string, createdBy?: string, organizationSlugParam?: string): Promise<string | null> => {
+    const targetOrgSlug = organizationSlugParam || organization?.slug || 'company-games';
+
+    const plan = organization.subscriptionPlan || 'free';
+    const maxAthletes = plan === 'elite' ? Infinity : plan === 'pro' ? 2000 : 100;
+    
+    // Count athletes (players, not teams) for this organization
+    const currentAthletesCount = participants.filter(p => {
+      const pOrg = p.organization_slug || 'company-games';
+      return !p.is_team && pOrg === targetOrgSlug;
+    }).length;
+
+    if (!is_team && currentAthletesCount >= maxAthletes) {
+      alert(`បរាជ័យ៖ គម្រោង ${plan.toUpperCase()} របស់អ្នកអនុញ្ញាតឱ្យមានកីឡាករត្រឹមតែ ${maxAthletes} នាក់ប៉ុណ្ណោះ។ សូមដំឡើងគម្រោងរបស់អ្នក! (Athlete limit reached: Your ${plan.toUpperCase()} plan is restricted to a maximum of ${maxAthletes} athletes. Please upgrade your subscription.)`);
+      return null;
+    }
+
     const newId = `p-${Date.now()}`;
     const targetEventId = eventId || activeEventId;
     const targetCreatedBy = createdBy || currentUser?.username || 'hempiden';
-    const targetOrgSlug = organizationSlugParam || organization?.slug || 'company-games';
 
     const newPar: Participant = {
       id: newId,
@@ -1776,6 +1808,7 @@ export default function App() {
                 activeEventId={activeEventId}
                 setActiveEventId={setActiveEventId}
                 organizationSlug={organization?.slug}
+                subscriptionPlan={organization.subscriptionPlan}
                 translations={translations}
                 saveTranslations={saveTranslations}
               />
@@ -1843,6 +1876,8 @@ export default function App() {
               <OrganizationSettings
                 organization={organization}
                 onUpdateOrganization={updateOrganization}
+                matches={filteredMatches}
+                participants={filteredParticipants}
               />
             )}
           </>

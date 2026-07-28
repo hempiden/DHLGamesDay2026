@@ -119,6 +119,7 @@ interface EventSettingsProps {
   isEnrolmentEnabled: boolean;
   setIsEnrolmentEnabled: (val: boolean) => void;
   organizationSlug?: string;
+  subscriptionPlan?: string;
   translations?: Record<string, { kh: string; en: string }>;
   saveTranslations?: (newTrans: Record<string, { kh: string; en: string }>) => Promise<any>;
 }
@@ -151,6 +152,7 @@ export default function EventSettings({
   isEnrolmentEnabled,
   setIsEnrolmentEnabled,
   organizationSlug,
+  subscriptionPlan,
   translations,
   saveTranslations = async () => {},
 }: EventSettingsProps) {
@@ -380,6 +382,16 @@ export default function EventSettings({
     if (!newSportName.trim() || !newSportKhmerName.trim()) {
       alert('សូមបំពេញឈ្មោះប្រភេទកីឡា! (Please fill both sport names.)');
       return;
+    }
+
+    const targetEvent = events.find(ev => ev.id === selectedEventIdForSport);
+    if (targetEvent) {
+      const plan = subscriptionPlan || 'free';
+      const maxSports = plan === 'elite' ? Infinity : plan === 'pro' ? 10 : 5;
+      if (targetEvent.sports.length >= maxSports) {
+        alert(`បរាជ័យ៖ គម្រោង ${plan.toUpperCase()} របស់អ្នកអនុញ្ញាតឱ្យបង្កើតប្រភេទកីឡាបានត្រឹមតែ ${maxSports} ប៉ុណ្ណោះ។ សូមដំឡើងគម្រោងរបស់អ្នកដើម្បីបន្ថែមទៀត! (Limit reached: Your ${plan.toUpperCase()} plan only permits a maximum of ${maxSports} sport categories.)`);
+        return;
+      }
     }
 
     const modifiedEvents = events.map(ev => {
