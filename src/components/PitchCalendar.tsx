@@ -31,6 +31,14 @@ const HOURS = [
   '19:00', '20:00', '21:00'
 ];
 
+const getTodayString = () => {
+  const today = new Date();
+  const yr = today.getFullYear();
+  const mo = String(today.getMonth() + 1).padStart(2, '0');
+  const dy = String(today.getDate()).padStart(2, '0');
+  return `${yr}-${mo}-${dy}`;
+};
+
 export default function PitchCalendar({
   organization,
   currentUser,
@@ -40,12 +48,42 @@ export default function PitchCalendar({
 }: PitchCalendarProps) {
   const isAdmin = currentUser && (currentUser.role === 'admin' || currentUser.role === 'super_admin');
 
-  // Selected date state defaulting to "2026-06-16" (matching tournament day)
-  const [selectedDate, setSelectedDate] = useState('2026-06-16');
+  // Selected date state defaulting to saved localStorage date or today's local date
+  const [selectedDate, setSelectedDate] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      const savedDate = localStorage.getItem('dhl_pitch_calendar_date');
+      if (savedDate && /^\d{4}-\d{2}-\d{2}$/.test(savedDate)) {
+        return savedDate;
+      }
+    }
+    return getTodayString();
+  });
+
+  // Save selected date to LocalStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('dhl_pitch_calendar_date', selectedDate);
+    }
+  }, [selectedDate]);
   
   // Selected sport state
   const activeSports = useMemo(() => getActiveSports(), []);
-  const [selectedSport, setSelectedSport] = useState<string>(activeSports[0] || 'Soccer');
+  const [selectedSport, setSelectedSport] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      const savedSport = localStorage.getItem('dhl_pitch_calendar_sport');
+      if (savedSport && activeSports.includes(savedSport as any)) {
+        return savedSport;
+      }
+    }
+    return activeSports[0] || 'Soccer';
+  });
+
+  // Save selected sport to LocalStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('dhl_pitch_calendar_sport', selectedSport);
+    }
+  }, [selectedSport]);
 
   // Bookings state loaded from LocalStorage
   const [bookings, setBookings] = useState<PitchBooking[]>(() => {
@@ -60,14 +98,15 @@ export default function PitchCalendar({
       }
     }
     
-    // Default system seed bookings for 2026-06-16 to present instant value
+    // Default system seed bookings for today & 2026-06-16 to present instant value
+    const todayStr = getTodayString();
     return [
       {
         id: 'book-1',
         bookerName: 'Group Stage Match: Express vs Supply Chain',
         sportName: 'Soccer',
         pitchNumber: 1,
-        date: '2026-06-16',
+        date: todayStr,
         startTime: '08:00',
         endTime: '09:00',
         notes: 'Official Tournament Match #1',
@@ -80,7 +119,7 @@ export default function PitchCalendar({
         bookerName: 'Friendly Practice Team A',
         sportName: 'Soccer',
         pitchNumber: 2,
-        date: '2026-06-16',
+        date: todayStr,
         startTime: '10:00',
         endTime: '11:00',
         notes: 'Coached training block',
@@ -91,7 +130,7 @@ export default function PitchCalendar({
         bookerName: 'Corporate Volleyball Semifinals',
         sportName: 'Volleyball',
         pitchNumber: 1,
-        date: '2026-06-16',
+        date: todayStr,
         startTime: '14:00',
         endTime: '15:00',
         notes: 'Match setup 30m prior',
@@ -104,7 +143,7 @@ export default function PitchCalendar({
         bookerName: 'IT Solutions vs Aviation warmup',
         sportName: 'Pingpong',
         pitchNumber: 1,
-        date: '2026-06-16',
+        date: todayStr,
         startTime: '09:00',
         endTime: '10:00',
         notes: 'Settle rackets',
@@ -357,17 +396,31 @@ export default function PitchCalendar({
             </button>
           </div>
 
-          <button
-            type="button"
-            onClick={() => setSelectedDate('2026-06-16')}
-            className={`w-full py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition duration-150 cursor-pointer ${
-              selectedDate === '2026-06-16' 
-                ? 'bg-amber-100 text-amber-800 font-extrabold border border-amber-200' 
-                : 'bg-gray-50 text-gray-500 border border-transparent hover:bg-gray-100'
-            }`}
-          >
-            📅 {currentLanguage === 'kh' ? 'ត្រឡប់ទៅថ្ងៃកម្មវិធី (June 16, 2026)' : 'Tournament Day (Default)'}
-          </button>
+          <div className="flex items-center gap-1.5 w-full">
+            <button
+              type="button"
+              onClick={() => setSelectedDate(getTodayString())}
+              className={`flex-1 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition duration-150 cursor-pointer ${
+                selectedDate === getTodayString() 
+                  ? 'bg-amber-100 text-amber-800 font-extrabold border border-amber-200' 
+                  : 'bg-gray-50 text-gray-500 border border-transparent hover:bg-gray-100'
+              }`}
+            >
+              📅 {currentLanguage === 'kh' ? 'ថ្ងៃនេះ (Today)' : 'Today'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedDate('2026-06-16')}
+              className={`px-2.5 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition duration-150 cursor-pointer ${
+                selectedDate === '2026-06-16' 
+                  ? 'bg-amber-100 text-amber-800 font-extrabold border border-amber-200' 
+                  : 'bg-gray-50 text-gray-500 border border-transparent hover:bg-gray-100'
+              }`}
+              title="Tournament Day (2026-06-16)"
+            >
+              🏆 2026-06-16
+            </button>
+          </div>
         </div>
 
         {/* Top bar Right: Sport Pitch selector tabs in 1 Row */}
