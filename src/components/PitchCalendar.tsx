@@ -25,11 +25,51 @@ interface PitchBooking {
   matchId?: string;
 }
 
+// Expanded 30-minute interval grid hours for fine-grained slot placement
 const HOURS = [
-  '07:00', '08:00', '09:00', '10:00', '11:00', '12:00',
-  '13:00', '14:00', '15:00', '16:00', '17:00', '18:00',
-  '19:00', '20:00', '21:00'
+  '07:00', '07:30', '08:00', '08:30', '09:00', '09:30', '10:00', '10:30',
+  '11:00', '11:30', '12:00', '12:30', '13:00', '13:30', '14:00', '14:30',
+  '15:00', '15:30', '16:00', '16:30', '17:00', '17:30', '18:00', '18:30',
+  '19:00', '19:30', '20:00', '20:30', '21:00'
 ];
+
+// Sub-hour start time options for fine precision (15m / 25m / 30m offsets)
+const TIME_OPTIONS = [
+  '07:00', '07:15', '07:25', '07:30', '07:45',
+  '08:00', '08:15', '08:25', '08:30', '08:45',
+  '09:00', '09:15', '09:25', '09:30', '09:45',
+  '10:00', '10:15', '10:25', '10:30', '10:45',
+  '11:00', '11:15', '11:25', '11:30', '11:45',
+  '12:00', '12:15', '12:25', '12:30', '12:45',
+  '13:00', '13:15', '13:25', '13:30', '13:45',
+  '14:00', '14:15', '14:25', '14:30', '14:45',
+  '15:00', '15:15', '15:25', '15:30', '15:45',
+  '16:00', '16:15', '16:25', '16:30', '16:45',
+  '17:00', '17:15', '17:25', '17:30', '17:45',
+  '18:00', '18:15', '18:25', '18:30', '18:45',
+  '19:00', '19:15', '19:25', '19:30', '19:45',
+  '20:00', '20:15', '20:25', '20:30', '20:45',
+  '21:00', '21:30', '22:00'
+];
+
+const addMinutesToTime = (timeStr: string, mins: number): string => {
+  const [hStr, mStr] = timeStr.split(':');
+  const h = parseInt(hStr, 10);
+  const m = parseInt(mStr, 10);
+  if (isNaN(h) || isNaN(m)) return timeStr;
+  const totalMins = h * 60 + m + mins;
+  const newH = Math.floor(totalMins / 60) % 24;
+  const newM = totalMins % 60;
+  return `${String(newH).padStart(2, '0')}:${String(newM).padStart(2, '0')}`;
+};
+
+const getDurationMinutes = (startTime: string, endTime: string): number => {
+  const [h1, m1] = startTime.split(':').map(Number);
+  const [h2, m2] = endTime.split(':').map(Number);
+  if (isNaN(h1) || isNaN(m1) || isNaN(h2) || isNaN(m2)) return 0;
+  const diff = (h2 * 60 + m2) - (h1 * 60 + m1);
+  return diff > 0 ? diff : 0;
+};
 
 const getTodayString = () => {
   const today = new Date();
@@ -201,15 +241,68 @@ export default function PitchCalendar({
     return bookings.filter(b => b.date === selectedDate && b.sportName === selectedSport);
   }, [bookings, selectedDate, selectedSport]);
 
-  // Map of bookings by pitch and start hour for instant lookup in the schedule grid
-  const bookingsGridMap = useMemo(() => {
-    const map: Record<string, PitchBooking> = {};
-    filteredBookings.forEach(b => {
-      const key = `${b.pitchNumber}_${b.startTime}`;
-      map[key] = b;
+  // Auto-synced bookings from created matches that have scheduled_date & scheduled_time
+  const autoMatchBookings = useMemo(() => {
+    const list: PitchBooking[] = [];
+    matches.forEach((m) => {
+      if (
+        m.sport_name === selectedSport &&
+        m.scheduled_date === selectedDate &&
+        m.scheduled_time &&
+        !bookings.some(b => b.matchId === m.id)
+      ) {
+        const startT = m.scheduled_time.length === 5 ? m.scheduled_time : m.scheduled_time.padStart(5, '0');
+        const endT = addMinutesToTime(startT, 30);
+        
+        let teamAName = m.team_a;
+        let teamBName = m.team_b;
+        if (m.sport_name === 'Swimming') {
+          try {
+            const swimmers = JSON.parse(m.team_a);
+            if (Array.isArray(swimmers)) {
+              teamAName = swimmers.map((s: any) => s.name).join(', ');
+              teamBName = 'Swimming Heat';
+            }
+          } catch (e) {
+            // fallback to raw
+          }
+        }
+
+        list.push({
+          id: `auto-match-${m.id}`,
+          bookerName: `★ League Match: ${teamAName} vs ${teamBName}`,
+          sportName: selectedSport,
+          pitchNumber: 1, // Default pitch 1
+          date: selectedDate,
+          startTime: startT,
+          endTime: endT,
+          notes: `${m.match_label || 'Official Game'} (${m.status})`,
+          status: 'Approved',
+          isLeagueMatch: true,
+          matchId: m.id
+        });
+      }
     });
-    return map;
-  }, [filteredBookings]);
+    return list;
+  }, [matches, selectedSport, selectedDate, bookings]);
+
+  // Combine manual bookings with auto-synced scheduled matches
+  const allBookingsForDay = useMemo(() => {
+    return [...filteredBookings, ...autoMatchBookings];
+  }, [filteredBookings, autoMatchBookings]);
+
+  // Get booking that starts within this 30-minute slot or matches slot
+  const getCellBooking = (pitchNum: number, slotHour: string) => {
+    return allBookingsForDay.find(b => {
+      if (b.pitchNumber !== pitchNum) return false;
+      if (b.startTime === slotHour) return true;
+      const [h, m] = slotHour.split(':').map(Number);
+      const slotMins = h * 60 + m;
+      const [bH, bM] = b.startTime.split(':').map(Number);
+      const bMins = bH * 60 + bM;
+      return bMins >= slotMins && bMins < slotMins + 30;
+    });
+  };
 
   // List of active unscheduled/unassigned matches belonging to this sport
   // Offers swift auto-booking mapping
@@ -222,16 +315,14 @@ export default function PitchCalendar({
     if (!isAdmin) return; // Spectators cannot write
     
     // Check if slot has booking
-    if (bookingsGridMap[`${pitchNum}_${hour}`]) return;
+    if (getCellBooking(pitchNum, hour)) return;
 
     // Prefill setup modal fields
     setNewBooker('');
     setNewPitchNum(pitchNum);
     setNewStartHour(hour);
-    // Auto incremental end hour
-    const idx = HOURS.indexOf(hour);
-    const end = idx < HOURS.length - 1 ? HOURS[idx + 1] : '22:00';
-    setNewEndHour(end);
+    // Default 30 min match duration
+    setNewEndHour(addMinutesToTime(hour, 30));
     setNewNotes('');
     setNewStatus('Approved');
     setNewIsLeagueMatch(false);
@@ -555,8 +646,8 @@ export default function PitchCalendar({
 
                         {Array.from({ length: pitchesCount }).map((_, colIdx) => {
                           const pitchNum = colIdx + 1;
-                          const gridKey = `${pitchNum}_${hour}`;
-                          const booking = bookingsGridMap[gridKey];
+                          const booking = getCellBooking(pitchNum, hour);
+                          const durationMins = booking ? getDurationMinutes(booking.startTime, booking.endTime) : 0;
 
                           return (
                             <td 
@@ -603,13 +694,18 @@ export default function PitchCalendar({
                                     </h5>
                                   </div>
 
-                                  <div className="flex items-center gap-2 pt-1.5 border-t border-gray-50 text-[9.5px] text-gray-400 font-bold">
+                                  <div className="flex items-center gap-2 pt-1.5 border-t border-gray-50 text-[9.5px] text-gray-400 font-bold flex-wrap">
                                     <div className="flex items-center gap-1">
-                                      <Clock className="w-3 h-3 text-gray-400" />
-                                      <span className="font-mono">{booking.startTime} - {booking.endTime}</span>
+                                      <Clock className="w-3 h-3 text-amber-600" />
+                                      <span className="font-mono font-black text-gray-700">{booking.startTime} - {booking.endTime}</span>
                                     </div>
+                                    {durationMins > 0 && (
+                                      <span className="bg-amber-100 text-amber-900 px-1.5 py-0.5 rounded-md font-mono font-black text-[8.5px]">
+                                        ⚡ {durationMins}m
+                                      </span>
+                                    )}
                                     {booking.notes && (
-                                      <div className="flex items-center gap-0.5 max-w-[120px] truncate text-[9px]">
+                                      <div className="flex items-center gap-0.5 max-w-[120px] truncate text-[9px] text-gray-500">
                                         <span>&bull;</span>
                                         <span>{booking.notes}</span>
                                       </div>
@@ -807,18 +903,52 @@ export default function PitchCalendar({
                 </div>
               </div>
 
+              {/* Quick Game Duration Selection */}
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-extrabold text-gray-400 uppercase tracking-wide flex items-center justify-between">
+                  <span>រយៈពេលប្រកួត (Game Duration)</span>
+                  <span className="text-amber-600 font-mono">
+                    ⚡ {getDurationMinutes(newStartHour, newEndHour)} mins
+                  </span>
+                </label>
+                <div className="grid grid-cols-5 gap-1.5">
+                  {[25, 30, 45, 60, 90].map((mins) => {
+                    const isSelected = getDurationMinutes(newStartHour, newEndHour) === mins;
+                    return (
+                      <button
+                        key={mins}
+                        type="button"
+                        onClick={() => setNewEndHour(addMinutesToTime(newStartHour, mins))}
+                        className={`py-1.5 px-1 rounded-xl border text-center font-mono font-black text-[10px] transition cursor-pointer ${
+                          isSelected
+                            ? 'bg-amber-500 text-slate-900 border-amber-600 shadow-3xs'
+                            : 'bg-gray-50 hover:bg-gray-100 border-gray-200 text-gray-700'
+                        }`}
+                      >
+                        {mins}m
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
               {/* Time slots rows */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <label className="text-[10px] font-extrabold text-gray-400 uppercase tracking-wide">
-                    ម៉ោងចាប់ផ្តើម (Start Hour)
+                    ម៉ោងចាប់ផ្តើម (Start Time)
                   </label>
                   <select
                     value={newStartHour}
-                    onChange={(e) => setNewStartHour(e.target.value)}
+                    onChange={(e) => {
+                      const newStart = e.target.value;
+                      const currentDur = getDurationMinutes(newStartHour, newEndHour) || 30;
+                      setNewStartHour(newStart);
+                      setNewEndHour(addMinutesToTime(newStart, currentDur));
+                    }}
                     className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 outline-none focus:ring-2 focus:ring-yellow-400 font-mono font-bold cursor-pointer"
                   >
-                    {HOURS.map(h => (
+                    {TIME_OPTIONS.slice(0, -1).map(h => (
                       <option key={h} value={h}>{h}</option>
                     ))}
                   </select>
@@ -826,14 +956,14 @@ export default function PitchCalendar({
 
                 <div className="space-y-1">
                   <label className="text-[10px] font-extrabold text-gray-400 uppercase tracking-wide">
-                    ម៉ោងបញ្ចាប់ (End Hour)
+                    ម៉ោងបញ្ចាប់ (End Time)
                   </label>
                   <select
                     value={newEndHour}
                     onChange={(e) => setNewEndHour(e.target.value)}
                     className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 outline-none focus:ring-2 focus:ring-yellow-400 font-mono font-bold cursor-pointer"
                   >
-                    {HOURS.concat(['22:00']).filter(h => h > newStartHour).map(h => (
+                    {TIME_OPTIONS.filter(h => h > newStartHour).map(h => (
                       <option key={h} value={h}>{h}</option>
                     ))}
                   </select>

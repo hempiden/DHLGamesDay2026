@@ -28,8 +28,59 @@ export default function AdminPanel({
   const [teamB, setTeamB] = useState('');
   const [matchLabel, setMatchLabel] = useState('វគ្គជម្រុះតាមពូល (Group Stage)');
   const [status, setStatus] = useState<'Upcoming' | 'Live' | 'Finished'>('Live');
-  const [scheduledDate, setScheduledDate] = useState('');
-  const [scheduledTime, setScheduledTime] = useState('');
+  // Date and Time helpers
+  const getTodayString = () => {
+    const today = new Date();
+    const yr = today.getFullYear();
+    const mo = String(today.getMonth() + 1).padStart(2, '0');
+    const dy = String(today.getDate()).padStart(2, '0');
+    return `${yr}-${mo}-${dy}`;
+  };
+
+  const getCurrentTimeString = () => {
+    const now = new Date();
+    const hh = String(now.getHours()).padStart(2, '0');
+    const mm = String(now.getMinutes()).padStart(2, '0');
+    return `${hh}:${mm}`;
+  };
+
+  const advanceTimeMins = (timeStr: string, mins = 30) => {
+    if (!timeStr) return getCurrentTimeString();
+    const [h, m] = timeStr.split(':').map(Number);
+    if (isNaN(h) || isNaN(m)) return getCurrentTimeString();
+    const totalMins = h * 60 + m + mins;
+    const newH = Math.floor(totalMins / 60) % 24;
+    const newM = totalMins % 60;
+    return `${String(newH).padStart(2, '0')}:${String(newM).padStart(2, '0')}`;
+  };
+
+  const [scheduledDate, setScheduledDate] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('dhl_admin_scheduled_date');
+      if (saved && /^\d{4}-\d{2}-\d{2}$/.test(saved)) return saved;
+    }
+    return getTodayString();
+  });
+
+  const [scheduledTime, setScheduledTime] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('dhl_admin_scheduled_time');
+      if (saved && /^\d{2}:\d{2}$/.test(saved)) return saved;
+    }
+    return getCurrentTimeString();
+  });
+
+  React.useEffect(() => {
+    if (typeof window !== 'undefined' && scheduledDate) {
+      localStorage.setItem('dhl_admin_scheduled_date', scheduledDate);
+    }
+  }, [scheduledDate]);
+
+  React.useEffect(() => {
+    if (typeof window !== 'undefined' && scheduledTime) {
+      localStorage.setItem('dhl_admin_scheduled_time', scheduledTime);
+    }
+  }, [scheduledTime]);
   
   // Custom teams toggle
   const [customTeamA, setCustomTeamA] = useState(false);
@@ -132,8 +183,8 @@ export default function AdminPanel({
         score_a: 0,
         score_b: 0,
         status,
-        scheduled_date: scheduledDate || undefined,
-        scheduled_time: scheduledTime || undefined,
+        scheduled_date: scheduledDate || getTodayString(),
+        scheduled_time: scheduledTime || getCurrentTimeString(),
       });
 
       alert('ការប្រកួតហែលទឹកត្រូវបានបង្កើត! Swimming heat created successfully.');
@@ -143,8 +194,11 @@ export default function AdminPanel({
         { id: 'lane-3', name: '', isCustom: false },
         { id: 'lane-4', name: '', isCustom: false }
       ]);
-      setScheduledDate('');
-      setScheduledTime('');
+      // Keep date intact and advance time by 30 mins for seamless creation
+      setScheduledTime((prev) => advanceTimeMins(prev || getCurrentTimeString(), 30));
+      if (!scheduledDate) {
+        setScheduledDate(getTodayString());
+      }
       return;
     }
 
@@ -165,15 +219,17 @@ export default function AdminPanel({
       score_a: 0,
       score_b: 0,
       status,
-      scheduled_date: scheduledDate || undefined,
-      scheduled_time: scheduledTime || undefined,
+      scheduled_date: scheduledDate || getTodayString(),
+      scheduled_time: scheduledTime || getCurrentTimeString(),
     });
 
-    // Reset simple form inputs
+    // Reset simple form inputs but keep scheduled date and advance scheduled time by 30 mins
     setTeamA('');
     setTeamB('');
-    setScheduledDate('');
-    setScheduledTime('');
+    setScheduledTime((prev) => advanceTimeMins(prev || getCurrentTimeString(), 30));
+    if (!scheduledDate) {
+      setScheduledDate(getTodayString());
+    }
     alert(playMode === 'single' ? 'ការប្រកួតឯកត្តជនត្រូវបានបង្កើត! Single player match created successfully.' : 'ការប្រកួតក្រុមត្រូវបានបង្កើត! Team match created successfully.');
   };
 
@@ -465,27 +521,65 @@ export default function AdminPanel({
             </div>
 
             {/* Scheduled Date & Time */}
-            <div className="grid grid-cols-2 gap-35 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
-                <label className="block text-[10px] font-black uppercase text-gray-400 tracking-wider mb-1">
-                  កាលបរិច្ឆេទប្រកួត (Scheduled Date)
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">
+                    កាលបរិច្ឆេទប្រកួត (Scheduled Date)
+                  </label>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setScheduledDate(getTodayString())}
+                      className="px-1.5 py-0.5 bg-amber-50 hover:bg-amber-100 text-amber-800 text-[9px] font-bold rounded cursor-pointer border border-amber-200 transition"
+                    >
+                      📅 Today
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setScheduledDate('2026-06-16')}
+                      className="px-1.5 py-0.5 bg-gray-50 hover:bg-gray-100 text-gray-600 text-[9px] font-bold rounded cursor-pointer border border-gray-200 transition"
+                    >
+                      🏆 Jun 16
+                    </button>
+                  </div>
+                </div>
                 <input
                   type="date"
+                  required
                   value={scheduledDate}
                   onChange={(e) => setScheduledDate(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:border-[#FFCC00] focus:ring-1 focus:ring-[#FFCC00] outline-none font-medium text-xs text-gray-700"
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:border-[#FFCC00] focus:ring-1 focus:ring-[#FFCC00] outline-none font-medium text-xs text-gray-700 bg-gray-50/30"
                 />
               </div>
               <div>
-                <label className="block text-[10px] font-black uppercase text-gray-400 tracking-wider mb-1">
-                  ម៉ោងប្រកួត (Scheduled Time)
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">
+                    ម៉ោងប្រកួត (Scheduled Time)
+                  </label>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setScheduledTime(getCurrentTimeString())}
+                      className="px-1.5 py-0.5 bg-amber-50 hover:bg-amber-100 text-amber-800 text-[9px] font-bold rounded cursor-pointer border border-amber-200 transition"
+                    >
+                      ⏰ Now
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setScheduledTime(advanceTimeMins(scheduledTime || getCurrentTimeString(), 30))}
+                      className="px-1.5 py-0.5 bg-gray-50 hover:bg-gray-100 text-gray-600 text-[9px] font-bold rounded cursor-pointer border border-gray-200 transition"
+                    >
+                      +30m
+                    </button>
+                  </div>
+                </div>
                 <input
                   type="time"
+                  required
                   value={scheduledTime}
                   onChange={(e) => setScheduledTime(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:border-[#FFCC00] focus:ring-1 focus:ring-[#FFCC00] outline-none font-medium text-xs text-gray-700"
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:border-[#FFCC00] focus:ring-1 focus:ring-[#FFCC00] outline-none font-medium text-xs text-gray-700 bg-gray-50/30"
                 />
               </div>
             </div>
