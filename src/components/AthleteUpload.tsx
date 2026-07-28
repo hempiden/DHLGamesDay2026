@@ -45,6 +45,16 @@ export default function AthleteUpload({
   const [csvImportSuccessCount, setCsvImportSuccessCount] = useState<number | null>(null);
   const [csvImportProgress, setCsvImportProgress] = useState(false);
 
+  // Toast notification state
+  const [toastMessage, setToastMessage] = useState<{ text: string; isError?: boolean } | null>(null);
+
+  const showToast = (text: string, isError = false) => {
+    setToastMessage({ text, isError });
+    setTimeout(() => {
+      setToastMessage((prev) => (prev?.text === text ? null : prev));
+    }, 3500);
+  };
+
   // Custom standard CSV Parsing algorithm
   const parseCSV = (text: string): string[][] => {
     const lines: string[][] = [];
@@ -255,7 +265,7 @@ export default function AthleteUpload({
         }
       }
       setCsvImportSuccessCount(successCount);
-      alert(`កីឡាករចំនួន ${successCount} នាក់ត្រូវបានបញ្ចូលដោយជោគជ័យ! Imported ${successCount} new athletes.`);
+      showToast(`កីឡាករចំនួន ${successCount} នាក់ត្រូវបានបញ្ចូលដោយជោគជ័យ! Imported ${successCount} new athletes.`);
       setCsvParsedRows([]);
       setCsvFileName(null);
       setCsvRawText('');
@@ -337,7 +347,7 @@ export default function AthleteUpload({
     e.preventDefault();
     if (!singleName.trim()) return;
     if (singleSports.length === 0) {
-      alert('សូមជ្រើសរើសវិញ្ញាសាយ៉ាងហោចណាស់មួយ! Please select at least one sport.');
+      showToast('សូមជ្រើសរើសវិញ្ញាសាយ៉ាងហោចណាស់មួយ! Please select at least one sport.', true);
       return;
     }
 
@@ -367,9 +377,9 @@ export default function AthleteUpload({
       setSingleName('');
       setSingleSports(['Soccer']);
       setSinglePhotoBase64(null);
-      alert(`កីឡាករថ្មីត្រូវបានចុះឈ្មោះដោយជោគជ័យលើវិញ្ញាសាចំនួន ${successCount}! Athlete registered successfully.`);
+      showToast(`✓ កីឡាករថ្មីត្រូវបានចុះឈ្មោះដោយជោគជ័យលើវិញ្ញាសាចំនួន ${successCount}! Athlete registered successfully.`);
     } else {
-      alert('ឈ្មោះកីឡាករនេះត្រូវបានចុះឈ្មោះរួចហើយក្នុងបញ្ជីវិញ្ញាសាដែលបានជ្រើសរើស! This athlete is already registered in these selected sport divisions.');
+      showToast('ឈ្មោះកីឡាករនេះត្រូវបានចុះឈ្មោះរួចហើយក្នុងបញ្ជីវិញ្ញាសាដែលបានជ្រើសរើស! This athlete is already registered in these selected sport divisions.', true);
     }
   };
 
@@ -448,6 +458,17 @@ export default function AthleteUpload({
 
   return (
     <div className="space-y-6 font-sans">
+      
+      {/* Toast Notification Banner */}
+      {toastMessage && (
+        <div className={`fixed top-4 right-4 z-50 px-5 py-3 rounded-2xl shadow-xl font-bold text-xs flex items-center gap-2 border animate-bounce ${
+          toastMessage.isError 
+            ? 'bg-rose-600 text-white border-rose-700' 
+            : 'bg-emerald-600 text-white border-emerald-700'
+        }`}>
+          <span>{toastMessage.text}</span>
+        </div>
+      )}
       
       {/* Page Title & Overview */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-3xl border border-gray-100 shadow-sm md:p-8">

@@ -163,14 +163,14 @@ export default function AdminPanel({
         .filter(Boolean);
 
       if (activeSwimmers.length === 0) {
-        alert('សូមបញ្ចូលឈ្មោះកីឡាករយ៉ាងហោចណាស់ម្នាក់! At least 1 swimmer is required.');
+        showToast('សូមបញ្ចូលឈ្មោះកីឡាករយ៉ាងហោចណាស់ម្នាក់! At least 1 swimmer is required.', true);
         return;
       }
 
       // Check for duplicates
       const uniqueSwimmers = new Set(activeSwimmers);
       if (uniqueSwimmers.size !== activeSwimmers.length) {
-        alert('ឈ្មោះកីឡាករមិនអាចដូចគ្នាបានឡើយ! Swimmers must have unique names.');
+        showToast('ឈ្មោះកីឡាករមិនអាចដូចគ្នាបានឡើយ! Swimmers must have unique names.', true);
         return;
       }
 

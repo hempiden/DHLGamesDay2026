@@ -58,6 +58,16 @@ export default function TeamManagement({
   const [teamupTargetType, setTeamupTargetType] = useState<'existing' | 'create_new'>('existing');
   const [targetTeamNamePattern, setTargetTeamNamePattern] = useState(`${selectedSport} Squad`);
   const [selectedTargetExistingTeamIds, setSelectedTargetExistingTeamIds] = useState<string[]>([]);
+
+  // Toast notification state
+  const [toastMessage, setToastMessage] = useState<{ text: string; isError?: boolean } | null>(null);
+
+  const showToast = (text: string, isError = false) => {
+    setToastMessage({ text, isError });
+    setTimeout(() => {
+      setToastMessage((prev) => (prev?.text === text ? null : prev));
+    }, 3500);
+  };
   
   // Results of generation (stored in state for preview before committing)
   const [generatedDraftPreview, setGeneratedDraftPreview] = useState<{
@@ -128,7 +138,7 @@ export default function TeamManagement({
     // Get selected athletes
     const activeAthletes = teamupAthletes.filter(a => a.selected);
     if (activeAthletes.length === 0) {
-      alert('សូមជ្រើសរើសកីឡាករយ៉ាងហោចណាស់ម្នាក់! Please select at least one athlete.');
+      showToast('សូមជ្រើសរើសកីឡាករយ៉ាងហោចណាស់ម្នាក់! Please select at least one athlete.', true);
       return;
     }
 
@@ -171,7 +181,7 @@ export default function TeamManagement({
       if (teamupTargetType === 'existing') {
         const sportTeams = participants.filter(p => p.is_team && p.sport_type === selectedSport && selectedTargetExistingTeamIds.includes(p.id));
         if (sportTeams.length === 0) {
-          alert('សូមជ្រើសរើសក្រុមគោលដៅយ៉ាងហោចណាស់មួយ! Please select at least one existing target team.');
+          showToast('សូមជ្រើសរើសក្រុមគោលដៅយ៉ាងហោចណាស់មួយ! Please select at least one existing target team.', true);
           return;
         }
 
@@ -233,7 +243,7 @@ export default function TeamManagement({
       if (teamupTargetType === 'existing') {
         const sportTeams = participants.filter(p => p.is_team && p.sport_type === selectedSport && selectedTargetExistingTeamIds.includes(p.id));
         if (sportTeams.length === 0) {
-          alert('សូមជ្រើសរើសក្រុមគោលដៅយ៉ាងហោចណាស់មួយ! Please select at least one existing target team.');
+          showToast('សូមជ្រើសរើសក្រុមគោលដៅយ៉ាងហោចណាស់មួយ! Please select at least one existing target team.', true);
           return;
         }
 
@@ -264,7 +274,7 @@ export default function TeamManagement({
 
   const applyRandomTeamupPreset = async () => {
     if (generatedDraftPreview.length === 0) {
-      alert('សូមបង្កើតការបែងចែកសាកល្បងជាមុនសិន! Please generate random preview first.');
+      showToast('សូមបង្កើតការបែងចែកសាកល្បងជាមុនសិន! Please generate random preview first.', true);
       return;
     }
 
@@ -291,12 +301,12 @@ export default function TeamManagement({
         }
       }
       
-      alert('ការបង្កើតក្រុមចៃដន្យត្រូវបានរក្សាទុកដោយជោគជ័យ! Random team allocation created and synced successfully.');
+      showToast('✓ ការបង្កើតក្រុមចៃដន្យត្រូវបានរក្សាទុកដោយជោគជ័យ! Random team allocation created and synced successfully.');
       setShowRandomTeamup(false);
       setGeneratedDraftPreview([]);
     } catch (err) {
       console.error('Failed to commit random team-up:', err);
-      alert('មានបញ្ហាក្នុងការរក្សាទុកទិន្នន័យ! Error saving random team up changes.');
+      showToast('មានបញ្ហាក្នុងការរក្សាទុកទិន្នន័យ! Error saving random team up changes.', true);
     } finally {
       setIsApplyingDraft(false);
     }
@@ -387,6 +397,17 @@ export default function TeamManagement({
   return (
     <div className="space-y-6">
       
+      {/* Toast Notification Banner */}
+      {toastMessage && (
+        <div className={`fixed top-4 right-4 z-50 px-5 py-3 rounded-2xl shadow-xl font-bold text-xs flex items-center gap-2 border animate-bounce ${
+          toastMessage.isError 
+            ? 'bg-rose-600 text-white border-rose-700' 
+            : 'bg-emerald-600 text-white border-emerald-700'
+        }`}>
+          <span>{toastMessage.text}</span>
+        </div>
+      )}
+
       {/* Consolidating Switch Tabs */}
       {!forceTab && (
         <div className="flex border-b border-gray-150 bg-white px-2 rounded-2xl shadow-sm border border-gray-100">

@@ -208,6 +208,16 @@ export default function PitchCalendar({
   const [newIsLeagueMatch, setNewIsLeagueMatch] = useState(false);
   const [newMatchId, setNewMatchId] = useState('');
 
+  // Toast notification state
+  const [toastMessage, setToastMessage] = useState<{ text: string; isError?: boolean } | null>(null);
+
+  const showToast = (text: string, isError = false) => {
+    setToastMessage({ text, isError });
+    setTimeout(() => {
+      setToastMessage((prev) => (prev?.text === text ? null : prev));
+    }, 3500);
+  };
+
   // Number of pitches for the selected sport in organization configuration
   const pitchesCount = useMemo(() => {
     if (organization.pitchesConfig && organization.pitchesConfig[selectedSport]) {
@@ -333,7 +343,7 @@ export default function PitchCalendar({
   const handleAddBooking = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newBooker.trim()) {
-      alert(currentLanguage === 'kh' ? 'សូមបញ្ចូលឈ្មោះអ្នកកក់!' : 'Please enter the booker or match identifier!');
+      showToast(currentLanguage === 'kh' ? 'សូមបញ្ចូលឈ្មោះអ្នកកក់!' : 'Please enter the booker or match identifier!', true);
       return;
     }
 
@@ -348,9 +358,10 @@ export default function PitchCalendar({
     );
 
     if (isConflict) {
-      alert(currentLanguage === 'kh' 
+      showToast(currentLanguage === 'kh' 
         ? '⚠️ ម៉ោងនេះមានការកក់រួចហើយនៅលើទីលាននេះ! សូមជ្រើសរើសម៉ោងផ្សេង។' 
-        : '⚠️ This slot conflicts with an existing booking on this pitch/court!'
+        : '⚠️ This slot conflicts with an existing booking on this pitch/court!',
+        true
       );
       return;
     }
@@ -419,6 +430,17 @@ export default function PitchCalendar({
   return (
     <div className="space-y-6 animate-fade-in pb-10">
       
+      {/* Toast Notification Banner */}
+      {toastMessage && (
+        <div className={`fixed top-4 right-4 z-50 px-5 py-3 rounded-2xl shadow-xl font-bold text-xs flex items-center gap-2 border animate-bounce ${
+          toastMessage.isError 
+            ? 'bg-rose-600 text-white border-rose-700' 
+            : 'bg-emerald-600 text-white border-emerald-700'
+        }`}>
+          <span>{toastMessage.text}</span>
+        </div>
+      )}
+
       {/* Upper header section */}
       <div className="bg-white rounded-3xl p-6 border border-gray-150 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div className="flex items-center gap-3">
