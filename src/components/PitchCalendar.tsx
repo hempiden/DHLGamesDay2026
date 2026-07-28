@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Calendar, ChevronLeft, ChevronRight, Clock, Plus, Trash2, ShieldAlert, CheckCircle, HelpCircle, Layers, MapPin, User, FileText, Check, AlertCircle } from 'lucide-react';
+import { Calendar, ChevronLeft, ChevronRight, Clock, Plus, Trash2, ShieldAlert, CheckCircle, HelpCircle, Layers, MapPin, User, FileText, Check, AlertCircle, ArrowRightLeft, Pencil } from 'lucide-react';
 import { AppUser, Match, OrganizationInfo, SportType } from '../types';
 import { getActiveSports, getSportConfig } from '../data';
 
@@ -208,6 +208,15 @@ export default function PitchCalendar({
   const [newIsLeagueMatch, setNewIsLeagueMatch] = useState(false);
   const [newMatchId, setNewMatchId] = useState('');
 
+  // Edit / Move Modal State
+  const [editingBooking, setEditingBooking] = useState<PitchBooking | null>(null);
+  const [editPitchNum, setEditPitchNum] = useState(1);
+  const [editStartHour, setEditStartHour] = useState('08:00');
+  const [editEndHour, setEditEndHour] = useState('08:30');
+  const [editDate, setEditDate] = useState(selectedDate);
+  const [editNotes, setEditNotes] = useState('');
+  const [editStatus, setEditStatus] = useState<'Reserved' | 'Approved' | 'Host-Blocked'>('Approved');
+
   // Toast notification state
   const [toastMessage, setToastMessage] = useState<{ text: string; isError?: boolean } | null>(null);
 
@@ -252,6 +261,7 @@ export default function PitchCalendar({
   }, [bookings, selectedDate, selectedSport]);
 
   // Auto-synced bookings from created matches that have scheduled_date & scheduled_time
+  // Automatically distributes matches across available pitches (Pitch 1, Pitch 2, etc.)
   const autoMatchBookings = useMemo(() => {
     const list: PitchBooking[] = [];
     matches.forEach((m) => {
@@ -278,11 +288,28 @@ export default function PitchCalendar({
           }
         }
 
+        // Find taken pitches at this slot by manual bookings
+        const manualTakenPitches = bookings
+          .filter(b => b.date === selectedDate && b.sportName === selectedSport && b.startTime === startT)
+          .map(b => b.pitchNumber);
+
+        // Find first pitch (1..pitchesCount) that is not taken by manual or auto match
+        let assignedPitch = 1;
+        for (let p = 1; p <= pitchesCount; p++) {
+          if (!manualTakenPitches.includes(p)) {
+            const alreadyAutoUsed = list.some(item => item.startTime === startT && item.pitchNumber === p);
+            if (!alreadyAutoUsed) {
+              assignedPitch = p;
+              break;
+            }
+          }
+        }
+
         list.push({
           id: `auto-match-${m.id}`,
           bookerName: `★ League Match: ${teamAName} vs ${teamBName}`,
           sportName: selectedSport,
-          pitchNumber: 1, // Default pitch 1
+          pitchNumber: assignedPitch,
           date: selectedDate,
           startTime: startT,
           endTime: endT,
@@ -294,7 +321,7 @@ export default function PitchCalendar({
       }
     });
     return list;
-  }, [matches, selectedSport, selectedDate, bookings]);
+  }, [matches, selectedSport, selectedDate, bookings, pitchesCount]);
 
   // Combine manual bookings with auto-synced scheduled matches
   const allBookingsForDay = useMemo(() => {
@@ -390,17 +417,105 @@ export default function PitchCalendar({
         scheduled_time: newStartHour
       });
     }
+
+    showToast(currentLanguage === 'kh' ? '✓ បានបង្កើតការកក់ទីលានជោគជ័យ' : '✓ Pitch allocation created successfully');
   };
 
-  const handleDeleteBooking = (id: string) => {
+  const handleDeleteBooking = async (id: string, matchId?: string) => {
     if (!isAdmin) return;
     const confirm = window.confirm(currentLanguage === 'kh' 
       ? 'តើអ្នកពិតជាចង់លុបការកក់ទីលាននេះមែនទេ?' 
       : 'Are you sure you want to release this pitch booking?'
     );
     if (confirm) {
-      setBookings(prev => prev.filter(b => b.id !== id));
+      const targetMatchId = matchId || (id.startsWith('auto-match-') ? id.replace('auto-match-', '') : undefined);
+
+      // Remove from bookings array
+      setBookings(prev => prev.filter(b => b.id !== id && (targetMatchId ? b.matchId !== targetMatchId : true)));
+
+      // If tied to a tournament match, clear its scheduled date/time in backend database
+      if (targetMatchId && onUpdateMatchFields) {
+        await onUpdateMatchFields(targetMatchId, {
+          scheduled_date: '',
+          scheduled_time: ''
+        });
+      }
+
+      showToast(currentLanguage === 'kh' ? '✓ បានលុបការកក់ទីលានរួចរាល់' : '✓ Pitch allocation released successfully');
     }
+  };
+
+  const handleOpenEditModal = (booking: PitchBooking) => {
+    if (!isAdmin) return;
+    setEditingBooking(booking);
+    setEditPitchNum(booking.pitchNumber);
+    setEditStartHour(booking.startTime);
+    setEditEndHour(booking.endTime);
+    setEditDate(booking.date || selectedDate);
+    setEditNotes(booking.notes || '');
+    setEditStatus(booking.status || 'Approved');
+  };
+
+  const handleSaveEditBooking = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingBooking) return;
+
+    const targetMatchId = editingBooking.matchId || (editingBooking.id.startsWith('auto-match-') ? editingBooking.id.replace('auto-match-', '') : undefined);
+
+    // Conflict check (exclude the match/booking currently being edited)
+    const isConflict = bookings.some(b => 
+      b.id !== editingBooking.id &&
+      (targetMatchId ? b.matchId !== targetMatchId : true) &&
+      b.date === editDate &&
+      b.sportName === selectedSport &&
+      b.pitchNumber === editPitchNum &&
+      ((editStartHour >= b.startTime && editStartHour < b.endTime) ||
+       (editEndHour > b.startTime && editEndHour <= b.endTime) ||
+       (editStartHour <= b.startTime && editEndHour >= b.endTime))
+    );
+
+    if (isConflict) {
+      showToast(
+        currentLanguage === 'kh' 
+          ? '⚠️ ម៉ោងនេះមានការកក់រួចហើយនៅលើទីលានដែលបានជ្រើសរើស! សូមជ្រើសរើសទីលាន ឬម៉ោងផ្សេង។' 
+          : '⚠️ This slot conflicts with an existing booking on the selected pitch/court!',
+        true
+      );
+      return;
+    }
+
+    const updatedBooking: PitchBooking = {
+      id: editingBooking.id.startsWith('auto-match-') ? 'book-' + Date.now() : editingBooking.id,
+      bookerName: editingBooking.bookerName,
+      sportName: selectedSport,
+      pitchNumber: editPitchNum,
+      date: editDate,
+      startTime: editStartHour,
+      endTime: editEndHour,
+      notes: editNotes.trim(),
+      status: editStatus,
+      isLeagueMatch: editingBooking.isLeagueMatch,
+      matchId: targetMatchId
+    };
+
+    setBookings(prev => {
+      const filtered = prev.filter(b => b.id !== editingBooking.id && (targetMatchId ? b.matchId !== targetMatchId : true));
+      return [...filtered, updatedBooking];
+    });
+
+    if (targetMatchId && onUpdateMatchFields) {
+      await onUpdateMatchFields(targetMatchId, {
+        scheduled_date: editDate,
+        scheduled_time: editStartHour
+      });
+    }
+
+    setEditingBooking(null);
+    showToast(
+      currentLanguage === 'kh'
+        ? '✓ បានផ្លាស់ប្តូរទីលាន និងម៉ោងប្រកួតដោយជោគជ័យ'
+        : '✓ Pitch allocation & time slot updated successfully'
+    );
   };
 
   // Autocomplete booking fields using a tournament match info
@@ -686,19 +801,33 @@ export default function PitchCalendar({
                               {booking ? (
                                 <div className="p-3 bg-white border border-gray-200 shadow-3xs rounded-xl space-y-2 relative group/item hover:border-gray-300 transition duration-150">
                                   
-                                  {/* Delete booking badge for admin */}
+                                  {/* Actions for admin */}
                                   {isAdmin && (
-                                    <button
-                                      type="button"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleDeleteBooking(booking.id);
-                                      }}
-                                      className="absolute top-2 right-2 p-1 text-gray-400 hover:text-red-500 bg-slate-50 hover:bg-red-50 rounded-lg opacity-0 group-hover/item:opacity-100 transition duration-150 cursor-pointer"
-                                      title={currentLanguage === 'kh' ? 'លុបការកក់' : 'Delete allocation'}
-                                    >
-                                      <Trash2 className="w-3 h-3" />
-                                    </button>
+                                    <div className="absolute top-2 right-2 flex items-center gap-1 z-10">
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleOpenEditModal(booking);
+                                        }}
+                                        className="p-1 text-amber-700 hover:text-amber-900 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg shadow-3xs cursor-pointer transition active:scale-95 flex items-center gap-0.5 text-[9.5px] font-extrabold px-1.5"
+                                        title={currentLanguage === 'kh' ? 'ផ្លាស់ប្តូរទីលាន/ម៉ោង' : 'Move Pitch / Edit Time'}
+                                      >
+                                        <ArrowRightLeft className="w-3 h-3 text-amber-600" />
+                                        <span>{currentLanguage === 'kh' ? 'ផ្លាស់ទី' : 'Move'}</span>
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleDeleteBooking(booking.id, booking.matchId);
+                                        }}
+                                        className="p-1 text-rose-500 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-lg shadow-3xs cursor-pointer transition active:scale-95"
+                                        title={currentLanguage === 'kh' ? 'លុបការកក់ទីលាន' : 'Remove allocation'}
+                                      >
+                                        <Trash2 className="w-3 h-3" />
+                                      </button>
+                                    </div>
                                   )}
 
                                   <div className="space-y-1">
@@ -787,7 +916,7 @@ export default function PitchCalendar({
               {leagueMatchesForSport.length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 max-h-52 overflow-y-auto pr-1">
                   {leagueMatchesForSport.map(match => {
-                    const isAlreadyBooked = bookings.some(b => b.matchId === match.id);
+                    const isAlreadyBooked = bookings.some(b => b.matchId === match.id) || autoMatchBookings.some(b => b.matchId === match.id);
 
                     return (
                       <div 
@@ -1059,6 +1188,210 @@ export default function PitchCalendar({
                 >
                   {currentLanguage === 'kh' ? 'យល់ព្រមរក្សាទុក' : 'Save allocation'}
                 </button>
+              </div>
+
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit / Move Pitch Allocation Modal */}
+      {editingBooking && isAdmin && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in text-xs font-semibold select-none text-slate-700">
+          <div className="bg-white rounded-3xl p-6 md:p-8 max-w-md w-full border border-gray-150 shadow-2xl space-y-5 animate-scale-up">
+            
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3 shadow-3xs">
+              <div className="flex items-center gap-2">
+                <ArrowRightLeft className="w-4 h-4 text-amber-600" />
+                <h3 className="font-black text-gray-800 uppercase tracking-wide">
+                  {currentLanguage === 'kh' ? 'ផ្លាស់ប្តូរទីលាន និងម៉ោងប្រកួត' : 'Move Pitch & Time Allocation'}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingBooking(null)}
+                className="p-1 px-2 text-gray-400 hover:text-gray-800 font-black hover:bg-gray-100 rounded-lg cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEditBooking} className="space-y-4">
+              
+              {/* Match/Booker Title */}
+              <div className="bg-amber-50/60 border border-amber-200/80 p-3 rounded-2xl space-y-1">
+                <span className="text-[9px] text-amber-800 font-black uppercase tracking-wider">
+                  {currentLanguage === 'kh' ? 'ការប្រកួត / អ្នកកក់' : 'Match / Booker'}
+                </span>
+                <p className="font-extrabold text-xs text-gray-900 leading-snug">
+                  {editingBooking.bookerName}
+                </p>
+              </div>
+
+              {/* Pitch Number and Status Row */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-extrabold text-gray-400 uppercase tracking-wide">
+                    {currentLanguage === 'kh' ? 'ជ្រើសរើសទីលាន (Pitch / Court #)' : 'Pitch / Court #'}
+                  </label>
+                  <select
+                    value={editPitchNum}
+                    onChange={(e) => setEditPitchNum(Number(e.target.value))}
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 outline-none focus:ring-2 focus:ring-yellow-400 font-extrabold cursor-pointer"
+                  >
+                    {Array.from({ length: pitchesCount }).map((_, idx) => (
+                      <option key={idx + 1} value={idx + 1}>
+                        📍 {currentLanguage === 'kh' ? `${activeSportConfig.khmerName} ទី ${idx + 1}` : `Pitch/Court ${idx + 1}`}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-extrabold text-gray-400 uppercase tracking-wide">
+                    {currentLanguage === 'kh' ? 'ស្ថានភាព' : 'Reservation Status'}
+                  </label>
+                  <select
+                    value={editStatus}
+                    onChange={(e) => setEditStatus(e.target.value as any)}
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 outline-none focus:ring-2 focus:ring-yellow-400 font-extrabold cursor-pointer"
+                  >
+                    <option value="Approved">Approved</option>
+                    <option value="Reserved">Pending Approval</option>
+                    <option value="Host-Blocked">Host-Blocked</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Date Input */}
+              <div className="space-y-1">
+                <label className="text-[10px] font-extrabold text-gray-400 uppercase tracking-wide">
+                  {currentLanguage === 'kh' ? 'កាលបរិច្ឆេទ (Scheduled Date)' : 'Scheduled Date'}
+                </label>
+                <input
+                  type="date"
+                  required
+                  value={editDate}
+                  onChange={(e) => setEditDate(e.target.value)}
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 outline-none focus:ring-2 focus:ring-yellow-400 font-bold cursor-pointer"
+                />
+              </div>
+
+              {/* Time Slots Row */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-extrabold text-gray-400 uppercase tracking-wide">
+                    {currentLanguage === 'kh' ? 'ម៉ោងចាប់ផ្តើម' : 'Start Time'}
+                  </label>
+                  <input
+                    type="time"
+                    required
+                    step="300"
+                    value={editStartHour}
+                    onChange={(e) => {
+                      const newStart = e.target.value;
+                      setEditStartHour(newStart);
+                      if (newStart) {
+                        const dur = getDurationMinutes(newStart, editEndHour);
+                        if (dur <= 0) {
+                          setEditEndHour(addMinutesToTime(newStart, 30));
+                        }
+                      }
+                    }}
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 outline-none focus:ring-2 focus:ring-yellow-400 font-mono font-bold text-sm cursor-pointer"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-extrabold text-gray-400 uppercase tracking-wide">
+                    {currentLanguage === 'kh' ? 'ម៉ោងបញ្ចាប់' : 'End Time'}
+                  </label>
+                  <input
+                    type="time"
+                    required
+                    step="300"
+                    value={editEndHour}
+                    onChange={(e) => setEditEndHour(e.target.value)}
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 outline-none focus:ring-2 focus:ring-yellow-400 font-mono font-bold text-sm cursor-pointer"
+                  />
+                </div>
+              </div>
+
+              {/* Duration Buttons */}
+              <div className="space-y-1">
+                <label className="text-[10px] font-extrabold text-gray-400 uppercase tracking-wide flex items-center justify-between">
+                  <span>{currentLanguage === 'kh' ? 'រយៈពេលប្រកួត' : 'Game Duration'}</span>
+                  <span className="text-amber-600 font-mono font-bold">
+                    ⚡ {getDurationMinutes(editStartHour, editEndHour)} mins
+                  </span>
+                </label>
+                <div className="grid grid-cols-5 gap-1.5">
+                  {[25, 30, 45, 60, 90].map((mins) => {
+                    const isSelected = getDurationMinutes(editStartHour, editEndHour) === mins;
+                    return (
+                      <button
+                        key={mins}
+                        type="button"
+                        onClick={() => setEditEndHour(addMinutesToTime(editStartHour, mins))}
+                        className={`py-1.5 px-1 rounded-xl border text-center font-mono font-black text-[10px] transition cursor-pointer ${
+                          isSelected
+                            ? 'bg-amber-500 text-slate-900 border-amber-600 shadow-3xs'
+                            : 'bg-gray-50 hover:bg-gray-100 border-gray-200 text-gray-700'
+                        }`}
+                      >
+                        {mins}m
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Booking Notes */}
+              <div className="space-y-1">
+                <label className="text-[10px] font-extrabold text-gray-400 uppercase tracking-wide">
+                  {currentLanguage === 'kh' ? 'កំណត់សម្គាល់បន្ថែម' : 'Notes / Remarks'}
+                </label>
+                <input
+                  type="text"
+                  placeholder="Need 4 bibs, extra water etc."
+                  value={editNotes}
+                  onChange={(e) => setEditNotes(e.target.value)}
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-yellow-400 font-medium"
+                />
+              </div>
+
+              {/* Action Buttons */}
+              <div className="pt-4 border-t border-gray-100 flex items-center justify-between gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const confirmDel = window.confirm(currentLanguage === 'kh' ? 'តើអ្នកពិតជាចង់លុបការកក់ទីលាននេះមែនទេ?' : 'Are you sure you want to release this pitch allocation?');
+                    if (confirmDel) {
+                      handleDeleteBooking(editingBooking.id, editingBooking.matchId);
+                      setEditingBooking(null);
+                    }
+                  }}
+                  className="px-3 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 rounded-xl text-[11px] font-extrabold flex items-center gap-1 cursor-pointer transition active:scale-95"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>{currentLanguage === 'kh' ? 'លុបការកក់' : 'Unschedule'}</span>
+                </button>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditingBooking(null)}
+                    className="px-4 py-2.5 bg-gray-100 hover:bg-gray-200 rounded-xl text-[11px] font-bold text-gray-700 cursor-pointer transition active:scale-95"
+                  >
+                    {currentLanguage === 'kh' ? 'បោះបង់' : 'Cancel'}
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 rounded-xl text-[11px] font-black uppercase text-slate-900 font-extrabold shadow-3xs cursor-pointer transition active:scale-95"
+                  >
+                    {currentLanguage === 'kh' ? 'រក្សាទុកការផ្លាស់ប្តូរ' : 'Save Changes'}
+                  </button>
+                </div>
               </div>
 
             </form>
