@@ -86,6 +86,16 @@ export default function AdminPanel({
   const [customTeamA, setCustomTeamA] = useState(false);
   const [customTeamB, setCustomTeamB] = useState(false);
 
+  // Toast notification state
+  const [toastMessage, setToastMessage] = useState<{ text: string; isError?: boolean } | null>(null);
+
+  const showToast = (text: string, isError = false) => {
+    setToastMessage({ text, isError });
+    setTimeout(() => {
+      setToastMessage((prev) => (prev?.text === text ? null : prev));
+    }, 3000);
+  };
+
   // Memoize available team names list to prevent duplicates and keep reference stable
   const availableTeamNamesList = React.useMemo(() => {
     const registeredTeamsFiltered = participants.filter((p) => p.is_team && p.sport_type === sport);
@@ -187,7 +197,7 @@ export default function AdminPanel({
         scheduled_time: scheduledTime || getCurrentTimeString(),
       });
 
-      alert('ការប្រកួតហែលទឹកត្រូវបានបង្កើត! Swimming heat created successfully.');
+      showToast('ការប្រកួតហែលទឹកត្រូវបានបង្កើត! Swimming heat created successfully.');
       setSwimmerSlots([
         { id: 'lane-1', name: '', isCustom: false },
         { id: 'lane-2', name: '', isCustom: false },
@@ -207,7 +217,7 @@ export default function AdminPanel({
     const finalB = teamB.trim() || (currentList[1] || currentList[0] || '');
 
     if (finalA === finalB) {
-      alert(playMode === 'single' ? 'កីឡាករទាំង២ មិនអាចដូចគ្នាបានឡើយ! Please choose distinct players.' : 'ក្រុមទាំង២ មិនអាចដូចគ្នាបានឡើយ! Please choose distinct teams.');
+      showToast(playMode === 'single' ? 'កីឡាករទាំង២ មិនអាចដូចគ្នាបានឡើយ! Please choose distinct players.' : 'ក្រុមទាំង២ មិនអាចដូចគ្នាបានឡើយ! Please choose distinct teams.', true);
       return;
     }
 
@@ -230,13 +240,24 @@ export default function AdminPanel({
     if (!scheduledDate) {
       setScheduledDate(getTodayString());
     }
-    alert(playMode === 'single' ? 'ការប្រកួតឯកត្តជនត្រូវបានបង្កើត! Single player match created successfully.' : 'ការប្រកួតក្រុមត្រូវបានបង្កើត! Team match created successfully.');
+    showToast(playMode === 'single' ? '✓ ការប្រកួតឯកត្តជនត្រូវបានបង្កើត! Single player match created successfully.' : '✓ ការប្រកួតក្រុមត្រូវបានបង្កើត! Team match created successfully.');
   };
 
   const registeredSwimmers = participants.filter((p) => !p.is_team && p.sport_type === 'Swimming');
 
   return (
     <div className="space-y-8 max-w-7xl mx-auto">
+      
+      {/* Toast Notification Banner */}
+      {toastMessage && (
+        <div className={`fixed top-4 right-4 z-50 px-5 py-3 rounded-2xl shadow-xl font-bold text-xs flex items-center gap-2 border animate-bounce ${
+          toastMessage.isError 
+            ? 'bg-rose-600 text-white border-rose-700' 
+            : 'bg-emerald-600 text-white border-emerald-700'
+        }`}>
+          <span>{toastMessage.text}</span>
+        </div>
+      )}
       
       {/* Centered and styled Module 1 container */}
       <div className="max-w-3xl mx-auto">
