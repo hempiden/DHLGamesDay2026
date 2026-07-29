@@ -106,6 +106,7 @@ export default function DatabaseSetup({
           score_a: Number(m.score_a) || 0,
           score_b: Number(m.score_b) || 0,
           status: m.status,
+          is_featured: m.is_featured || false,
           event_id: m.event_id || null,
           created_by: m.created_by || null,
         }));
@@ -272,6 +273,7 @@ export default function DatabaseSetup({
         score_a: Number(item.score_a) || 0,
         score_b: Number(item.score_b) || 0,
         status: item.status || 'Upcoming',
+        is_featured: item.is_featured !== undefined && item.is_featured !== null ? Boolean(item.is_featured) : false,
         created_at: item.created_at || new Date().toISOString(),
         updated_at: item.updated_at || new Date().toISOString(),
         scheduled_date: item.scheduled_date || undefined,
@@ -750,6 +752,7 @@ alter table public.matches add column if not exists event_id text;
 alter table public.matches add column if not exists created_by text;
 alter table public.matches add column if not exists scheduled_date text;
 alter table public.matches add column if not exists scheduled_time text;
+alter table public.matches add column if not exists is_featured boolean default false;
 
 -- Safe upgrades for participants table columns
 alter table public.participants add column if not exists event_id text;
@@ -958,6 +961,7 @@ alter table public.matches add column if not exists event_id text;
 alter table public.matches add column if not exists created_by text;
 alter table public.matches add column if not exists scheduled_date text;
 alter table public.matches add column if not exists scheduled_time text;
+alter table public.matches add column if not exists is_featured boolean default false;
 
 -- Safe upgrades for participants table columns
 alter table public.participants add column if not exists event_id text;

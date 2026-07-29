@@ -1000,6 +1000,7 @@ export default function App() {
               score_a: Number(item.score_a),
               score_b: Number(item.score_b),
               status: item.status as 'Upcoming' | 'Live' | 'Finished',
+              is_featured: item.is_featured !== undefined && item.is_featured !== null ? Boolean(item.is_featured) : undefined,
               created_at: item.created_at || new Date().toISOString(),
               updated_at: item.updated_at || new Date().toISOString(),
               scheduled_date: item.scheduled_date || undefined,
@@ -1011,10 +1012,17 @@ export default function App() {
             setMatches((prev) => {
               // Combine remote mapped matches with any local unsynced matches so local data is never wiped
               const localUnsynced = prev.filter(p => p.id.startsWith('match-') && !mappedMatches.some(m => m.id === p.id));
-              const combinedMatches = [...mappedMatches, ...localUnsynced];
-              if (JSON.stringify(prev) !== JSON.stringify(combinedMatches)) {
-                localStorage.setItem('dhl_games_day_matches', JSON.stringify(combinedMatches));
-                return combinedMatches;
+              const combinedMatches = mappedMatches.map(m => {
+                const localMatch = prev.find(p => p.id === m.id);
+                return {
+                  ...m,
+                  is_featured: m.is_featured !== undefined ? m.is_featured : (localMatch?.is_featured || false)
+                };
+              });
+              const finalMatches = [...combinedMatches, ...localUnsynced];
+              if (JSON.stringify(prev) !== JSON.stringify(finalMatches)) {
+                localStorage.setItem('dhl_games_day_matches', JSON.stringify(finalMatches));
+                return finalMatches;
               }
               return prev;
             });
@@ -1259,7 +1267,7 @@ export default function App() {
                                 error.message?.toLowerCase().includes('attribute') ||
                                 error.message?.toLowerCase().includes('not found');
             if (isColumnErr) {
-              const { scheduled_date, scheduled_time, ...fallbackPayload } = payload;
+              const { scheduled_date, scheduled_time, is_featured, ...fallbackPayload } = payload;
               const { error: secondErr } = await client
                 .from('matches')
                 .update(fallbackPayload)
@@ -1268,7 +1276,7 @@ export default function App() {
                 console.error('Error syncing updated match fields (fallback):', secondErr.message);
                 return false;
               } else {
-                console.log('Successfully synced update (fallback without scheduled_date/time)');
+                console.log('Successfully synced update (fallback without optional columns)');
               }
             } else {
               console.error('Error syncing updated match fields:', error.message);
@@ -1368,6 +1376,7 @@ export default function App() {
             score_a: items.score_a,
             score_b: items.score_b,
             status: items.status,
+            is_featured: items.is_featured || false,
             scheduled_date: items.scheduled_date || null,
             scheduled_time: items.scheduled_time || null,
             event_id: targetEventId,
@@ -1381,7 +1390,7 @@ export default function App() {
                                 result.error.message?.toLowerCase().includes('attribute') ||
                                 result.error.message?.toLowerCase().includes('not found');
             if (isColumnErr) {
-              const { scheduled_date, scheduled_time, event_id, created_by, ...fallbackPayload } = payload;
+              const { scheduled_date, scheduled_time, event_id, created_by, is_featured, ...fallbackPayload } = payload;
               result = await client.from('matches').insert(fallbackPayload).select('id');
             }
           }
