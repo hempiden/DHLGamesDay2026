@@ -1821,6 +1821,7 @@ export default function App() {
                 participants={filteredParticipants}
                 addMatch={addMatch}
                 updateMatchStatus={updateMatchStatus}
+                onUpdateMatchFields={updateMatchFields}
                 deleteMatch={deleteMatch}
                 resetToDefault={resetToDefault}
               />
@@ -1857,6 +1858,7 @@ export default function App() {
                 participants={filteredParticipants}
                 addMatch={addMatch}
                 updateMatchStatus={updateMatchStatus}
+                onUpdateMatchFields={updateMatchFields}
                 deleteMatch={deleteMatch}
                 resetToDefault={resetToDefault}
                 isOnline={isOnline}
