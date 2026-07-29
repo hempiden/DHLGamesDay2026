@@ -44,9 +44,12 @@ export default function PublicScores({ matches, participants, currentLanguage = 
     return () => clearInterval(intervalId);
   }, [matches]);
 
-  // Filter matches based on selected sport
+  // Featured matches filter toggle
+  const [onlyFeatured, setOnlyFeatured] = useState<boolean>(false);
+
+  // Filter matches based on selected sport and featured filter
   const filteredMatches = matches.filter(
-    (m) => selectedSport === 'All' || m.sport_name === selectedSport
+    (m) => (selectedSport === 'All' || m.sport_name === selectedSport) && (!onlyFeatured || m.is_featured)
   );
 
   // Active / Live matches
@@ -143,9 +146,24 @@ export default function PublicScores({ matches, participants, currentLanguage = 
 
       {/* SPORT SELECTOR TAB MENU */}
       <div className="bg-white p-4 rounded-3xl border border-gray-100 shadow-sm">
-        <div className="flex items-center gap-2 text-gray-500 text-xs font-black uppercase tracking-wider mb-3.5 pl-1.5">
-          <Flame className="w-4 h-4 text-[#D40511] animate-bounce" />
-          <span>{t('select_sport_filter', 'ជ្រើសរើសប្រភេទកីឡាដើម្បីមើល (Select Sport to Filter)', 'Select Sport Category to Filter')}</span>
+        <div className="flex flex-wrap items-center justify-between gap-3 text-gray-500 text-xs font-black uppercase tracking-wider mb-3.5 pl-1.5">
+          <div className="flex items-center gap-2">
+            <Flame className="w-4 h-4 text-[#D40511] animate-bounce" />
+            <span>{t('select_sport_filter', 'ជ្រើសរើសប្រភេទកីឡាដើម្បីមើល (Select Sport to Filter)', 'Select Sport Category to Filter')}</span>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setOnlyFeatured(!onlyFeatured)}
+            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-black uppercase transition cursor-pointer select-none active:scale-95 ${
+              onlyFeatured
+                ? 'bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 text-gray-950 shadow-md ring-2 ring-amber-300'
+                : 'bg-amber-50 border border-amber-300/80 text-amber-900 hover:bg-amber-100/80'
+            }`}
+          >
+            <Star className={`w-3.5 h-3.5 ${onlyFeatured ? 'fill-gray-950 text-gray-950' : 'fill-amber-500 text-amber-500 animate-spin'}`} />
+            <span>⭐ គូប្រកួតលេចធ្លោ ({matches.filter(m => m.is_featured).length})</span>
+          </button>
         </div>
         
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2.5">
@@ -597,17 +615,34 @@ export default function PublicScores({ matches, participants, currentLanguage = 
                   <div 
                     key={m.id}
                     onClick={() => setSelectedFullscreenMatchId(m.id)}
-                    className="bg-white rounded-[24px] border-l-[6px] border-l-red-500 border border-gray-150 shadow-md p-6 relative overflow-hidden cursor-pointer hover:scale-[1.01] hover:shadow-lg hover:border-red-200 transition-all duration-200 group"
+                    className={`rounded-[26px] p-6 relative overflow-hidden cursor-pointer hover:scale-[1.01] hover:shadow-xl transition-all duration-200 group ${
+                      m.is_featured
+                        ? 'bg-gradient-to-br from-amber-500/15 via-white to-amber-50/40 border-2 border-amber-400 ring-2 ring-amber-300/60 shadow-xl shadow-amber-500/15'
+                        : 'bg-white border-l-[6px] border-l-red-500 border border-gray-150 shadow-md'
+                    }`}
                     title="Click to enter Fullscreen Slideshow Mode"
                   >
-                    <div className="absolute top-0 right-0 py-1.5 px-4 bg-red-650 text-white font-black text-[9px] uppercase tracking-widest rounded-bl-xl flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping"></span>
-                      <span>Live Score</span>
-                    </div>
+                    {m.is_featured ? (
+                      <div className="absolute top-0 right-0 py-1.5 px-4 bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 text-gray-950 font-black text-[9.5px] uppercase tracking-widest rounded-bl-xl flex items-center gap-1.5 shadow-sm">
+                        <Star className="w-3 h-3 fill-gray-950 text-gray-950 animate-spin" />
+                        <span>🔥 FEATURED LIVE MATCH</span>
+                      </div>
+                    ) : (
+                      <div className="absolute top-0 right-0 py-1.5 px-4 bg-red-650 text-white font-black text-[9px] uppercase tracking-widest rounded-bl-xl flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping"></span>
+                        <span>Live Score</span>
+                      </div>
+                    )}
 
                     <div className="flex flex-col sm:flex-row justify-between items-center gap-6">
                       <div className="space-y-1 text-center sm:text-left shrink-0">
                         <div className="flex flex-wrap justify-center sm:justify-start items-center gap-1.5">
+                          {m.is_featured && (
+                            <span className="px-2 py-0.5 bg-amber-400 text-gray-950 font-black uppercase text-[9px] tracking-wider rounded-md flex items-center gap-1 shadow-xs">
+                              <Star className="w-3 h-3 fill-gray-950 text-gray-950" />
+                              <span>⭐ FEATURED</span>
+                            </span>
+                          )}
                           <span className="px-2 py-0.5 bg-red-50 text-[#D40511] font-black uppercase text-[9px] tracking-wider rounded-md border border-red-100">
                             {getSportConfig(m.sport_name)?.icon} {m.sport_name}
                           </span>
@@ -670,10 +705,20 @@ export default function PublicScores({ matches, participants, currentLanguage = 
                 {upcomingMatches.map((m) => (
                   <div 
                     key={m.id}
-                    className="p-5 bg-white border border-gray-100 rounded-3xl shadow-sm flex flex-col justify-between space-y-4"
+                    className={`p-5 rounded-3xl flex flex-col justify-between space-y-4 transition-all duration-200 ${
+                      m.is_featured
+                        ? 'bg-gradient-to-br from-amber-500/15 via-white to-amber-50/50 border-2 border-amber-400 shadow-lg shadow-amber-500/10 ring-2 ring-amber-200/60 hover:scale-[1.01]'
+                        : 'bg-white border border-gray-100 shadow-sm'
+                    }`}
                   >
                     <div className="flex justify-between items-start">
                       <div className="flex flex-wrap items-center gap-1.5">
+                        {m.is_featured && (
+                          <span className="px-2.5 py-1 bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 text-gray-950 font-black text-[9px] uppercase tracking-wide rounded-xl shadow-xs flex items-center gap-1 animate-pulse">
+                            <Star className="w-3 h-3 fill-gray-950 text-gray-950" />
+                            <span>🔥 FEATURED GAME</span>
+                          </span>
+                        )}
                         <span className="px-2.5 py-1 bg-blue-50 border border-blue-100 text-blue-600 rounded-xl font-extrabold text-[9px] uppercase tracking-wide">
                           {getSportConfig(m.sport_name)?.icon} {m.sport_name}
                         </span>
@@ -683,7 +728,11 @@ export default function PublicScores({ matches, participants, currentLanguage = 
                           </span>
                         )}
                       </div>
-                      <span className="text-[9px] text-gray-400 font-extrabold uppercase bg-gray-50 px-2 py-0.5 rounded-md">Upcoming</span>
+                      <span className={`text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-md ${
+                        m.is_featured ? 'bg-amber-100 text-amber-950 border border-amber-300 font-black' : 'text-gray-400 bg-gray-50'
+                      }`}>
+                        {m.is_featured ? '⭐ Featured' : 'Upcoming'}
+                      </span>
                     </div>
 
                     <div className="space-y-1">

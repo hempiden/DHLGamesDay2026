@@ -1288,7 +1288,7 @@ export default function PitchCalendar({
                       <option value="">-- {currentLanguage === 'kh' ? 'ជ្រើសរើសការប្រកួត' : 'Select live game'} --</option>
                       {matches.filter(m => m.sport_name === selectedSport).map(m => (
                         <option key={m.id} value={m.id}>
-                          {m.team_a} vs {m.team_b} ({m.match_label})
+                          {m.is_featured ? '⭐ [FEATURED] ' : ''}{m.team_a} vs {m.team_b} ({m.match_label})
                         </option>
                       ))}
                     </select>

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import { Match, SportType, Participant, AppUser } from '../types';
 import { SPORT_CONFIGS, getSportConfig, getActiveSports, isSportMeasure, isSportDistance, getSportDistanceUnit } from '../data';
-import { Play, Check, Trophy, Trash2, ArrowRight, ShieldCheck, AlertCircle, Plus, Minus } from 'lucide-react';
+import { Play, Check, Trophy, Trash2, ArrowRight, ShieldCheck, AlertCircle, Plus, Minus, Star } from 'lucide-react';
 import SwimmingTimer from './SwimmingTimer';
 
 interface ScoringPanelProps {
@@ -230,9 +230,24 @@ export default function ScoringPanel({
                       {config?.khmerName || m.sport_name}
                     </span>
                   </div>
-                  <span className="text-[10px] font-extrabold text-[#1a1a1a] bg-[#FFCC00] px-2.5 py-1 rounded-md uppercase tracking-wide">
-                    {m.match_label || 'Regular Match'}
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => updateMatchFields(m.id, { is_featured: !m.is_featured })}
+                      className={`px-2 py-1 rounded-lg text-[9px] font-black uppercase transition cursor-pointer flex items-center gap-1 ${
+                        m.is_featured
+                          ? 'bg-amber-400 text-gray-950 border border-amber-300 shadow-xs ring-1 ring-amber-300'
+                          : 'bg-gray-200 text-gray-500 hover:text-gray-700'
+                      }`}
+                      title={m.is_featured ? 'Click to unfeature game' : 'Click to mark as Featured Game'}
+                    >
+                      <Star className={`w-3 h-3 ${m.is_featured ? 'fill-gray-950 text-gray-950' : 'text-gray-500'}`} />
+                      <span>{m.is_featured ? '⭐ Featured' : 'Feature'}</span>
+                    </button>
+                    <span className="text-[10px] font-extrabold text-[#1a1a1a] bg-[#FFCC00] px-2.5 py-1 rounded-md uppercase tracking-wide">
+                      {m.match_label || 'Regular Match'}
+                    </span>
+                  </div>
                 </div>
 
                 {/* Score Editing Content */}

@@ -99,6 +99,7 @@ interface EventSettingsProps {
   participants: Participant[];
   addMatch: (match: Omit<Match, 'id' | 'created_at' | 'updated_at'>) => void;
   updateMatchStatus: (id: string, status: 'Upcoming' | 'Live' | 'Finished') => void;
+  onUpdateMatchFields?: (id: string, fields: Partial<Match>) => Promise<boolean>;
   deleteMatch: (id: string) => void;
   resetToDefault: () => void;
 
@@ -136,6 +137,7 @@ export default function EventSettings({
   participants,
   addMatch,
   updateMatchStatus,
+  onUpdateMatchFields,
   deleteMatch,
   resetToDefault,
   isOnline,
@@ -968,6 +970,7 @@ export default function EventSettings({
                 participants={participants}
                 addMatch={addMatch}
                 updateMatchStatus={updateMatchStatus}
+                onUpdateMatchFields={onUpdateMatchFields}
                 deleteMatch={deleteMatch}
                 resetToDefault={resetToDefault}
               />

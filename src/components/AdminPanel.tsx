@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
 import { Match, SportType, Participant } from '../types';
 import { DEFAULT_TEAMS, SPORT_CONFIGS, getSportConfig, getActiveSports, isSportDistance, formatSportScore } from '../data';
-import { Plus, Undo, Trash2, RefreshCw, AlertTriangle } from 'lucide-react';
+import { Plus, Undo, Trash2, RefreshCw, AlertTriangle, Star } from 'lucide-react';
 
 interface AdminPanelProps {
   matches: Match[];
   participants: Participant[];
   addMatch: (match: Omit<Match, 'id' | 'created_at' | 'updated_at'>) => void;
   updateMatchStatus: (id: string, status: 'Upcoming' | 'Live' | 'Finished') => void;
+  onUpdateMatchFields?: (id: string, fields: Partial<Match>) => Promise<boolean>;
   deleteMatch: (id: string) => void;
   resetToDefault: () => void;
 }
@@ -17,6 +18,7 @@ export default function AdminPanel({
   participants,
   addMatch,
   updateMatchStatus,
+  onUpdateMatchFields,
   deleteMatch,
   resetToDefault,
 }: AdminPanelProps) {
@@ -28,6 +30,7 @@ export default function AdminPanel({
   const [teamB, setTeamB] = useState('');
   const [matchLabel, setMatchLabel] = useState('វគ្គជម្រុះតាមពូល (Group Stage)');
   const [status, setStatus] = useState<'Upcoming' | 'Live' | 'Finished'>('Live');
+  const [isFeatured, setIsFeatured] = useState<boolean>(false);
   // Date and Time helpers
   const getTodayString = () => {
     const today = new Date();
@@ -195,9 +198,11 @@ export default function AdminPanel({
         status,
         scheduled_date: scheduledDate || getTodayString(),
         scheduled_time: scheduledTime || getCurrentTimeString(),
+        is_featured: isFeatured,
       });
 
       showToast('ការប្រកួតហែលទឹកត្រូវបានបង្កើត! Swimming heat created successfully.');
+      setIsFeatured(false);
       setSwimmerSlots([
         { id: 'lane-1', name: '', isCustom: false },
         { id: 'lane-2', name: '', isCustom: false },
@@ -231,11 +236,13 @@ export default function AdminPanel({
       status,
       scheduled_date: scheduledDate || getTodayString(),
       scheduled_time: scheduledTime || getCurrentTimeString(),
+      is_featured: isFeatured,
     });
 
     // Reset simple form inputs but keep scheduled date and advance scheduled time by 30 mins
     setTeamA('');
     setTeamB('');
+    setIsFeatured(false);
     setScheduledTime((prev) => advanceTimeMins(prev || getCurrentTimeString(), 30));
     if (!scheduledDate) {
       setScheduledDate(getTodayString());
@@ -628,6 +635,31 @@ export default function AdminPanel({
               </div>
             </div>
 
+            {/* Feature Game option */}
+            <div className={`p-4 rounded-2xl border transition-all ${
+              isFeatured 
+                ? 'bg-gradient-to-r from-amber-500/15 via-amber-50/70 to-yellow-500/15 border-amber-400 shadow-sm' 
+                : 'bg-gray-50/80 border-gray-200'
+            }`}>
+              <label className="flex items-start gap-3 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={isFeatured}
+                  onChange={(e) => setIsFeatured(e.target.checked)}
+                  className="w-5 h-5 mt-0.5 rounded border-amber-400 text-amber-500 focus:ring-amber-400 accent-amber-500 cursor-pointer"
+                />
+                <div className="space-y-0.5">
+                  <div className="flex items-center gap-1.5 font-black text-xs text-amber-950 uppercase tracking-wide">
+                    <Star className={`w-4 h-4 ${isFeatured ? 'text-amber-500 fill-amber-400 animate-spin' : 'text-gray-400'}`} />
+                    <span>កំណត់ជាគូប្រកួតលេចធ្លោ (Mark as Featured Game / Main Match)</span>
+                  </div>
+                  <p className="text-[10px] text-gray-500 font-medium leading-relaxed">
+                    ការប្រកួតនេះនឹងបង្ហាញលេចធ្លោជាងគេជាមួយនឹងស៊ុមមាស និងឡូហ្គូ Featured Card នៅលើផ្ទាំងមហាជន (Highlighted with gold border & emblem on spectator board).
+                  </p>
+                </div>
+              </label>
+            </div>
+
             <button
               type="submit"
               className="w-full py-4.5 bg-[#D40511] hover:bg-red-700 text-white font-extrabold text-[13px] uppercase tracking-wide rounded-2xl active:scale-95 duration-150 transition-all shadow-md shadow-[#D40511]/10 flex items-center justify-center gap-2 cursor-pointer mt-2"
@@ -707,6 +739,7 @@ export default function AdminPanel({
                 <th className="py-3 px-4 text-center">ពិន្ទុ (Score)</th>
                 <th className="py-3 px-4">ក្រុមទី២ (TEAM B)</th>
                 <th className="py-3 px-4 text-center">ស្ថានភាព (Status)</th>
+                <th className="py-3 px-4 text-center">Featured</th>
                 <th className="py-3 px-4 text-center w-24">ជម្រើស (Actions)</th>
               </tr>
             </thead>
@@ -793,6 +826,23 @@ export default function AdminPanel({
                           );
                         })}
                       </div>
+                    </td>
+
+                    {/* Featured toggle */}
+                    <td className="py-3 px-4 text-center">
+                      <button
+                        type="button"
+                        onClick={() => onUpdateMatchFields && onUpdateMatchFields(m.id, { is_featured: !m.is_featured })}
+                        className={`px-2.5 py-1 rounded-xl text-[9px] font-black uppercase transition cursor-pointer flex items-center gap-1 mx-auto select-none ${
+                          m.is_featured
+                            ? 'bg-gradient-to-r from-amber-500 to-yellow-400 text-gray-950 shadow-xs border border-amber-300 ring-1 ring-amber-200'
+                            : 'bg-gray-100 text-gray-400 hover:text-gray-700 hover:bg-gray-200'
+                        }`}
+                        title={m.is_featured ? 'Click to unfeature' : 'Click to feature match'}
+                      >
+                        <Star className={`w-3 h-3 ${m.is_featured ? 'fill-gray-950 text-gray-950' : 'text-gray-400'}`} />
+                        <span>{m.is_featured ? 'Featured' : 'Normal'}</span>
+                      </button>
                     </td>
 
                     {/* Actions delete */}

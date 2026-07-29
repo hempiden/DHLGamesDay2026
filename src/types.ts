@@ -38,6 +38,7 @@ export interface Match {
   scheduled_time?: string;
   event_id?: string;
   created_by?: string;
+  is_featured?: boolean;
 }
 
 export interface TeamStanding {
