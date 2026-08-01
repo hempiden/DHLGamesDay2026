@@ -165,14 +165,11 @@ export default function EventSettings({
   }, [events]);
 
   const syncEventsToSupabase = async (updatedEventsList: EventInfo[]) => {
+    localStorage.setItem('dhl_events', JSON.stringify(updatedEventsList));
     if (isSupabaseEnabled && supabaseConnected && supabaseUrl && supabaseAnonKey) {
       const client = getSupabaseClient(supabaseUrl, supabaseAnonKey);
       if (client) {
-        const myAdminEvents = updatedEventsList.filter(e => {
-          const orgSlug = e.organization_slug || 'dhl-games';
-          return orgSlug === organizationSlug;
-        });
-        for (const ev of myAdminEvents) {
+        for (const ev of updatedEventsList) {
           const payload: any = {
             id: ev.id,
             name: ev.name,
@@ -184,7 +181,7 @@ export default function EventSettings({
             created_by: ev.created_by || currentUser?.username || 'hempiden',
             show_public_teams: ev.show_public_teams ?? false,
             is_enrolment_enabled: ev.is_enrolment_enabled ?? true,
-            organization_slug: ev.organization_slug || null,
+            organization_slug: ev.organization_slug || organizationSlug || 'dhl-games',
             enabled_languages: (ev.enabled_languages || ['kh', 'en']).join(',')
           };
           const { error } = await client.from('events').upsert(payload);
@@ -1832,6 +1829,7 @@ export default function EventSettings({
                         setIsSavingTrans(true);
                         try {
                           await saveTranslations(localTranslations);
+                          await syncEventsToSupabase(events);
                           setTransSaveSuccess(true);
                           setTimeout(() => setTransSaveSuccess(false), 3000);
                         } catch (err) {

@@ -57,12 +57,22 @@ export default function FacilitatorSwimmerDesk({
           return;
         }
 
-        const parsedId = isNaN(Number(matchId)) ? matchId : Number(matchId);
-        const { data, error } = await client
+        const targetIdStr = String(matchId);
+        let res = await client
           .from('matches')
           .select('*')
-          .eq('id', parsedId)
+          .eq('id', targetIdStr)
           .single();
+
+        if (res.error && !isNaN(Number(matchId))) {
+          res = await client
+            .from('matches')
+            .select('*')
+            .eq('id', Number(matchId))
+            .single();
+        }
+
+        const { data, error } = res;
 
         if (error) {
           console.error('Error polling match on facilitator side:', error.message);

@@ -350,6 +350,24 @@ export default function App() {
     localStorage.setItem('dhl_language', lang);
   };
 
+  // Keep currentLanguage synchronized with active event's enabled_languages setting
+  useEffect(() => {
+    if (activeEvent?.enabled_languages && activeEvent.enabled_languages.length > 0) {
+      if (!activeEvent.enabled_languages.includes(currentLanguage)) {
+        const available = activeEvent.enabled_languages[0] as 'kh' | 'en';
+        setCurrentLanguage(available);
+        localStorage.setItem('dhl_language', available);
+      }
+    }
+  }, [activeEvent?.enabled_languages, currentLanguage]);
+
+  // Persist local events whenever events state changes
+  useEffect(() => {
+    if (events && events.length > 0) {
+      localStorage.setItem('dhl_events', JSON.stringify(events));
+    }
+  }, [events]);
+
   const [translations, setTranslations] = useState<Record<string, { kh: string; en: string }>>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('dhl_custom_translations');
@@ -1238,13 +1256,19 @@ export default function App() {
       const client = getSupabaseClient(supabaseUrl, supabaseAnonKey);
       if (client) {
         try {
-          // Match might be identified by an integer or a UUID in Supabase depending on DB table schemas
-          // First attempt to convert id to double check compatibility
-          const parsedId = isNaN(Number(id)) ? id : Number(id);
-          const { error } = await client
+          const targetIdStr = String(id);
+          let { error } = await client
             .from('matches')
             .update({ score_a: scoreA, score_b: scoreB, updated_at: new Date().toISOString() })
-            .eq('id', parsedId);
+            .eq('id', targetIdStr);
+
+          if (error && !isNaN(Number(id))) {
+            const retry = await client
+              .from('matches')
+              .update({ score_a: scoreA, score_b: scoreB, updated_at: new Date().toISOString() })
+              .eq('id', Number(id));
+            error = retry.error;
+          }
 
           if (error) {
             console.error('Error syncing updated score:', error.message);
@@ -1277,12 +1301,20 @@ export default function App() {
       const client = getSupabaseClient(supabaseUrl, supabaseAnonKey);
       if (client) {
         try {
-          const parsedId = isNaN(Number(id)) ? id : Number(id);
+          const targetIdStr = String(id);
           const payload: any = { ...fields, updated_at: new Date().toISOString() };
-          const { error } = await client
+          let { error } = await client
             .from('matches')
             .update(payload)
-            .eq('id', parsedId);
+            .eq('id', targetIdStr);
+
+          if (error && !isNaN(Number(id))) {
+            const retry = await client
+              .from('matches')
+              .update(payload)
+              .eq('id', Number(id));
+            error = retry.error;
+          }
 
           if (error) {
             const isColumnErr = error.message?.toLowerCase().includes('column') || 
@@ -1290,11 +1322,11 @@ export default function App() {
                                 error.message?.toLowerCase().includes('attribute') ||
                                 error.message?.toLowerCase().includes('not found');
             if (isColumnErr) {
-              const { scheduled_date, scheduled_time, is_featured, ...fallbackPayload } = payload;
+              const { scheduled_date, scheduled_time, ...fallbackPayload } = payload;
               const { error: secondErr } = await client
                 .from('matches')
                 .update(fallbackPayload)
-                .eq('id', parsedId);
+                .eq('id', targetIdStr);
               if (secondErr) {
                 console.error('Error syncing updated match fields (fallback):', secondErr.message);
                 return false;
@@ -1334,11 +1366,19 @@ export default function App() {
       const client = getSupabaseClient(supabaseUrl, supabaseAnonKey);
       if (client) {
         try {
-          const parsedId = isNaN(Number(id)) ? id : Number(id);
-          const { error } = await client
+          const targetIdStr = String(id);
+          let { error } = await client
             .from('matches')
             .update({ status: 'Finished', updated_at: new Date().toISOString() })
-            .eq('id', parsedId);
+            .eq('id', targetIdStr);
+
+          if (error && !isNaN(Number(id))) {
+            const retry = await client
+              .from('matches')
+              .update({ status: 'Finished', updated_at: new Date().toISOString() })
+              .eq('id', Number(id));
+            error = retry.error;
+          }
 
           if (error) {
             console.error('Error syncing finished status:', error.message);
@@ -1448,11 +1488,18 @@ export default function App() {
       const client = getSupabaseClient(supabaseUrl, supabaseAnonKey);
       if (client) {
         try {
-          const parsedId = isNaN(Number(id)) ? id : Number(id);
-          const { error } = await client
+          const targetIdStr = String(id);
+          let { error } = await client
             .from('matches')
             .update({ status, updated_at: new Date().toISOString() })
-            .eq('id', parsedId);
+            .eq('id', targetIdStr);
+          if (error && !isNaN(Number(id))) {
+            const retry = await client
+              .from('matches')
+              .update({ status, updated_at: new Date().toISOString() })
+              .eq('id', Number(id));
+            error = retry.error;
+          }
           if (error) console.error('Status sync error:', error.message);
         } catch (err) {
           console.error('Status sync network error:', err);
@@ -1470,8 +1517,12 @@ export default function App() {
       const client = getSupabaseClient(supabaseUrl, supabaseAnonKey);
       if (client) {
         try {
-          const parsedId = isNaN(Number(id)) ? id : Number(id);
-          const { error } = await client.from('matches').delete().eq('id', parsedId);
+          const targetIdStr = String(id);
+          let { error } = await client.from('matches').delete().eq('id', targetIdStr);
+          if (error && !isNaN(Number(id))) {
+            const retry = await client.from('matches').delete().eq('id', Number(id));
+            error = retry.error;
+          }
           if (error) console.error('Delete sync error:', error.message);
         } catch (err) {
           console.error('Delete sync network error:', err);
