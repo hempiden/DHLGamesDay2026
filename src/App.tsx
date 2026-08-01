@@ -21,6 +21,9 @@ import { Laptop, Wifi, WifiOff, RefreshCw, Layers, ShieldAlert, Heart, Calendar 
 import OrganizationSettings from './components/OrganizationSettings';
 import PitchCalendar from './components/PitchCalendar';
 
+const DEMO_MATCH_IDS = new Set(INITIAL_MATCHES.map((m) => m.id));
+const DEMO_PARTICIPANT_IDS = new Set(INITIAL_PARTICIPANTS.map((p) => p.id));
+
 export default function App() {
   const hasAttemptedEventsSync = useRef(false);
   const [activeTab, setActiveTab] = useState<'leaderboard' | 'public_teams' | 'dashboard' | 'scoring' | 'admin' | 'teams' | 'database' | 'users' | 'login' | 'settings' | 'enrolment' | 'organization' | 'calendar'>(() => {
@@ -722,28 +725,48 @@ export default function App() {
     const localData = localStorage.getItem('dhl_games_day_matches');
     if (localData) {
       try {
-        setMatches(JSON.parse(localData));
+        const parsed: Match[] = JSON.parse(localData);
+        if (isSupabaseEnabled) {
+          const nonDemo = parsed.filter((m) => !DEMO_MATCH_IDS.has(m.id));
+          setMatches(nonDemo);
+        } else {
+          setMatches(parsed);
+        }
       } catch (err) {
         console.error('Error parsing local matches:', err);
-        setMatches(INITIAL_MATCHES);
+        setMatches(isSupabaseEnabled ? [] : INITIAL_MATCHES);
       }
     } else {
-      setMatches(INITIAL_MATCHES);
-      localStorage.setItem('dhl_games_day_matches', JSON.stringify(INITIAL_MATCHES));
+      if (isSupabaseEnabled) {
+        setMatches([]);
+      } else {
+        setMatches(INITIAL_MATCHES);
+        localStorage.setItem('dhl_games_day_matches', JSON.stringify(INITIAL_MATCHES));
+      }
     }
 
     // 2b. Participants Seeding
     const localParticipants = localStorage.getItem('dhl_games_day_participants');
     if (localParticipants) {
       try {
-        setParticipants(JSON.parse(localParticipants));
+        const parsedP: Participant[] = JSON.parse(localParticipants);
+        if (isSupabaseEnabled) {
+          const nonDemoP = parsedP.filter((p) => !DEMO_PARTICIPANT_IDS.has(p.id));
+          setParticipants(nonDemoP);
+        } else {
+          setParticipants(parsedP);
+        }
       } catch (err) {
         console.error('Error parsing local participants:', err);
-        setParticipants(INITIAL_PARTICIPANTS);
+        setParticipants(isSupabaseEnabled ? [] : INITIAL_PARTICIPANTS);
       }
     } else {
-      setParticipants(INITIAL_PARTICIPANTS);
-      localStorage.setItem('dhl_games_day_participants', JSON.stringify(INITIAL_PARTICIPANTS));
+      if (isSupabaseEnabled) {
+        setParticipants([]);
+      } else {
+        setParticipants(INITIAL_PARTICIPANTS);
+        localStorage.setItem('dhl_games_day_participants', JSON.stringify(INITIAL_PARTICIPANTS));
+      }
     }
   }, []);
 
@@ -1010,8 +1033,8 @@ export default function App() {
             }));
             
             setMatches((prev) => {
-              // Combine remote mapped matches with any local unsynced matches so local data is never wiped
-              const localUnsynced = prev.filter(p => p.id.startsWith('match-') && !mappedMatches.some(m => m.id === p.id));
+              // Combine remote mapped matches with any local unsynced matches, but exclude demo match IDs so deleted demo matches never reappear
+              const localUnsynced = prev.filter(p => p.id.startsWith('match-') && !DEMO_MATCH_IDS.has(p.id) && !mappedMatches.some(m => m.id === p.id));
               const combinedMatches = mappedMatches.map(m => {
                 const localMatch = prev.find(p => p.id === m.id);
                 return {
@@ -1070,7 +1093,7 @@ export default function App() {
               created_by: item.created_by || undefined
             }));
             setParticipants((prev) => {
-              const localUnsynced = prev.filter(p => p.id.startsWith('p-') && !mappedParticipants.some(m => m.id === p.id));
+              const localUnsynced = prev.filter(p => (p.id.startsWith('p-') || p.id.startsWith('player-') || p.id.startsWith('team-')) && !DEMO_PARTICIPANT_IDS.has(p.id) && !mappedParticipants.some(m => m.id === p.id));
               const combinedParticipants = [...mappedParticipants, ...localUnsynced];
               if (JSON.stringify(prev) !== JSON.stringify(combinedParticipants)) {
                 localStorage.setItem('dhl_games_day_participants', JSON.stringify(combinedParticipants));
